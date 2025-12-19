@@ -1,0 +1,25 @@
+# 바이너리 파일
+fms
+fms_mac
+fms.exe
+fms.apk
+
+# 설정 디렉토리 (민감 정보 포함 가능)
+config/
+
+# 커널 모듈 소스 (참조용, 별도 관리)
+smartfw_hs/
+
+# Go 관련
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

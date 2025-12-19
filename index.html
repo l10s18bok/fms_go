@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>FMS</title>
+	<!-- 부트스트랩 CSS 링크 -->
+	<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet" />
+	<link href="https://cdn.jsdelivr.net/npm/vue-toastification@latest/dist/index.css" rel="stylesheet" />
+	<style>
+		[v-cloak] {
+			display: none;
+		}
+
+		.table-responsive {
+			max-height: 400px;
+			overflow-y: auto;
+		}
+
+		.hover-text-container {
+			position: relative;
+			display: inline-block;
+			text-align: center;
+		}
+
+		.hover-text {
+			font-size: 13px;
+			visibility: hidden;
+			position: absolute;
+			left: 0;
+			top: 100%;
+			background: #fff;
+			z-index: 1;
+			width: auto;
+			background-color: #6b6b6b;
+			color: #f9f9f9;
+			text-align: center;
+			border-radius: 6px;
+			padding: 8px;
+			border: 1px solid #ccc;
+			opacity: 0;
+			transition: opacity 0.3s;
+		}
+
+		.hover-text::after {
+			content: "";
+			position: absolute;
+			top: 0;
+			left: 20px;
+			margin-left: -5px;
+			border-width: 5px;
+			border-style: solid;
+			border-color: #ccc transparent transparent transparent;
+		}
+
+		.hover-text-container:hover .hover-text {
+			visibility: visible;
+			opacity: 1;
+		}
+
+		.qy-5 {
+			padding: 5px 0 5px 0 !important;
+		}
+
+		.modal-backdrop {
+			background-color: rgba(0, 0, 0, 0.5);
+		}
+
+		.template-list {
+			height: 500px;
+			overflow-y: auto;
+		}
+
+		/* 스크롤바 스타일 */
+		::-webkit-scrollbar {
+			width: 10px;
+			height: 2px;
+		}
+
+		/* 스크롤바 track */
+		::-webkit-scrollbar-track {
+			background-color: #f1f1f1;
+			border-radius: 10px;
+		}
+
+		/* 스크롤바 thumb */
+		::-webkit-scrollbar-thumb {
+			background-color: #cacaca;
+			border-radius: 10px;
+		}
+
+		/* 스크롤바 hover 상태 */
+		::-webkit-scrollbar-thumb:hover {
+			background: #555;
+		}
+
+		.fms-container {
+			margin: 40px 40px 60px 0px;
+			display: flex;
+			align-items: center;
+		}
+
+		.fms-text {
+			margin-left: 20px;
+			font-size: 32px;
+		}
+
+		.text-14 {
+			font-size: 14px !important;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container" id="app" v-cloak>
+		<h1 class="display-5 fms-container">
+			<b>F M S</b>
+			<span class="fms-text text-muted">Firewall Management System</span>
+		</h1>
+
+		<div class="row mt-3 mb-5">
+			<div class="col-4">
+				<b-card class="template-list" title="템플릿 목록">
+					<b-list-group v-if="templateList.length > 0" class="mt-3" flush>
+						<b-list-group-item v-for="(el, idx) in templateList" :key="idx" button
+							@click="fnTemplateView(el)">
+							<input class="mr-3" type="radio" v-model="templateVersionName" :value="el.version" />
+							{{ el.version }}
+						</b-list-group-item>
+					</b-list-group>
+					<div v-else>템플릿 데이터가 없습니다.</div>
+				</b-card>
+			</div>
+
+			<!-- 버튼 영역 -->
+			<div class="col">
+				<div class="row mb-3 justify-content-between">
+					<div class="col-4">
+						<button class="btn btn-success" type="button" @click="fnConfirm('templateSave')">
+							템플릿 저장하기
+						</button>
+					</div>
+					<div class="col text-right">
+						<button v-for="(btn, index) in tButtons" type="button" :key="index" :class="btn.class"
+							@click="fnConfirm(btn.action)">
+							{{ btn.text }}
+						</button>
+					</div>
+				</div>
+
+				<!-- 템플릿 입력 textarea -->
+				<div class="form-group">
+					<textarea class="form-control" v-model="templateData.contents" rows="18"></textarea>
+				</div>
+			</div>
+		</div>
+
+		<!-- 버튼 영역 -->
+		<div class="mb-3 row justify-content-between">
+			<div class="col-4">
+				<button class="btn btn-outline-secondary mr-2" type="button" :disabled="spinnerBool"
+					@click="fnConfirm('healthCheck')">
+					서버 상태 확인
+				</button>
+				<button class="btn btn-outline-info" type="button" :disabled="spinnerBool" @click="fnConfirm('deploy')">
+					배포
+				</button>
+				<!--<button class="btn btn-outline-info" type="button" :disabled="spinnerBool" @click="fnTest()">
+					테스트
+				</button>-->
+			</div>
+			<div class="col-4 text-right">
+				<button v-for="(btn, index) in sButtons" type="button" :key="index" :class="btn.class"
+					:disabled="spinnerBool" @click="fnConfirm(btn.action)">
+					{{ btn.text }}
+				</button>
+			</div>
+		</div>
+
+		<!-- 장비 목록 테이블 -->
+		<div class="table-responsive">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">
+							<input type="checkbox" v-model="checkedAllItems" @input="handleClick(!checkedAllItems)" />
+						</th>
+						<th class scope="col">장비명</th>
+						<th class="text-center" scope="col">서버 상태</th>
+						<th class="text-center" scope="col">배포 상태</th>
+						<th class="text-center" scope="col">버전</th>
+					</tr>
+				</thead>
+				<tbody v-if="firewallList.length > 0">
+					<tr v-for="(data, index) in firewallList" :key="index">
+						<td>
+							<input type="checkbox" v-model="checkedItems" :value="data" :disabled="!data.index"
+								@input="handleClick(!data.index, data)" />
+						</td>
+						<td class="qy-5">
+							<input class="form-control" type="text" v-model="data.deviceName" />
+						</td>
+						<td class="text-center">
+							<b-overlay :show="serverBool" opacity="0.7" spinner-variant="success" spinner-small
+								class="text-14 d-inline-block text-info"
+								:class="{'text-danger': data.serverStatus == 'stop'}">
+								{{ textCode[data.serverStatus] }}
+							</b-overlay>
+						</td>
+						<td class="text-center">
+							<b-overlay :show="deployBool" opacity="0.7" spinner-variant="success" spinner-small
+								class="text-14 d-inline-block text-info"
+								:class="{'text-muted': data.deployStatus == 'fail', 'text-danger': data.deployStatus == 'error'}">
+								<div @click="fnShow(data.deviceName)" style="cursor: pointer;">
+									{{ textCode[data.deployStatus] }}
+								</div>
+							</b-overlay>
+						</td>
+						<td class="text-14 text-center">{{ data.version }}</td>
+					</tr>
+				</tbody>
+				<tbody v-else>
+					<tr class="text-center mt-4 mb-4">
+						<td colspan="5">데이터가 없습니다.</td>
+					</tr>
+				</tbody>
+			</table>
+			</section>
+			<!--
+				service 자기밑에
+				server 공용 (파일경로)
+			 -->
+
+			<!-- 모달 컴포넌트 -->
+			<b-modal title="확인해주세요" v-model="modalVisible" centered>
+				<template #default="">
+					<p>{{ modalContents }}</p>
+					<!-- template 저장 -->
+					<b-input-group v-if="modalType === 'templateSave'" class="mt-3" prepend="버전명">
+						<b-form-input v-model="templateVersionName" />
+					</b-input-group>
+
+					<!-- inport -->
+					<b-form-file v-else-if="modalType === 'import'" v-model="importFiles" placeholder="파일을 선택해주세요.">
+						<b-form-checkbox-group v-else-if="['reset','export'].includes(modalType)" class="mb-2"
+							v-model="checkSelected" :options="checkOptions" value-field="item" text-field="name"
+							disabled-field="notEnabled" />
+					</b-form-file>
+				</template>
+				<template #modal-footer="{ cancel, ok }">
+					<b-button class variant="outline-primary" @click="fnModalOk">
+						확인
+					</b-button>
+					<b-button class variant="outline-danger" @click="cancel">
+						취소
+					</b-button>
+				</template>
+			</b-modal>
+
+			<b-modal v-model="isDeployModal" title="Deploy Result Detail" centered hide-footer size="xl">
+				<div class="table-responsive text-14">
+					<b-table :items="selectDeploy" :fields="tableFields" :sort-by.sync="tableSort">
+						<template #cell(rule)="data">
+							<div class="hover-text-container text-center">
+								<i class="hover-text"> {{ data.item.text }} </i>
+								<i> {{ data.item.rule }} </i>
+							</div>
+						</template>
+						<template #cell(status)="data">
+							<span :class="`${deployDetailStatus(data.item.status).color}`">
+								{{ deployDetailStatus(data.item.status).text }} </span>
+						</template>
+						<template #cell(reason)="data">
+							<!--<span class="text-center text-muted"> {{ data.item.reason || "-" }} </span>-->
+							<span class="text-center text-muted"> {{ data.item.status?.toLowerCase() == "ok" ? "-" :
+								data.item.reason || "-" }} </span>
+						</template>
+					</b-table>
+				</div>
+			</b-modal>
+		</div>
+
+		<!-- Vue.js CDN -->
+		<script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+		<script src="https://cdn.jsdelivr.net/npm/vue-toastification@latest"></script>
+		<script src="https://unpkg.com/bootstrap-vue@2/dist/bootstrap-vue.js"></script>
+		<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+		<script>
+			const isServer = ["http:", "https:"].includes(location.protocol);
+			const axiosInstance = axios.create();
+
+			// 플러그인 사용 설정
+			Vue.use(VueToastification.default, { position: "bottom-center", transition: "Vue-Toastification__fade", newestOnTop: true, icon: true, pauseOnFocusLoss: false, });
+			const successNotify = (msg) => {
+				Vue.$toast.success(msg, {
+					timeout: 1800,
+					pauseOnHover: true,
+					hideProgressBar: true,
+					className: "toast"
+				});
+			};
+			const errorNotify = (msg) => {
+				Vue.$toast.error(msg, {
+					timeout: 1800,
+					pauseOnHover: true,
+					hideProgressBar: true,
+					className: "toast"
+				});
+			};
+
+			new Vue({
+				el: "#app",
+				data: {
+					// template button
+					tButtons: [
+						{
+							text: "Reset",
+							class: "btn btn-outline-danger mr-2",
+							action: "reset",
+						},
+						{
+							text: "Export",
+							class: "btn btn-outline-info mr-2",
+							action: "export",
+						},
+						{
+							text: "Import",
+							class: "btn btn-outline-success mr-2",
+							action: "import",
+						},
+						{
+							text: "Delete",
+							class: "btn btn-outline-danger",
+							action: "deleteTemplate",
+						},
+					],
+					// server button
+					sButtons: [
+						{
+							text: "저장",
+							class: "btn btn-outline-success mr-2",
+							action: "save",
+						},
+						{
+							text: "추가",
+							class: "btn btn-outline-primary mr-2",
+							action: "add",
+						},
+						{
+							text: "삭제",
+							class: "btn btn-outline-danger mr-2",
+							action: "delete",
+						},
+					],
+
+					// bool
+					spinnerBool: false,
+					serverBool: false,
+					deployBool: false,
+					isDeployModal: false,
+
+					// Data
+					selectDeploy: [],
+					tableSort: 'index',
+					tableFields: [
+						{ key: 'rule', label: 'rule' },
+						{ key: 'status', label: 'status', class: 'text-center' },
+						{ key: 'reason', label: 'reason', class: 'text-center' },
+					],
+
+					templateVersionName: "",
+					templateData: { version: "", contents: "" },
+					templateList: [],
+					firewallList: [],
+					originFwList: [],
+
+					// check
+					checkedAllItems: false,
+					checkedItems: [],
+
+					// indexedDB
+					db: "",
+					dbName: "FMS_DB",
+					templateStoreName: "templateList",
+					dataStoreName: "firewallList",
+
+					// Modal
+					modalVisible: false,
+					modalType: "",
+					modalContents: "",
+
+					// Reset
+					checkSelected: ["templateList", "firewallList"],
+					checkOptions: [
+						{ name: "템플릿 정보", item: "templateList" },
+						{ name: "방화벽 데이터 정보", item: "firewallList" },
+					],
+
+					// Files
+					importFiles: null,
+
+					textCode: {
+						"running": "정상",
+						"stop": "정지",
+						"success": "성공",
+						"error": "확인요망",
+						"fail": "실패",
+					}
+				},
+
+				computed: {
+					deployDetailStatus() {
+						return (text) => {
+							let obj = {
+								text: "성공",
+								color: "text-info"
+							}
+							switch (text.toLowerCase()) {
+								case "error", "unfind", "validation":
+									obj.text = "실패"
+									obj.color = "text-danger"
+									break;
+								case "write":
+									obj.text = "진행중"
+									obj.color = "text-muted"
+									break;
+							}
+							return obj
+						}
+					},
+				},
+
+				mounted() {
+					this.dbInit();
+				},
+
+				methods: {
+					// Init
+					dbInit() {
+						const request = indexedDB.open(this.dbName, 1);
+
+						request.onupgradeneeded = (event) => {
+							this.db = event.target.result;
+							this.db.createObjectStore(this.dataStoreName, {
+								keyPath: "index",
+								autoIncrement: true
+							});
+
+							this.db.createObjectStore(this.templateStoreName, {
+								keyPath: "version",
+								autoIncrement: true,
+							});
+
+							console.log("== Database initialized. ==");
+						};
+
+						request.onsuccess = (event) => {
+							console.log("== Database connection established. ==");
+							this.db = event.target.result;
+							this.firewallDataLoad();
+							this.templateDataLoad();
+						};
+
+						request.onerror = (event) => {
+							console.log("Database error : ", event.target.error);
+							errorNotify(`dbInit Database error : ${event.target.error}`);
+						};
+					},
+
+					// firewall 목록
+					firewallDataLoad(bool) {
+						this.loadData(
+							this.dataStoreName,
+							"readonly",
+							(result) => {
+								this.firewallList = result;
+								this.originFwList = JSON.parse(JSON.stringify(result))
+								console.log("# firewallList : ", this.firewallList);
+							},
+							(error) => {
+								console.log("# error : ", error);
+								errorNotify(`firewallDataLoad Request error : ${error}`);
+							}
+						);
+
+						this.handleClick();
+					},
+
+					// template 목록
+					templateDataLoad() {
+						this.loadData(
+							this.templateStoreName,
+							"readwrite",
+							(result) => {
+								this.templateList = result;
+								console.log("# templateList ::", this.templateList);
+							},
+							(error) => {
+								console.log("# error : ", error);
+								errorNotify(`templateDataLoad Request error : , ${error}`);
+							}
+						);
+					},
+
+					// 장비 저장
+					fnSave(isUpdate) {
+						let list = this.firewallList
+
+						const addList = this.firewallList.filter(el => !el.index)
+						const isRegistered = addList.some(el => this.originFwList.some(ele => ele.deviceName === el.deviceName));
+						if (isRegistered) {
+							if (isUpdate) {
+								// 추가 후 저장할때
+								return errorNotify("장비가 이미 등록되어 있습니다.");
+							}
+
+							// 서버상태, 배포 후 저장시
+							list = this.firewallList.filter(el => el.index)
+						}
+
+						console.log("# isResigtered : ", isRegistered);
+
+						const transaction = this.db.transaction([this.dataStoreName], "readwrite");
+						const objectStore = transaction.objectStore(this.dataStoreName);
+
+						list.forEach(el => {
+							if (el.deviceName) {
+								objectStore.put(el)
+							}
+						})
+
+						transaction.oncomplete = () => {
+							console.log("== Data inserted. ==");
+							if (isUpdate) {
+								successNotify("저장 했습니다.");
+							}
+							this.firewallDataLoad();
+						};
+
+						transaction.onerror = (event) => {
+							console.log("# Database error : ", event.target.error);
+							errorNotify(`fnSave Transaction error : ${event.target.error}`);
+						};
+					},
+
+					// 장비 추가
+					fnAdd() {
+						this.handleClick(false)
+						const newDevice = {
+							deviceName: "",
+							serverStatus: "-",
+							deployStatus: "-",
+							version: "-",
+						};
+						this.firewallList.push(newDevice);
+					},
+
+					// 장비 삭제
+					fnDelete() {
+						const transaction = this.db.transaction([this.dataStoreName], "readwrite");
+						const objectStore = transaction.objectStore(this.dataStoreName);
+
+						this.checkedItems.forEach((el) => {
+							objectStore.delete(el.index);
+						});
+
+						transaction.oncomplete = () => {
+							console.log("== Data deleted. ==");
+							successNotify("삭제 했습니다.");
+							this.firewallDataLoad();
+						};
+
+						transaction.onerror = (event) => {
+							console.log("# Database error : ", event.target.error);
+							errorNotify(`fnDelete Transaction error : , ${event.target.error}`);
+						};
+					},
+
+					async fnTest() {
+						/*
+							70초 테스트
+
+							도메인으로 요청 (게이트웨이 -> 서버) : ssl (응답 생성 후 리턴시)
+							- ex) https://bod-hydra.moobro.com/service/seulgi
+
+							nginx 통해서 요청 (nginx -> 서버(uds)) : nginx gateway timeout
+							- ex) https://fed-goodbuy.moobro.com/agent/respCheck
+
+							--
+
+							서버로 요청시 (클라이언트 -> 서버 -- echo) : ok
+							- ex) http://192.168.31.20:9300/respCheck1
+
+							5 / 10 초 기준
+							서버로 요청시 (클라이언트 -> 서버 -- http) : ERR_EMPTY_RESPONSE
+							- ex) http://192.168.31.20:9300/respCheck1
+
+
+
+							uds- > net.Listen: Post "http://unix/agent/respCheck": EOF | httpc(Get/Post): Post "http://unix/agent/respCheck": dial unix /tmp/agent.sock: connect: no such file or directory
+
+
+						*/
+						//const resp = await this.callApi("post", `http://192.168.31.20:9300/respCheck1`, { count: "70"})
+						//const resp = await this.callApi("post", `https://bod-goodbuy.moobro.com/agent/respCheck1`, { count: "70"})
+						//const resp = await this.callApi("post", `http://192.168.31.20:8084/agent/respCheck`, { count: "10"})
+						//const resp = await this.callApi("post", `https://bod-hydra.moobro.com/service/seulgi`, { count: "61"})
+						//const resp = await this.callApi("post", `http://192.168.41.31:12000/seulgi`, { count: "70"})
+						const resp = await this.callApi("post", `http://172.24.10.6:8080/delayed`, { count: "10" })
+						//const resp = await this.callApi("post", `http://192.168.31.20:8000/slow1`, { count: "6"})
+						console.log(resp);
+						//const resp = await this.callApi("post", `${location.origin}/agent/respCheck4`, { ipAddrs: "192.168.41.30"})
+					},
+
+					// 서버 상태 확인
+					async fnHealthCheck() {
+						console.log("== HEALTH CHECK START ==");
+						this.spinnerBool = this.serverBool = true
+
+						// server
+						if (isServer) {
+							const ipAddrs = this.checkedItems.map(el => el.deviceName);
+							const resp = await this.callApi("post", `${location.origin}/agent/req-respCheck`, { ipAddrs: ipAddrs })
+
+							let rData = resp.data.data
+							this.checkedItems.forEach(check => {
+								let result = Array.isArray(rData) ? rData.find(el => check.deviceName === el.ip) : null;
+								if (resp === 'Network Error') {
+									check.serverStatus = "stop"
+								} else {
+									console.log("# result: ", result);
+									check.serverStatus = result?.status || 'running';
+								}
+							});
+						} else {
+							// local
+							for (const check of this.checkedItems) {
+								const resp = await this.callApi("get", `http://${check.deviceName}/respCheck`, null, 5000)
+								check.serverStatus = resp === 'Network Error' ? 'stop' : 'running'
+							}
+						}
+
+						this.fnSave()
+						setTimeout(() => {
+							this.spinnerBool = this.serverBool = false
+							console.log("== HEALTH CHECK END ==");
+						}, 500);
+					},
+
+					// 서버 배포
+					async fnDeploy() {
+						console.log("== DEPLOY START ==");
+						this.spinnerBool = this.deployBool = true
+
+						const params = {
+							template: this.templateData.contents,
+						}
+
+						try {
+							for (const data of this.checkedItems) {
+								params["ipAddrs"] = [`${data.deviceName}`]
+
+								let url = isServer ? `${location.origin}/agent/req-deploy` : `http://${data.deviceName}/deploy`
+
+								const resp = await this.callApi('post', url, params)
+
+								if (Array.isArray(resp.data?.data)) {
+									let result = resp.data
+
+									if (isServer) {
+										result.data.forEach(el => {
+											if (data.deviceName === el.ip) {
+												data.version = el.status === "fail" ? "-" : this.templateData.version;
+												data.deployStatus = el.status;
+												data.deployResult = el.status === "fail" ? "-" : el
+											}
+										})
+									} else {
+										const statusCheck = result.data.some(el => el.status?.toLowerCase() === "error")
+										data.version = this.templateData.version;
+										data.deployStatus = statusCheck ? "error" : "success";
+
+										const temp = {
+											info: result.data,
+											ip: data.deviceName,
+											status: data.deployStatus
+										}
+
+										data.deployResult = temp
+									}
+								} else {
+									data.version = "-"
+									data.deployResult = "-"
+									data.deployStatus = 'fail'
+								}
+							}
+						} catch (err) {
+							console.log("# err :", err);
+							errorNotify(`err : ${err}`);
+							setTimeout(() => {
+								this.spinnerBool = this.deployBool = false
+							}, 500);
+							return
+						}
+
+						// 저장
+						this.fnSave()
+						setTimeout(() => {
+							this.spinnerBool = this.deployBool = false
+							console.log("== DEPLOY END ==");
+						}, 500);
+					},
+
+					// 템플릿 저장
+					fnTemplateSave() {
+						const transaction = this.db.transaction([this.templateStoreName], "readwrite");
+						const objectStore = transaction.objectStore(this.templateStoreName);
+
+						const obj = {
+							version: this.templateVersionName,
+							contents: this.templateData.contents,
+						}
+
+						if (this.templateVersionName === this.templateData.version) {
+							console.log("== UPDATE ==");
+							objectStore.put(obj);
+						} else {
+							console.log("== INSERT ==");
+							objectStore.add(obj);
+						}
+
+						transaction.oncomplete = () => {
+							console.log("Data inserted.");
+							successNotify("저장 했습니다.");
+							this.templateDataLoad();
+						};
+
+						transaction.onerror = (event) => {
+							errorNotify(`fnTemplateSave Transaction error : ${event.target.error}`);
+						};
+					},
+
+					// 템플릿 상세보기
+					fnTemplateView(el) {
+						this.templateData = el;
+						this.templateVersionName = el.version;
+
+						//fnDeploy()
+					},
+
+					// 템플릿 데이터 리셋
+					fnDataReset() {
+						console.log("== RESET START ==");
+						this.checkSelected.forEach((el) => {
+							const transaction = this.db.transaction([el], "readwrite");
+							const objectStore = transaction.objectStore(el);
+							objectStore.clear();
+						});
+
+						// 변수 추기화
+						this.templateList = [];
+						this.firewallList = [];
+						this.templateVersionName = "";
+						this.templateData = { version: "", contents: "" };
+						this.handleClick(false)
+
+						successNotify("초기화 됐습니다.");
+						console.log("== RESET END ==");
+					},
+
+					// 템플릿 Export
+					fnExport() {
+						// 체크된 항목이 없는지 확인
+						if (!this.checkSelected || this.checkSelected.length === 0) {
+							errorNotify("Export할 데이터를 선택해주세요.");
+							return;
+						}
+
+						this.checkSelected.forEach((el) => {
+							// 리스트를 문자열로 변환
+							let list;
+							switch (el) {
+								case "templateList":
+									list = this.templateList;
+									break;
+								case "firewallList":
+									list = this.firewallList;
+									break;
+								default:
+									errorNotify("잘못된 데이터 선택");
+									return;
+							}
+
+							const jsonString = JSON.stringify(list, null, 2); // 가독성을 위해 들여쓰기 추가
+
+							try {
+								// Blob 생성
+								const blob = new Blob([jsonString], { type: "application/json" });
+
+								// 다운로드 링크 생성
+								const downloadLink = document.createElement("a");
+								downloadLink.href = URL.createObjectURL(blob);
+								downloadLink.download = `${el}.json`;
+
+								// 링크를 문서에 추가하고 클릭하여 다운로드
+								document.body.appendChild(downloadLink);
+								downloadLink.click();
+
+								// 링크를 제거
+								document.body.removeChild(downloadLink);
+
+								// 성공 토스트 메시지
+								successNotify(`${el} 다운로드가 완료됐습니다.`);
+							} catch (error) {
+								// 오류 처리
+								console.error("Export Error:", error);
+								errorNotify("Export 중 오류가 발생했습니다.");
+							}
+						});
+					},
+
+					// 템플릿 Import
+					fnImport() {
+						try {
+							let storeName, fnLoadData
+							switch (this.importFiles.name) {
+								case 'firewallList.json':
+									storeName = this.dataStoreName
+									fnLoadData = this.firewallDataLoad.bind(this)
+									break;
+								case 'templateList.json':
+									storeName = this.templateStoreName
+									fnLoadData = this.templateDataLoad.bind(this)
+									break;
+								default:
+									errorNotify("파일명이 일치하지 않습니다. \n방화벽 정보 : firewallList.json \n템플릿 정보 : templateList.json");
+									return;
+							}
+
+							const reader = new FileReader();
+							reader.onload = (e) => {
+								const fileContents = e.target.result;
+								console.log("File contents:", fileContents);
+
+								if (this.fnCheckIfJson(fileContents)) {
+									const _data = JSON.parse(fileContents);
+									const transaction = this.db.transaction([storeName], "readwrite");
+									const objectStore = transaction.objectStore(storeName);
+
+									_data.forEach((el) => {
+										objectStore.put(el);
+									});
+
+									transaction.oncomplete = () => {
+										console.log("Data inserted.");
+										//successNotify("저장 했습니다.");
+										fnLoadData()
+									};
+
+									transaction.onerror = (event) => {
+										errorNotify(`fnSave Transaction error : , ${event.target.error}`);
+									};
+								} else {
+									errorNotify("JSON 형태의 파일이 아닙니다.");
+								}
+							};
+
+							reader.onerror = (e) => {
+								console.error("# Error reading file:", e);
+							};
+
+							reader.readAsText(this.importFiles);
+						} catch (ex) {
+							errorNotify(`오류가 발생했습니다. ${ex}`);
+						}
+
+						setTimeout(() => {
+							this.importFiles = null
+						}, 1000);
+					},
+
+					// 템플릿 delete
+					fnTemplateDelete() {
+						const transaction = this.db.transaction([this.templateStoreName], "readwrite");
+						const objectStore = transaction.objectStore(this.templateStoreName);
+
+						objectStore.delete(this.templateData.version);
+
+						transaction.oncomplete = () => {
+							console.log("Data inserted.");
+							successNotify("삭제 했습니다.");
+							this.templateDataLoad();
+						};
+
+						transaction.onerror = (event) => {
+							errorNotify(`fnDelete Transaction error : ${event.target.error}`);
+						};
+
+					},
+
+					// 배포 상세
+					fnShow(deviceName) {
+						const select = this.firewallList?.find(el => el.deviceName == deviceName)
+						if (select.deployResult?.info) {
+							this.selectDeploy = select.deployResult.info
+							this.isDeployModal = true
+						}
+					},
+
+					// modal confirm
+					fnConfirm(type) {
+						this.modalType = type;
+
+						if (this.fnValidation()) {
+							switch (type) {
+								case "reset":
+									this.modalContents = "데이터를 초기화 하시겠습니까?";
+									break;
+								case "delete":
+									this.modalContents = "삭제 하시겠습니까?";
+									break;
+								case "templateSave":
+									this.modalContents = "등록 하시겠습니까?";
+									break;
+								case "healthCheck":
+									this.modalContents = "서버 상태 확인을 진행 하시겠습니까?";
+									break;
+								case "deploy":
+									this.modalContents = `${this.templateVersionName} 을 배포 하시겠습니까?`;
+									break;
+								case "export":
+									this.modalContents = "데이터를 Export 하시겠습니까?";
+									break;
+								case "import":
+									this.modalContents = "데이터를 Import 하시겠습니까?";
+									break
+								case "deleteTemplate":
+									this.modalContents = "데이터를 Delete 하시겠습니까?";
+									break;
+								case "save":
+									this.fnSave(true)
+									return;
+								case "add":
+									this.fnAdd()
+									return;
+							}
+
+							this.modalVisible = true;
+						}
+					},
+
+					// modal Ok
+					fnModalOk() {
+						switch (this.modalType) {
+							case "reset":
+								this.fnDataReset();
+								break;
+							case "delete":
+								this.fnDelete();
+								break;
+							case "templateSave":
+								this.fnTemplateSave();
+								break;
+							case "healthCheck":
+								this.fnHealthCheck();
+								break;
+							case "deploy":
+								this.fnDeploy();
+								break;
+							case "export":
+								this.fnExport();
+								break;
+							case "import":
+								this.fnImport();
+								break;
+							case "deleteTemplate":
+								this.fnTemplateDelete();
+								break;
+						}
+						this.modalVisible = false;
+					},
+
+					loadData(dataStoreName, mode, successCallback, errorCallback) {
+						const transaction = this.db.transaction(
+							[dataStoreName],
+							mode
+						);
+
+						const objectStore = transaction.objectStore(dataStoreName);
+
+						const request = objectStore.getAll();
+
+						request.onsuccess = (event) => {
+							successCallback(event.target.result);
+						};
+
+						request.onerror = (event) => {
+							console.error("Request error:", event.target.error);
+							errorCallback(event.target.error);
+						};
+					},
+
+					async callApi(method, url, data, timeout) {
+						try {
+							if (timeout) {
+								axiosInstance.defaults.timeout = timeout
+							}
+
+							const resp = await axiosInstance({
+								method, url, data,
+								headers: {
+									'Content-Type': 'application/json',
+								},
+							})
+
+							console.log("# resp :: ", resp);
+							return resp;
+						} catch (error) {
+							console.log("# error :: ", error);
+							return error.response || 'Network Error';
+						}
+					},
+
+					// 장비 체크박스
+					handleClick(bool, data) {
+						if (!data) {
+							this.checkedAllItems = bool;
+							this.checkedItems = !bool ? [] : [...this.firewallList.filter(el => el.index)];
+
+						} else {
+							if (this.checkedItems.includes(data)) {
+								this.checkedItems = this.checkedItems.filter((el) => el !== data)
+							} else {
+								this.checkedItems.push(data)
+							}
+
+							this.checkedAllItems = this.checkedItems.length == this.firewallList.length
+						}
+					},
+
+					// check json
+					fnCheckIfJson(contents) {
+						try {
+							JSON.parse(contents);
+							return true;
+						} catch (e) {
+							console.log("e ::", e);
+							return false;
+						}
+					},
+
+					// 유효성
+					fnValidation() {
+						switch (this.modalType) {
+							case "reset":
+								if (this.checkSelected.length === 0) {
+									errorNotify("초기화 할 정보를 선택해주세요.");
+									return false;
+								}
+								break;
+							case "templateSave":
+								if (this.templateData.contents.length === 0) {
+									errorNotify("템플릿 정보가 없습니다.");
+									return false;
+								}
+								break;
+							case "deploy":
+								if (this.templateVersionName === "") {
+									errorNotify("배포할 템플릿을 선택해주세요.");
+									return false;
+								}
+								break;
+						}
+
+						if (["delete", "deploy", "healthCheck"].includes(this.modalType)) {
+							if (this.checkedItems.length === 0) {
+								errorNotify('선택된 정보가 없습니다.');
+								return false
+							}
+						}
+						return true;
+					}
+				}
+			});
+		</script>
+</body>
+
+</html>
