@@ -65,6 +65,7 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 	// 장비 상태 업데이트
 	fw.DeployStatus = result.History.Status
 	if result.History.Status == model.DeployStatusSuccess {
+		fw.ServerStatus = model.ServerStatusRunning // 배포 성공 시 서버 상태도 running으로 변경
 		fw.Version = template.Version
 		result.Success = true
 	} else {
