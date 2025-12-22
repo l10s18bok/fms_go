@@ -177,6 +177,13 @@ func (t *TemplateTab) RefreshTemplates() {
 	t.loadTemplates()
 }
 
+// 템플릿 선택 상태와 내용을 초기화합니다. (Reset 시 호출)
+func (t *TemplateTab) ClearSelection() {
+	t.selectedVersion = ""
+	t.templateList.SetSelected("")
+	t.templateContent.SetText("")
+}
+
 // 모든 템플릿 버전 목록을 반환합니다.
 func (t *TemplateTab) GetTemplateVersions() []string {
 	versions := make([]string, len(t.templates))

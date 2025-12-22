@@ -5,7 +5,7 @@ import "time"
 // 커스텀 시간 포맷을 위한 타입입니다.
 type JSONTime time.Time
 
-const jsonTimeFormat = "2006-01-02 15:04"
+const jsonTimeFormat = "2006-01-02 15:04:05"
 
 // JSONTime을 JSON으로 변환합니다.
 func (t JSONTime) MarshalJSON() ([]byte, error) {
@@ -18,8 +18,15 @@ func (t *JSONTime) UnmarshalJSON(b []byte) error {
 	s := string(b)
 	s = s[1 : len(s)-1] // 따옴표 제거
 
-	// 새로운 포맷 시도
-	parsed, err := time.Parse(jsonTimeFormat, s)
+	// 새로운 포맷 시도 (초 포함, 로컬 타임존으로 파싱)
+	parsed, err := time.ParseInLocation(jsonTimeFormat, s, time.Local)
+	if err == nil {
+		*t = JSONTime(parsed)
+		return nil
+	}
+
+	// 기존 포맷 시도 (초 없음, 기존 데이터 호환)
+	parsed, err = time.ParseInLocation("2006-01-02 15:04", s, time.Local)
 	if err == nil {
 		*t = JSONTime(parsed)
 		return nil

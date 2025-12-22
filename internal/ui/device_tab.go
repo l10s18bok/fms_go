@@ -547,8 +547,14 @@ func (d *DeviceTab) onDeploy() {
 			progressLabel.SetText("결과 처리 중... 잠시만 기다려주세요.")
 			progressBar.SetValue(1.0)
 
+			// 배포 완료 후 체크 상태 초기화
+			d.checkedDevices = make(map[int]bool)
+
 			// UI 업데이트
 			d.deviceTable.Refresh()
+
+			// 상태 요약 업데이트
+			d.updateStatusSummary()
 
 			// 이력 탭 새로고침
 			if d.historyTab != nil {
@@ -678,10 +684,27 @@ func (d *DeviceTab) ResetDeviceDeployStatus(deviceIP string) {
 	d.deviceTable.Refresh()
 }
 
-// 템플릿 목록과 전체 장비 서버 상태를 새로고침합니다.
+// 선택한 장비의 서버 상태를 새로고침합니다.
 func (d *DeviceTab) onRefreshAll() {
 	// 이미 새로고침 중이면 무시
 	if d.isRefreshing {
+		return
+	}
+
+	// 템플릿 목록 새로고침
+	d.refreshTemplateList()
+
+	// 선택된 장비 목록 수집
+	selectedFirewalls := make([]*model.Firewall, 0)
+	for _, fw := range d.firewalls {
+		if d.checkedDevices[fw.Index] {
+			selectedFirewalls = append(selectedFirewalls, fw)
+		}
+	}
+
+	// 선택된 장비가 없으면 종료
+	if len(selectedFirewalls) == 0 {
+		dialog.ShowInformation("알림", "상태를 확인할 장비를 선택해주세요.", d.window)
 		return
 	}
 
@@ -691,37 +714,14 @@ func (d *DeviceTab) onRefreshAll() {
 		d.refreshBtn.Disable()
 	}
 
-	// 템플릿 목록 새로고침
-	d.refreshTemplateList()
-
-	// 장비가 없으면 상태 요약만 업데이트하고 다이얼로그 표시 후 종료
-	if len(d.firewalls) == 0 {
-		d.updateStatusSummary()
-		d.isRefreshing = false
-		if d.refreshBtn != nil {
-			d.refreshBtn.Enable()
-		}
-
-		// 2초 후 자동으로 사라지는 다이얼로그 표시
-		infoDialog := dialog.NewInformation("완료", "새로고침 완료", d.window)
-		infoDialog.Show()
-		go func() {
-			time.Sleep(2 * time.Second)
-			fyne.Do(func() {
-				infoDialog.Hide()
-			})
-		}()
-		return
-	}
-
 	// 진행 중 다이얼로그 표시
-	progressLabel := widget.NewLabel(fmt.Sprintf("장비 상태 확인 중... (총 %d개)", len(d.firewalls)))
+	progressLabel := widget.NewLabel(fmt.Sprintf("장비 상태 확인 중... (총 %d개)", len(selectedFirewalls)))
 	progressBar := widget.NewProgressBarInfinite()
 	progressContent := container.NewVBox(progressLabel, progressBar)
 	progressDialog := dialog.NewCustomWithoutButtons("새로고침 중", progressContent, d.window)
 	progressDialog.Show()
 
-	// 백그라운드에서 전체 장비 상태 확인 실행
+	// 백그라운드에서 선택된 장비 상태 확인 실행
 	go func() {
 		config, err := d.store.GetConfig()
 		if err != nil {
@@ -737,12 +737,12 @@ func (d *DeviceTab) onRefreshAll() {
 
 		deployer := deploy.NewDeployer(config)
 
-		// Agent 모드: 배치 호출 (한번에 모든 장비 상태 확인)
+		// Agent 모드: 배치 호출 (한번에 선택된 장비 상태 확인)
 		// Direct 모드: 개별 호출 (장비별로 순차 확인)
-		deployer.HealthCheckBatch(d.firewalls)
+		deployer.HealthCheckBatch(selectedFirewalls)
 
 		// 장비 상태 저장
-		for _, fw := range d.firewalls {
+		for _, fw := range selectedFirewalls {
 			d.store.SaveFirewall(fw)
 		}
 
@@ -764,7 +764,7 @@ func (d *DeviceTab) onRefreshAll() {
 			}
 
 			// 2초 후 자동으로 사라지는 완료 다이얼로그 표시
-			infoDialog := dialog.NewInformation("완료", "새로고침 완료", d.window)
+			infoDialog := dialog.NewInformation("완료", fmt.Sprintf("%d개 장비 상태 확인 완료", len(selectedFirewalls)), d.window)
 			infoDialog.Show()
 			go func() {
 				time.Sleep(2 * time.Second)

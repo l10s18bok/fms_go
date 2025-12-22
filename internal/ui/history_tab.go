@@ -255,6 +255,11 @@ func (h *HistoryTab) RefreshHistory() {
 	}()
 }
 
+// 배포 이력만 다시 로드합니다. (다이얼로그 없이)
+func (h *HistoryTab) ReloadHistory() {
+	h.loadHistory()
+}
+
 // 선택된 이력을 삭제합니다.
 func (h *HistoryTab) onDeleteHistory() {
 	if h.selectedHistoryIndex < 0 || h.selectedHistory == nil {

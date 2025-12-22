@@ -555,10 +555,11 @@ func (m *MainUI) showResetDialog() {
 				return
 			}
 
-			// UI 새로고침
+			// UI 초기화 (서버 상태 체크 없이, 다이얼로그 없이)
+			m.templateTab.ClearSelection()
 			m.templateTab.RefreshTemplates()
-			m.deviceTab.RefreshDevices()
-			m.historyTab.RefreshHistory()
+			m.deviceTab.ReloadDevices()
+			m.historyTab.ReloadHistory()
 
 			dialog.ShowInformation("완료", "모든 데이터가 초기화되었습니다.", m.window)
 		}, m.window)
