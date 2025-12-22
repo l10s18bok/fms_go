@@ -13,57 +13,117 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* 상단 툴바 */
-.app-toolbar {
+/* 상단 메뉴바 */
+.app-menubar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 16px;
+    padding: 0 8px;
     background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
     border-bottom: 1px solid #0f3460;
+    height: 36px;
 }
 
-.toolbar-left,
-.toolbar-right {
+.menubar-left {
     display: flex;
-    gap: 8px;
     align-items: center;
+    height: 100%;
 }
 
-.toolbar-btn {
+.menubar-right {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    background-color: #0f3460;
-    border: 1px solid #1a4a7a;
-    border-radius: 6px;
+    height: 100%;
+}
+
+/* 메뉴 아이템 (드롭다운 트리거) */
+.menu-item {
+    position: relative;
+    height: 100%;
+}
+
+.menu-btn {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 16px;
+    background: transparent;
+    border: none;
     color: #ccc;
     cursor: pointer;
-    font-size: 0.85rem;
-    transition: all 0.2s;
+    font-size: 0.9rem;
+    transition: all 0.15s;
 }
 
-.toolbar-btn:hover {
-    background-color: #1a4a7a;
+.menu-btn:hover {
+    background-color: rgba(233, 69, 96, 0.2);
     color: #fff;
 }
 
-.toolbar-btn .icon {
-    font-size: 1rem;
+/* 드롭다운 메뉴 */
+.menu-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 160px;
+    background-color: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    overflow: hidden;
 }
 
-.toolbar-btn-danger {
-    border-color: #8b3a3a;
+.menu-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 0.85rem;
+    text-align: left;
+    transition: all 0.15s;
 }
 
-.toolbar-btn-danger:hover {
-    background-color: #8b3a3a;
+.menu-dropdown-item:hover {
+    background-color: rgba(233, 69, 96, 0.2);
+    color: #fff;
 }
 
-.toolbar-btn-icon {
-    padding: 6px 10px;
+.menu-dropdown-item.danger {
+    color: #e74c3c;
+}
+
+.menu-dropdown-item.danger:hover {
+    background-color: rgba(231, 76, 60, 0.2);
+}
+
+.menu-divider {
+    height: 1px;
+    background-color: #0f3460;
+    margin: 4px 0;
+}
+
+/* 우측 아이콘 버튼 */
+.menubar-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
     font-size: 1.1rem;
+    transition: all 0.15s;
+}
+
+.menubar-icon-btn:hover {
+    background-color: rgba(233, 69, 96, 0.2);
+    color: #fff;
 }
 
 .app-header {

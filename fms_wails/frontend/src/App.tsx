@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
 import TemplateTab, { TemplateTabRef } from './components/TemplateTab';
 import DeviceTab, { DeviceTabRef } from './components/DeviceTab';
@@ -33,6 +33,7 @@ import {
 } from '../wailsjs/go/main/App';
 
 type TabType = 'template' | 'device' | 'history';
+type MenuType = 'file' | 'tools' | 'help' | null;
 
 // Config 인터페이스
 interface Config {
@@ -43,6 +44,7 @@ interface Config {
 
 function App() {
     const [activeTab, setActiveTab] = useState<TabType>('template');
+    const [activeMenu, setActiveMenu] = useState<MenuType>(null);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
     const [config, setConfig] = useState<Config>({
@@ -53,6 +55,18 @@ function App() {
     const [configDir, setConfigDir] = useState('');
     const [appVersion, setAppVersion] = useState('');
     const [showChartModal, setShowChartModal] = useState(false);
+
+    // 메뉴 외부 클릭 시 닫기
+    const closeMenu = useCallback(() => {
+        setActiveMenu(null);
+    }, []);
+
+    useEffect(() => {
+        if (activeMenu) {
+            document.addEventListener('click', closeMenu);
+            return () => document.removeEventListener('click', closeMenu);
+        }
+    }, [activeMenu, closeMenu]);
 
     // 차트 데모 데이터 - 월별 배포 통계 (임의의 값)
     const chartData = [
@@ -249,30 +263,69 @@ function App() {
         }
     };
 
+    // 메뉴 토글
+    const toggleMenu = (menu: MenuType, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setActiveMenu(activeMenu === menu ? null : menu);
+    };
+
     return (
         <div id="App">
-            {/* 상단 툴바 */}
-            <header className="app-toolbar">
-                <div className="toolbar-left">
-                    <button className="toolbar-btn" onClick={handleImport}>
-                        <span className="icon">📂</span> Import
-                    </button>
-                    <button className="toolbar-btn" onClick={handleExport}>
-                        <span className="icon">💾</span> Export
-                    </button>
-                    <button className="toolbar-btn toolbar-btn-danger" onClick={handleReset}>
-                        <span className="icon">🔄</span> Reset
-                    </button>
+            {/* 상단 메뉴바 */}
+            <header className="app-menubar">
+                <div className="menubar-left">
+                    {/* 파일 메뉴 */}
+                    <div className="menu-item">
+                        <button className="menu-btn" onClick={(e) => toggleMenu('file', e)}>
+                            파일
+                        </button>
+                        {activeMenu === 'file' && (
+                            <div className="menu-dropdown">
+                                <button className="menu-dropdown-item" onClick={() => { handleImport(); closeMenu(); }}>
+                                    Import
+                                </button>
+                                <button className="menu-dropdown-item" onClick={() => { handleExport(); closeMenu(); }}>
+                                    Export
+                                </button>
+                                <div className="menu-divider" />
+                                <button className="menu-dropdown-item danger" onClick={() => { handleReset(); closeMenu(); }}>
+                                    Reset
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 도구 메뉴 */}
+                    <div className="menu-item">
+                        <button className="menu-btn" onClick={(e) => toggleMenu('tools', e)}>
+                            도구
+                        </button>
+                        {activeMenu === 'tools' && (
+                            <div className="menu-dropdown">
+                                <button className="menu-dropdown-item" onClick={() => { handleOpenSettings(); closeMenu(); }}>
+                                    설정
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 도움말 메뉴 */}
+                    <div className="menu-item">
+                        <button className="menu-btn" onClick={(e) => toggleMenu('help', e)}>
+                            도움말
+                        </button>
+                        {activeMenu === 'help' && (
+                            <div className="menu-dropdown">
+                                <button className="menu-dropdown-item" onClick={() => { setShowHelpModal(true); closeMenu(); }}>
+                                    도움말
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <div className="toolbar-right">
-                    <button className="toolbar-btn" onClick={handleRefresh}>
-                        <span className="icon">🔃</span> 새로고침
-                    </button>
-                    <button className="toolbar-btn toolbar-btn-icon" onClick={handleOpenSettings} title="설정">
-                        ⚙️
-                    </button>
-                    <button className="toolbar-btn toolbar-btn-icon" onClick={() => setShowHelpModal(true)} title="도움말">
-                        ❓
+                <div className="menubar-right">
+                    <button className="menubar-icon-btn" onClick={handleRefresh} title="새로고침">
+                        🔃
                     </button>
                 </div>
             </header>
