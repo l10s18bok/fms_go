@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -71,143 +72,189 @@ func (c *Client) CheckHealthViaAgent(ipAddrs []string) (map[string]bool, error) 
 // 직접 연결로 장비 상태를 확인합니다.
 func (c *Client) CheckHealthDirect(deviceIP string) (bool, error) {
 	url := fmt.Sprintf("http://%s/respCheck", deviceIP)
+	log.Printf("[DEBUG] CheckHealthDirect 요청: %s", url)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
+		log.Printf("[DEBUG] CheckHealthDirect 연결 실패: %v", err)
 		return false, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
+	log.Printf("[DEBUG] CheckHealthDirect 응답: StatusCode=%d, Body=%s", resp.StatusCode, string(body))
+
 	return resp.StatusCode == http.StatusOK, nil
 }
 
-// Agent 서버를 통해 규칙을 배포합니다.
-func (c *Client) DeployViaAgent(deviceIP string, rules []string) ([]model.RuleResult, error) {
+// Agent 서버를 통해 템플릿을 배포합니다.
+func (c *Client) DeployViaAgent(deviceIP string, template string) (*model.DeployResult, error) {
 	url := fmt.Sprintf("%s/agent/req-deploy", strings.TrimSuffix(c.config.AgentServerURL, "/"))
 
-	results := make([]model.RuleResult, 0, len(rules))
-
-	for _, rule := range rules {
-		rule = strings.TrimSpace(rule)
-		if rule == "" {
-			continue
-		}
-
-		result := model.RuleResult{
-			Rule:   rule,
-			Status: model.RuleStatusOK,
-		}
-
-		// 요청 데이터 생성
-		reqData := map[string]string{
-			"deviceName": deviceIP,
-			"rule":       rule,
-		}
-		jsonData, err := json.Marshal(reqData)
-		if err != nil {
-			result.Status = model.RuleStatusError
-			result.Reason = fmt.Sprintf("JSON 변환 실패: %v", err)
-			results = append(results, result)
-			continue
-		}
-
-		// POST 요청
-		resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
-		if err != nil {
-			result.Status = model.RuleStatusError
-			result.Reason = fmt.Sprintf("Agent 서버 연결 실패: %v", err)
-			results = append(results, result)
-			continue
-		}
-
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			result.Status = model.RuleStatusError
-			result.Reason = fmt.Sprintf("Agent 서버 응답 오류: %d", resp.StatusCode)
-			results = append(results, result)
-			continue
-		}
-
-		// 응답 확인 (OK 포함 여부)
-		outputStr := strings.ToUpper(string(body))
-		if strings.Contains(outputStr, "OK") {
-			result.Status = model.RuleStatusOK
-			result.Reason = ""
-		} else {
-			result.Status = model.RuleStatusError
-			result.Reason = fmt.Sprintf("응답: %s", strings.TrimSpace(string(body)))
-		}
-
-		results = append(results, result)
+	// 요청 데이터 생성 (index.html과 동일한 형식)
+	reqData := map[string]interface{}{
+		"template": template,
+		"ipAddrs":  []string{deviceIP},
+	}
+	jsonData, err := json.Marshal(reqData)
+	if err != nil {
+		return nil, fmt.Errorf("JSON 변환 실패: %v", err)
 	}
 
-	return results, nil
+	// POST 요청
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("Agent 서버 연결 실패: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Agent 서버 응답 오류: %d", resp.StatusCode)
+	}
+
+	// 응답 파싱
+	var response struct {
+		Data []model.DeployResult `json:"data"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
+	}
+
+	// 해당 장비의 결과 찾기
+	for _, result := range response.Data {
+		if result.IP == deviceIP {
+			return &result, nil
+		}
+	}
+
+	return nil, fmt.Errorf("장비 %s의 배포 결과를 찾을 수 없습니다", deviceIP)
 }
 
-// 직접 연결로 규칙을 배포합니다.
-func (c *Client) DeployDirect(deviceIP string, rules []string) ([]model.RuleResult, error) {
-	url := fmt.Sprintf("http://%s/deploy", deviceIP)
+// 템플릿을 Direct 모드용 형식으로 변환합니다.
+// 입력: req|INSERT|101|INPUT|ACCEPT|192.168.44.11|TCP|ANY|9090||
+// 출력: agent -m=insert -c=INPUT -p=tcp --dport=9090 -a=ACCEPT -s=192.168.44.11
+func convertTemplateForDirect(template string) string {
+	lines := strings.Split(template, "\n")
+	var result []string
 
-	results := make([]model.RuleResult, 0, len(rules))
-
-	for _, rule := range rules {
-		rule = strings.TrimSpace(rule)
-		if rule == "" {
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
 
-		result := model.RuleResult{
-			Rule:   rule,
-			Status: model.RuleStatusOK,
-		}
-
-		// 요청 데이터 생성
-		reqData := map[string]string{
-			"rule": rule,
-		}
-		jsonData, err := json.Marshal(reqData)
-		if err != nil {
-			result.Status = model.RuleStatusError
-			result.Reason = fmt.Sprintf("JSON 변환 실패: %v", err)
-			results = append(results, result)
+		// req|INSERT|101|INPUT|ACCEPT|192.168.44.11|TCP|ANY|9090||
+		parts := strings.Split(line, "|")
+		if len(parts) < 9 {
 			continue
 		}
 
-		// POST 요청
-		resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
-		if err != nil {
-			result.Status = model.RuleStatusError
-			result.Reason = fmt.Sprintf("장비 연결 실패: %v", err)
-			results = append(results, result)
-			continue
+		// parts[0]: req
+		// parts[1]: INSERT/DELETE/FLUSH 등
+		// parts[2]: ID
+		// parts[3]: CHAIN (INPUT/OUTPUT/FORWARD)
+		// parts[4]: ACTION (ACCEPT/DROP/REJECT)
+		// parts[5]: SRC IP
+		// parts[6]: PROTOCOL (TCP/UDP/ANY)
+		// parts[7]: DST IP (또는 ANY)
+		// parts[8]: DPORT
+
+		method := strings.ToLower(parts[1])
+		chain := parts[3]
+		action := parts[4]
+		srcIP := parts[5]
+		protocol := strings.ToLower(parts[6])
+		dport := parts[8]
+
+		// agent 명령어 형식으로 변환
+		cmd := fmt.Sprintf("agent -m=%s -c=%s", method, chain)
+
+		if protocol != "any" && protocol != "" {
+			cmd += fmt.Sprintf(" -p=%s", protocol)
 		}
 
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			result.Status = model.RuleStatusError
-			result.Reason = fmt.Sprintf("장비 응답 오류: %d", resp.StatusCode)
-			results = append(results, result)
-			continue
+		if dport != "" && dport != "ANY" {
+			cmd += fmt.Sprintf(" --dport=%s", dport)
 		}
 
-		// 응답 확인 (OK 포함 여부)
-		outputStr := strings.ToUpper(string(body))
-		if strings.Contains(outputStr, "OK") {
-			result.Status = model.RuleStatusOK
-			result.Reason = ""
-		} else {
-			result.Status = model.RuleStatusError
-			result.Reason = fmt.Sprintf("응답: %s", strings.TrimSpace(string(body)))
+		cmd += fmt.Sprintf(" -a=%s", action)
+
+		if srcIP != "" && srcIP != "ANY" {
+			cmd += fmt.Sprintf(" -s=%s", srcIP)
 		}
 
-		results = append(results, result)
+		result = append(result, cmd)
 	}
 
-	return results, nil
+	return strings.Join(result, "\n")
+}
+
+// 직접 연결로 템플릿을 배포합니다.
+func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployResult, error) {
+	url := fmt.Sprintf("http://%s/agent/req-deploy", deviceIP)
+	log.Printf("[DEBUG] DeployDirect 요청: %s", url)
+
+	// Direct 모드용 템플릿 형식으로 변환
+	convertedTemplate := convertTemplateForDirect(template)
+	log.Printf("[DEBUG] DeployDirect 변환된 템플릿:\n%s", convertedTemplate)
+
+	// 요청 데이터 생성
+	reqData := map[string]interface{}{
+		"template": convertedTemplate,
+		"ipAddrs":  []string{deviceIP},
+	}
+	jsonData, err := json.Marshal(reqData)
+	if err != nil {
+		return nil, fmt.Errorf("JSON 변환 실패: %v", err)
+	}
+	log.Printf("[DEBUG] DeployDirect 요청 Body: %s", string(jsonData))
+
+	// POST 요청
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("[DEBUG] DeployDirect 연결 실패: %v", err)
+		return nil, fmt.Errorf("장비 연결 실패: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
+	}
+	log.Printf("[DEBUG] DeployDirect 응답: StatusCode=%d, Body=%s", resp.StatusCode, string(body))
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("장비 응답 오류: %d", resp.StatusCode)
+	}
+
+	// 응답 파싱
+	var response struct {
+		Data []model.DeployResult `json:"data"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
+	}
+	log.Printf("[DEBUG] DeployDirect 파싱 결과: Data 개수=%d", len(response.Data))
+
+	// 해당 장비의 결과 찾기
+	for _, result := range response.Data {
+		log.Printf("[DEBUG] DeployDirect 결과 IP=%s, Status=%s", result.IP, result.Status)
+		if result.IP == deviceIP {
+			return &result, nil
+		}
+	}
+
+	// 결과가 하나만 있으면 그것을 반환
+	if len(response.Data) == 1 {
+		return &response.Data[0], nil
+	}
+
+	return nil, fmt.Errorf("장비 %s의 배포 결과를 찾을 수 없습니다", deviceIP)
 }
 
 // 장비 상태를 확인합니다. (설정에 따라 Agent 또는 Direct)
@@ -234,10 +281,10 @@ func (c *Client) CheckHealth(fw *model.Firewall) (string, error) {
 	return model.ServerStatusStop, nil
 }
 
-// 규칙을 배포합니다. (설정에 따라 Agent 또는 Direct)
-func (c *Client) DeployRules(fw *model.Firewall, rules []string) ([]model.RuleResult, error) {
+// 템플릿을 배포합니다. (설정에 따라 Agent 또는 Direct)
+func (c *Client) DeployTemplate(fw *model.Firewall, template string) (*model.DeployResult, error) {
 	if c.config.IsAgentMode() {
-		return c.DeployViaAgent(fw.DeviceName, rules)
+		return c.DeployViaAgent(fw.DeviceName, template)
 	}
-	return c.DeployDirect(fw.DeviceName, rules)
+	return c.DeployDirect(fw.DeviceName, template)
 }

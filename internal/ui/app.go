@@ -65,12 +65,12 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 
 // 메인 UI 컨텐츠를 반환합니다.
 func (m *MainUI) Content() fyne.CanvasObject {
-	// 상단 툴바
-	toolbar := m.createToolbar()
+	// 윈도우 내부 메뉴바 생성
+	menuBar := m.createMenuBar()
 
-	// 전체 레이아웃: 상단 툴바 고정, 중앙 탭 확장
+	// 전체 레이아웃: 상단 메뉴바, 중앙 탭
 	return container.NewBorder(
-		toolbar, // 상단
+		menuBar, // 상단
 		nil,     // 하단
 		nil,     // 좌측
 		nil,     // 우측
@@ -78,27 +78,63 @@ func (m *MainUI) Content() fyne.CanvasObject {
 	)
 }
 
-// 상단 툴바를 생성합니다.
-func (m *MainUI) createToolbar() fyne.CanvasObject {
-	// Import/Export 버튼 (템플릿, 장비 공용, 아이콘 포함)
-	importBtn := widget.NewButtonWithIcon("Import", theme.FolderOpenIcon(), func() {
-		m.showImportDialog()
-	})
-	exportBtn := widget.NewButtonWithIcon("Export", theme.DocumentSaveIcon(), func() {
-		m.showExportDialog()
-	})
+// 윈도우 내부 메뉴바를 생성합니다.
+func (m *MainUI) createMenuBar() fyne.CanvasObject {
+	// 파일 메뉴
+	fileMenu := fyne.NewMenu("",
+		fyne.NewMenuItem("Import", func() {
+			m.showImportDialog()
+		}),
+		fyne.NewMenuItem("Export", func() {
+			m.showExportDialog()
+		}),
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem("Reset", func() {
+			m.showResetDialog()
+		}),
+	)
 
-	resetBtn := widget.NewButtonWithIcon("Reset", theme.MediaReplayIcon(), func() {
-		m.showResetDialog()
-	})
-	resetBtn.Importance = widget.LowImportance
+	// 도구 메뉴
+	toolsMenu := fyne.NewMenu("",
+		fyne.NewMenuItem("설정", func() {
+			m.showSettingsDialog()
+		}),
+	)
 
-	// 좌측 버튼 그룹
-	leftButtons := container.NewHBox(importBtn, exportBtn, resetBtn)
+	// 도움말 메뉴
+	helpMenu := fyne.NewMenu("",
+		fyne.NewMenuItem("도움말", func() {
+			m.showHelpDialog()
+		}),
+	)
 
-	// 새로고침 버튼 (현재 탭에 따라 새로고침)
-	refreshBtn := widget.NewButtonWithIcon("새로고침", theme.ViewRefreshIcon(), func() {
+	// 메뉴 버튼 생성
+	fileBtn := widget.NewButton("파일", nil)
+	fileBtn.OnTapped = func() {
+		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(fileBtn)
+		pos.Y += fileBtn.Size().Height
+		widget.ShowPopUpMenuAtPosition(fileMenu, m.window.Canvas(), pos)
+	}
+
+	toolsBtn := widget.NewButton("도구", nil)
+	toolsBtn.OnTapped = func() {
+		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(toolsBtn)
+		pos.Y += toolsBtn.Size().Height
+		widget.ShowPopUpMenuAtPosition(toolsMenu, m.window.Canvas(), pos)
+	}
+
+	helpBtn := widget.NewButton("도움말", nil)
+	helpBtn.OnTapped = func() {
+		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(helpBtn)
+		pos.Y += helpBtn.Size().Height
+		widget.ShowPopUpMenuAtPosition(helpMenu, m.window.Canvas(), pos)
+	}
+
+	// 새로고침 버튼 (우측)
+	refreshBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
 		switch m.tabs.SelectedIndex() {
+		case 0: // 템플릿 관리 탭
+			m.templateTab.RefreshTemplates()
 		case 1: // 장비 관리 탭
 			m.deviceTab.RefreshDevices()
 		case 2: // 배포 이력 탭
@@ -106,24 +142,19 @@ func (m *MainUI) createToolbar() fyne.CanvasObject {
 		}
 	})
 
-	// 설정 버튼
-	settingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
-		m.showSettingsDialog()
-	})
+	// DeviceTab에 새로고침 버튼 참조 설정
+	m.deviceTab.SetRefreshButton(refreshBtn)
 
-	// 도움말 버튼
-	helpBtn := widget.NewButtonWithIcon("", theme.HelpIcon(), func() {
-		m.showHelpDialog()
-	})
+	// 좌측 메뉴 버튼들 (버튼 사이 간격 추가)
+	spacer := widget.NewLabel("  ") // 간격용 빈 라벨
+	spacer2 := widget.NewLabel("  ")
+	leftMenus := container.NewHBox(fileBtn, spacer, toolsBtn, spacer2, helpBtn)
 
-	// 우측 버튼 그룹
-	rightButtons := container.NewHBox(refreshBtn, settingsBtn, helpBtn)
+	// 우측 버튼
+	rightButtons := container.NewHBox(refreshBtn)
 
-	// 툴바 레이아웃
-	return container.NewBorder(
-		nil, nil, leftButtons, rightButtons,
-		nil,
-	)
+	// 메뉴바 레이아웃 (좌측 메뉴, 우측 새로고침)
+	return container.NewBorder(nil, nil, leftMenus, rightButtons, nil)
 }
 
 // 설정 다이얼로그를 표시합니다.
@@ -135,18 +166,16 @@ func (m *MainUI) showSettingsDialog() {
 		return
 	}
 
-	// 연결 모드 라디오 그룹
-	connectionMode := widget.NewRadioGroup([]string{"Agent Server", "Direct"}, nil)
-	if config.IsAgentMode() {
-		connectionMode.SetSelected("Agent Server")
-	} else {
-		connectionMode.SetSelected("Direct")
-	}
+	// 연결 모드 라디오 그룹 (Agent Server는 임시로 비활성화)
+	connectionMode := widget.NewRadioGroup([]string{"Agent Server (준비중)", "Direct"}, nil)
+	connectionMode.SetSelected("Direct")
+	connectionMode.Disable() // Agent 모드 임시 비활성화
 
-	// Agent Server URL 입력 필드
+	// Agent Server URL 입력 필드 (Agent 모드 비활성화로 인해 항상 비활성화)
 	agentURLEntry := widget.NewEntry()
 	agentURLEntry.SetText(config.AgentServerURL)
 	agentURLEntry.SetPlaceHolder("http://172.24.10.6:8080")
+	agentURLEntry.Disable() // Agent 모드 임시 비활성화
 
 	// 타임아웃 입력 필드
 	timeoutEntry := widget.NewEntry()
@@ -339,7 +368,7 @@ func (m *MainUI) showImportDialog() {
 				return
 			}
 			dialog.ShowInformation("성공", fmt.Sprintf("%d개의 장비 정보가 가져오기 되었습니다.", validCount), m.window)
-			m.deviceTab.RefreshDevices()
+			m.deviceTab.ReloadDevices()
 		case 2: // 배포 이력 탭
 			var histories []*model.DeployHistory
 			if err := json.Unmarshal(data, &histories); err != nil {

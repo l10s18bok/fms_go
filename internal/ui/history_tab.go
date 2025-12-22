@@ -175,20 +175,19 @@ func (h *HistoryTab) createDetailPanel() fyne.CanvasObject {
 					result := h.selectedHistory.Results[idx]
 					switch id.Col {
 					case 0:
-						// 규칙이 너무 길면 축약
-						rule := result.Rule
-						if len(rule) > 60 {
-							rule = rule[:60] + "..."
+						// 규칙이 너무 길면 축약 (Text 필드 사용)
+						text := result.Text
+						if text == "" {
+							text = result.Rule // Text가 비어있으면 Rule 사용
 						}
-						label.SetText(rule)
+						if len(text) > 60 {
+							text = text[:60] + "..."
+						}
+						label.SetText(text)
 					case 1:
 						label.SetText(model.GetRuleStatusText(result.Status))
 					case 2:
-						reason := result.Reason
-						if reason == "" {
-							reason = "-"
-						}
-						label.SetText(reason)
+						label.SetText(model.GetReasonText(result.Reason))
 					}
 				}
 			}
@@ -230,9 +229,9 @@ func (h *HistoryTab) loadHistory() {
 
 	h.histories = histories
 
-	// 시간순 내림차순 정렬 (최신순)
+	// ID 내림차순 정렬 (최신순 - ID가 클수록 최신)
 	sort.Slice(h.histories, func(i, j int) bool {
-		return h.histories[i].Timestamp.After(h.histories[j].Timestamp)
+		return h.histories[i].ID > h.histories[j].ID
 	})
 
 	h.selectedHistoryIndex = -1
@@ -250,7 +249,9 @@ func (h *HistoryTab) RefreshHistory() {
 	infoDialog.Show()
 	go func() {
 		time.Sleep(2 * time.Second)
-		infoDialog.Hide()
+		fyne.Do(func() {
+			infoDialog.Hide()
+		})
 	}()
 }
 

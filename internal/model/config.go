@@ -8,7 +8,7 @@ const (
 )
 
 // 기본 타임아웃 (초)
-const DefaultTimeoutSeconds = 10
+const DefaultTimeoutSeconds = 5
 
 // 애플리케이션 설정을 나타냅니다.
 type Config struct {

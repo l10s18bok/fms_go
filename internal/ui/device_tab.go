@@ -48,6 +48,10 @@ type DeviceTab struct {
 	firewalls           []*model.Firewall
 	selectedDeviceIndex int
 	checkedDevices      map[int]bool
+
+	// 새로고침 상태
+	isRefreshing bool
+	refreshBtn   *widget.Button
 }
 
 // 새로운 장비 관리 탭을 생성합니다.
@@ -330,7 +334,7 @@ func (d *DeviceTab) createDetailPanel() fyne.CanvasObject {
 	d.ipErrorLabel.Hidden = true
 
 	// 적용 버튼
-	applyBtn := component.NewColoredButton("장비 추가", component.ButtonBlack, func() {
+	applyBtn := component.NewColoredButton("추가/수정", component.ButtonBlack, func() {
 		d.onApplyDetail()
 	})
 
@@ -341,8 +345,8 @@ func (d *DeviceTab) createDetailPanel() fyne.CanvasObject {
 	form := container.NewVBox(
 		widget.NewSeparator(),
 		container.NewHBox(
-			widget.NewLabelWithStyle("장비 추가", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			widget.NewLabel("(IP 주소를 입력하고 추가 버튼을 클릭하세요)"),
+			widget.NewLabelWithStyle("장비 추가/수정", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			widget.NewLabel("(IP 주소를 입력하거나 테이블에서 선택 후 수정)"),
 		),
 		container.NewGridWithColumns(4,
 			widget.NewLabel("장비 IP:"), ipContainer,
@@ -398,15 +402,15 @@ func (d *DeviceTab) onApplyDetail() {
 	d.ipErrorLabel.Hidden = true
 	d.ipErrorLabel.Text = ""
 
-	// IP 검증
+	// IP 검증 (IP 또는 IP:PORT 형식 허용)
 	if d.ipEntry.Text == "" {
 		d.ipErrorLabel.Text = "IP 주소를 입력해주세요"
 		d.ipErrorLabel.Hidden = false
 		d.ipErrorLabel.Refresh()
 		return
 	}
-	if ip := net.ParseIP(d.ipEntry.Text); ip == nil {
-		d.ipErrorLabel.Text = "올바른 IP 주소 형식이 아닙니다"
+	if !isValidIPOrHostPort(d.ipEntry.Text) {
+		d.ipErrorLabel.Text = "올바른 IP 주소 형식이 아닙니다 (예: 192.168.1.1 또는 192.168.1.1:8080)"
 		d.ipErrorLabel.Hidden = false
 		d.ipErrorLabel.Refresh()
 		return
@@ -415,29 +419,40 @@ func (d *DeviceTab) onApplyDetail() {
 	var fw *model.Firewall
 	newIP := d.ipEntry.Text
 
-	// 동일 IP 장비가 이미 있는지 확인
-	existingIndex := -1
-	for i, existing := range d.firewalls {
-		if existing.DeviceName == newIP {
-			existingIndex = i
-			break
-		}
-	}
-
-	// 동일 IP 장비가 있으면 해당 장비 수정, 없으면 새 장비 생성
-	if existingIndex >= 0 {
-		// 기존 장비 수정
-		fw = d.firewalls[existingIndex]
-		d.selectedDeviceIndex = existingIndex
+	// 선택된 장비가 있으면 해당 장비 수정, 없으면 새 장비 생성
+	if d.selectedDeviceIndex >= 0 && d.selectedDeviceIndex < len(d.firewalls) {
+		// 기존 장비 수정 (테이블에서 선택한 장비)
+		fw = d.firewalls[d.selectedDeviceIndex]
 	} else {
-		// 새 장비 생성
-		fw = model.NewFirewall("")
-		d.firewalls = append(d.firewalls, fw)
-		d.selectedDeviceIndex = len(d.firewalls) - 1
+		// 동일 IP 장비가 이미 있는지 확인
+		existingIndex := -1
+		for i, existing := range d.firewalls {
+			if existing.DeviceName == newIP {
+				existingIndex = i
+				break
+			}
+		}
+
+		if existingIndex >= 0 {
+			// 동일 IP 장비가 있으면 해당 장비 수정
+			fw = d.firewalls[existingIndex]
+			d.selectedDeviceIndex = existingIndex
+		} else {
+			// 새 장비 생성
+			fw = model.NewFirewall("")
+			d.firewalls = append(d.firewalls, fw)
+			d.selectedDeviceIndex = len(d.firewalls) - 1
+		}
 	}
 
 	// 값 적용
 	fw.DeviceName = d.ipEntry.Text
+
+	// 장비 저장
+	if err := d.store.SaveFirewall(fw); err != nil {
+		dialog.ShowError(err, d.window)
+		return
+	}
 
 	d.deviceTable.Refresh()
 
@@ -447,19 +462,6 @@ func (d *DeviceTab) onApplyDetail() {
 	// 입력 필드 클리어
 	d.ipEntry.SetText("")
 	d.selectedDeviceIndex = -1
-
-	// 해당 장비 서버 상태 자동 확인
-	go func(targetFw *model.Firewall) {
-		config, err := d.store.GetConfig()
-		if err != nil {
-			return
-		}
-		deployer := deploy.NewDeployer(config)
-		deployer.HealthCheck(targetFw)
-		d.deviceTable.Refresh()
-		// 상태 확인 후 상태 요약 다시 업데이트
-		d.updateStatusSummary()
-	}(fw)
 }
 
 // 배포 시 호출됩니다.
@@ -501,8 +503,10 @@ func (d *DeviceTab) onDeploy() {
 	go func() {
 		config, err := d.store.GetConfig()
 		if err != nil {
-			progressDialog.Hide()
-			dialog.ShowError(err, d.window)
+			fyne.Do(func() {
+				progressDialog.Hide()
+				dialog.ShowError(err, d.window)
+			})
 			return
 		}
 
@@ -512,9 +516,12 @@ func (d *DeviceTab) onDeploy() {
 		failCount := 0
 
 		for i, fw := range checkedFirewalls {
-			// 진행률 업데이트
-			progressLabel.SetText(fmt.Sprintf("배포 중: %s (%d/%d)", fw.DeviceName, i+1, total))
-			progressBar.SetValue(float64(i+1) / float64(total))
+			// 진행률 업데이트 (UI 스레드에서 실행)
+			idx := i
+			fyne.Do(func() {
+				progressLabel.SetText(fmt.Sprintf("배포 중: %s (%d/%d)", fw.DeviceName, idx+1, total))
+				progressBar.SetValue(float64(idx+1) / float64(total))
+			})
 
 			// 배포 실행
 			result := deployer.Deploy(fw, template)
@@ -535,23 +542,25 @@ func (d *DeviceTab) onDeploy() {
 			}
 		}
 
-		// 결과 처리 중 메시지 표시
-		progressLabel.SetText("결과 처리 중... 잠시만 기다려주세요.")
-		progressBar.SetValue(1.0)
+		// 결과 처리 및 UI 업데이트 (UI 스레드에서 실행)
+		fyne.Do(func() {
+			progressLabel.SetText("결과 처리 중... 잠시만 기다려주세요.")
+			progressBar.SetValue(1.0)
 
-		// UI 업데이트를 위한 짧은 대기
-		d.deviceTable.Refresh()
+			// UI 업데이트
+			d.deviceTable.Refresh()
 
-		// 이력 탭 새로고침
-		if d.historyTab != nil {
-			d.historyTab.RefreshHistory()
-		}
+			// 이력 탭 새로고침
+			if d.historyTab != nil {
+				d.historyTab.loadHistory()
+			}
 
-		// 다이얼로그 닫기 및 결과 표시
-		progressDialog.Hide()
+			// 다이얼로그 닫기 및 결과 표시
+			progressDialog.Hide()
 
-		resultMsg := fmt.Sprintf("배포 완료\n\n템플릿: %s\n성공: %d개\n실패: %d개", template.Version, successCount, failCount)
-		dialog.ShowInformation("배포 결과", resultMsg, d.window)
+			resultMsg := fmt.Sprintf("배포 완료\n\n템플릿: %s\n성공: %d개\n실패: %d개", template.Version, successCount, failCount)
+			dialog.ShowInformation("배포 결과", resultMsg, d.window)
+		})
 	}()
 }
 
@@ -636,6 +645,11 @@ func (d *DeviceTab) RefreshDevices() {
 	d.onRefreshAll()
 }
 
+// 장비 목록만 새로고침합니다. (서버 상태 체크 없이)
+func (d *DeviceTab) ReloadDevices() {
+	d.loadFirewalls()
+}
+
 // 템플릿 목록만 새로고침합니다.
 func (d *DeviceTab) RefreshTemplates() {
 	d.refreshTemplateList()
@@ -644,6 +658,11 @@ func (d *DeviceTab) RefreshTemplates() {
 // 이력 탭 참조를 설정합니다.
 func (d *DeviceTab) SetHistoryTab(historyTab *HistoryTab) {
 	d.historyTab = historyTab
+}
+
+// 새로고침 버튼 참조를 설정합니다.
+func (d *DeviceTab) SetRefreshButton(btn *widget.Button) {
+	d.refreshBtn = btn
 }
 
 // 해당 IP의 장비 배포 상태를 초기화합니다.
@@ -661,27 +680,58 @@ func (d *DeviceTab) ResetDeviceDeployStatus(deviceIP string) {
 
 // 템플릿 목록과 전체 장비 서버 상태를 새로고침합니다.
 func (d *DeviceTab) onRefreshAll() {
+	// 이미 새로고침 중이면 무시
+	if d.isRefreshing {
+		return
+	}
+
+	// 새로고침 시작
+	d.isRefreshing = true
+	if d.refreshBtn != nil {
+		d.refreshBtn.Disable()
+	}
+
 	// 템플릿 목록 새로고침
 	d.refreshTemplateList()
 
 	// 장비가 없으면 상태 요약만 업데이트하고 다이얼로그 표시 후 종료
 	if len(d.firewalls) == 0 {
 		d.updateStatusSummary()
+		d.isRefreshing = false
+		if d.refreshBtn != nil {
+			d.refreshBtn.Enable()
+		}
 
 		// 2초 후 자동으로 사라지는 다이얼로그 표시
 		infoDialog := dialog.NewInformation("완료", "새로고침 완료", d.window)
 		infoDialog.Show()
 		go func() {
 			time.Sleep(2 * time.Second)
-			infoDialog.Hide()
+			fyne.Do(func() {
+				infoDialog.Hide()
+			})
 		}()
 		return
 	}
+
+	// 진행 중 다이얼로그 표시
+	progressLabel := widget.NewLabel(fmt.Sprintf("장비 상태 확인 중... (총 %d개)", len(d.firewalls)))
+	progressBar := widget.NewProgressBarInfinite()
+	progressContent := container.NewVBox(progressLabel, progressBar)
+	progressDialog := dialog.NewCustomWithoutButtons("새로고침 중", progressContent, d.window)
+	progressDialog.Show()
 
 	// 백그라운드에서 전체 장비 상태 확인 실행
 	go func() {
 		config, err := d.store.GetConfig()
 		if err != nil {
+			fyne.Do(func() {
+				progressDialog.Hide()
+				d.isRefreshing = false
+				if d.refreshBtn != nil {
+					d.refreshBtn.Enable()
+				}
+			})
 			return
 		}
 
@@ -696,18 +746,43 @@ func (d *DeviceTab) onRefreshAll() {
 			d.store.SaveFirewall(fw)
 		}
 
-		// 테이블 새로고침
-		d.deviceTable.Refresh()
+		// UI 업데이트 (메인 스레드에서 실행)
+		fyne.Do(func() {
+			// 테이블 새로고침
+			d.deviceTable.Refresh()
 
-		// 상태 요약 업데이트
-		d.updateStatusSummary()
+			// 상태 요약 업데이트
+			d.updateStatusSummary()
 
-		// 2초 후 자동으로 사라지는 다이얼로그 표시
-		infoDialog := dialog.NewInformation("완료", "새로고침 완료", d.window)
-		infoDialog.Show()
-		go func() {
-			time.Sleep(2 * time.Second)
-			infoDialog.Hide()
-		}()
+			// 진행 다이얼로그 닫기
+			progressDialog.Hide()
+
+			// 새로고침 완료
+			d.isRefreshing = false
+			if d.refreshBtn != nil {
+				d.refreshBtn.Enable()
+			}
+
+			// 2초 후 자동으로 사라지는 완료 다이얼로그 표시
+			infoDialog := dialog.NewInformation("완료", "새로고침 완료", d.window)
+			infoDialog.Show()
+			go func() {
+				time.Sleep(2 * time.Second)
+				fyne.Do(func() {
+					infoDialog.Hide()
+				})
+			}()
+		})
 	}()
+}
+
+// IP 주소 또는 IP:PORT 형식이 유효한지 검사합니다.
+func isValidIPOrHostPort(address string) bool {
+	// IP:PORT 형식인 경우
+	if host, _, err := net.SplitHostPort(address); err == nil {
+		// 호스트 부분이 유효한 IP인지 확인
+		return net.ParseIP(host) != nil
+	}
+	// 순수 IP 주소인 경우
+	return net.ParseIP(address) != nil
 }

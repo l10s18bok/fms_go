@@ -1,6 +1,10 @@
 package model
 
-import "fms/internal/utils"
+import (
+	"strings"
+
+	"fms/internal/utils"
+)
 
 // 배포 이력을 나타냅니다.
 type DeployHistory struct {
@@ -78,14 +82,24 @@ func (h *DeployHistory) GetTimestampString() string {
 
 // 규칙 상태 코드를 표시 텍스트로 변환합니다.
 func GetRuleStatusText(status string) string {
-	switch status {
+	// 대소문자 구분 없이 비교
+	switch strings.ToLower(status) {
 	case RuleStatusOK:
-		return "성공"
+		return "OK"
 	case RuleStatusError, RuleStatusUnfind, RuleStatusValidation:
 		return "실패"
 	case RuleStatusWrite:
 		return "진행중"
 	default:
+		return status // 원본 상태 표시
+	}
+}
+
+// 사유를 표시용 텍스트로 변환합니다.
+func GetReasonText(reason string) string {
+	// OK 또는 빈 문자열이면 "-" 표시
+	if reason == "" || strings.ToLower(reason) == "ok" {
 		return "-"
 	}
+	return reason
 }
