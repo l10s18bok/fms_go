@@ -108,13 +108,18 @@ func (m *MainUI) createMenuBar() fyne.CanvasObject {
 		}),
 	)
 
-	// 메뉴 버튼 생성
+	// 메뉴 버튼 생성 (고정 크기: 80x30, 수동 배치로 간격 제거)
+	btnWidth := float32(80)
+	btnHeight := float32(30)
+
 	fileBtn := widget.NewButton("파일", nil)
 	fileBtn.OnTapped = func() {
 		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(fileBtn)
 		pos.Y += fileBtn.Size().Height
 		widget.ShowPopUpMenuAtPosition(fileMenu, m.window.Canvas(), pos)
 	}
+	fileBtn.Resize(fyne.NewSize(btnWidth, btnHeight))
+	fileBtn.Move(fyne.NewPos(0, 0))
 
 	toolsBtn := widget.NewButton("도구", nil)
 	toolsBtn.OnTapped = func() {
@@ -122,6 +127,8 @@ func (m *MainUI) createMenuBar() fyne.CanvasObject {
 		pos.Y += toolsBtn.Size().Height
 		widget.ShowPopUpMenuAtPosition(toolsMenu, m.window.Canvas(), pos)
 	}
+	toolsBtn.Resize(fyne.NewSize(btnWidth, btnHeight))
+	toolsBtn.Move(fyne.NewPos(btnWidth, 0))
 
 	helpBtn := widget.NewButton("도움말", nil)
 	helpBtn.OnTapped = func() {
@@ -129,6 +136,8 @@ func (m *MainUI) createMenuBar() fyne.CanvasObject {
 		pos.Y += helpBtn.Size().Height
 		widget.ShowPopUpMenuAtPosition(helpMenu, m.window.Canvas(), pos)
 	}
+	helpBtn.Resize(fyne.NewSize(btnWidth, btnHeight))
+	helpBtn.Move(fyne.NewPos(btnWidth*2, 0))
 
 	// 새로고침 버튼 (우측)
 	refreshBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
@@ -145,10 +154,9 @@ func (m *MainUI) createMenuBar() fyne.CanvasObject {
 	// DeviceTab에 새로고침 버튼 참조 설정
 	m.deviceTab.SetRefreshButton(refreshBtn)
 
-	// 좌측 메뉴 버튼들 (버튼 사이 간격 추가)
-	spacer := widget.NewLabel("  ") // 간격용 빈 라벨
-	spacer2 := widget.NewLabel("  ")
-	leftMenus := container.NewHBox(fileBtn, spacer, toolsBtn, spacer2, helpBtn)
+	// 좌측 메뉴 버튼들 (수동 배치로 간격 완전 제거)
+	leftMenus := container.NewWithoutLayout(fileBtn, toolsBtn, helpBtn)
+	leftMenus.Resize(fyne.NewSize(btnWidth*3, btnHeight))
 
 	// 우측 버튼
 	rightButtons := container.NewHBox(refreshBtn)
