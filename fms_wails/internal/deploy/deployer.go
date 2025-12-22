@@ -2,7 +2,6 @@
 package deploy
 
 import (
-	"strings"
 	"sync"
 
 	"fms_wails/internal/http"
@@ -42,11 +41,8 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 		History:  model.NewDeployHistory(fw.DeviceName, template.Version),
 	}
 
-	// 템플릿 내용을 규칙 단위로 분리
-	rules := strings.Split(template.Contents, "\n")
-
-	// 규칙 배포
-	ruleResults, err := d.client.DeployRules(fw, rules)
+	// 템플릿 전체를 배포
+	deployResult, err := d.client.DeployTemplate(fw, template.Contents)
 	if err != nil {
 		result.Success = false
 		result.ErrorMsg = err.Error()
@@ -56,19 +52,43 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 		return result
 	}
 
-	// 결과 저장
-	result.History.Results = ruleResults
+	// DeployResult를 Firewall에 저장
+	fw.DeployResult = deployResult
+
+	// DeployResult.Info를 RuleResult로 변환하여 History에 저장
+	for _, info := range deployResult.Info {
+		ruleResult := model.RuleResult{
+			Rule:   info.Rule,
+			Text:   info.Text,
+			Status: info.Status,
+			Reason: info.Reason,
+		}
+		result.History.Results = append(result.History.Results, ruleResult)
+	}
 
 	// 전체 상태 계산
-	result.History.CalculateStatus()
-
-	// 장비 상태 업데이트
-	fw.DeployStatus = result.History.Status
-	if result.History.Status == model.DeployStatusSuccess {
+	if deployResult.Status == model.DeployStatusSuccess {
+		result.History.Status = model.DeployStatusSuccess
+		fw.DeployStatus = model.DeployStatusSuccess
 		fw.ServerStatus = model.ServerStatusRunning // 배포 성공 시 서버 상태도 running으로 변경
 		fw.Version = template.Version
 		result.Success = true
 	} else {
+		// error 체크
+		hasError := false
+		for _, info := range deployResult.Info {
+			if info.Status != model.RuleStatusOK {
+				hasError = true
+				break
+			}
+		}
+		if hasError {
+			result.History.Status = model.DeployStatusError
+			fw.DeployStatus = model.DeployStatusError
+		} else {
+			result.History.Status = model.DeployStatusFail
+			fw.DeployStatus = model.DeployStatusFail
+		}
 		fw.Version = "-"
 		result.Success = false
 	}
@@ -119,17 +139,23 @@ func (d *Deployer) HealthCheckMultiple(firewalls []*model.Firewall, progressCb f
 	return errors
 }
 
-// 여러 장비의 연결 상태를 한번에 확인합니다. (Agent 모드용 - 배치 호출)
+// 여러 장비의 연결 상태를 한번에 확인합니다. (Agent 모드용 - 배치 호출, Direct 모드는 병렬 처리)
 func (d *Deployer) HealthCheckBatch(firewalls []*model.Firewall) error {
 	if len(firewalls) == 0 {
 		return nil
 	}
 
-	// Agent 모드가 아니면 개별 호출로 처리
+	// Agent 모드가 아니면 병렬로 개별 호출 처리
 	if !d.config.IsAgentMode() {
+		var wg sync.WaitGroup
 		for _, fw := range firewalls {
-			d.HealthCheck(fw)
+			wg.Add(1)
+			go func(f *model.Firewall) {
+				defer wg.Done()
+				d.HealthCheck(f)
+			}(fw)
 		}
+		wg.Wait()
 		return nil
 	}
 

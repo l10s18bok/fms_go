@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -72,17 +71,12 @@ func (c *Client) CheckHealthViaAgent(ipAddrs []string) (map[string]bool, error) 
 // 직접 연결로 장비 상태를 확인합니다.
 func (c *Client) CheckHealthDirect(deviceIP string) (bool, error) {
 	url := fmt.Sprintf("http://%s/respCheck", deviceIP)
-	log.Printf("[DEBUG] CheckHealthDirect 요청: %s", url)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
-		log.Printf("[DEBUG] CheckHealthDirect 연결 실패: %v", err)
 		return false, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	log.Printf("[DEBUG] CheckHealthDirect 응답: StatusCode=%d, Body=%s", resp.StatusCode, string(body))
 
 	return resp.StatusCode == http.StatusOK, nil
 }
@@ -197,11 +191,9 @@ func convertTemplateForDirect(template string) string {
 // 직접 연결로 템플릿을 배포합니다.
 func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployResult, error) {
 	url := fmt.Sprintf("http://%s/agent/req-deploy", deviceIP)
-	log.Printf("[DEBUG] DeployDirect 요청: %s", url)
 
 	// Direct 모드용 템플릿 형식으로 변환
 	convertedTemplate := convertTemplateForDirect(template)
-	log.Printf("[DEBUG] DeployDirect 변환된 템플릿:\n%s", convertedTemplate)
 
 	// 요청 데이터 생성
 	reqData := map[string]interface{}{
@@ -212,12 +204,10 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 	if err != nil {
 		return nil, fmt.Errorf("JSON 변환 실패: %v", err)
 	}
-	log.Printf("[DEBUG] DeployDirect 요청 Body: %s", string(jsonData))
 
 	// POST 요청
 	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("[DEBUG] DeployDirect 연결 실패: %v", err)
 		return nil, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
@@ -226,7 +216,6 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 	if err != nil {
 		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
 	}
-	log.Printf("[DEBUG] DeployDirect 응답: StatusCode=%d, Body=%s", resp.StatusCode, string(body))
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("장비 응답 오류: %d", resp.StatusCode)
@@ -239,11 +228,9 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
 	}
-	log.Printf("[DEBUG] DeployDirect 파싱 결과: Data 개수=%d", len(response.Data))
 
 	// 해당 장비의 결과 찾기
 	for _, result := range response.Data {
-		log.Printf("[DEBUG] DeployDirect 결과 IP=%s, Status=%s", result.IP, result.Status)
 		if result.IP == deviceIP {
 			return &result, nil
 		}
