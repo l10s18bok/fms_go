@@ -479,6 +479,12 @@ func (d *DeviceTab) onDeploy() {
 		return
 	}
 
+	// 템플릿 내용 검증
+	if !template.IsValid() {
+		dialog.ShowError(fmt.Errorf("선택한 템플릿에 내용이 없습니다"), d.window)
+		return
+	}
+
 	// 체크된 장비 수집
 	checkedFirewalls := []*model.Firewall{}
 	for _, fw := range d.firewalls {
