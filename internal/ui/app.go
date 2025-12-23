@@ -60,28 +60,22 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 		}
 	}
 
+	// 네이티브 메뉴바 설정
+	ui.setupMainMenu()
+
 	return ui
 }
 
 // 메인 UI 컨텐츠를 반환합니다.
 func (m *MainUI) Content() fyne.CanvasObject {
-	// 윈도우 내부 메뉴바 생성
-	menuBar := m.createMenuBar()
-
-	// 전체 레이아웃: 상단 메뉴바, 중앙 탭
-	return container.NewBorder(
-		menuBar, // 상단
-		nil,     // 하단
-		nil,     // 좌측
-		nil,     // 우측
-		m.tabs,  // 중앙 (자동 확장)
-	)
+	// 탭만 반환 (메뉴바는 네이티브 메뉴로 이동)
+	return m.tabs
 }
 
-// 윈도우 내부 메뉴바를 생성합니다.
-func (m *MainUI) createMenuBar() fyne.CanvasObject {
+// 네이티브 메뉴바를 설정합니다.
+func (m *MainUI) setupMainMenu() {
 	// 파일 메뉴
-	fileMenu := fyne.NewMenu("",
+	fileMenu := fyne.NewMenu("파일",
 		fyne.NewMenuItem("Import", func() {
 			m.showImportDialog()
 		}),
@@ -95,74 +89,22 @@ func (m *MainUI) createMenuBar() fyne.CanvasObject {
 	)
 
 	// 도구 메뉴
-	toolsMenu := fyne.NewMenu("",
+	toolsMenu := fyne.NewMenu("도구",
 		fyne.NewMenuItem("설정", func() {
 			m.showSettingsDialog()
 		}),
 	)
 
 	// 도움말 메뉴
-	helpMenu := fyne.NewMenu("",
+	helpMenu := fyne.NewMenu("도움말",
 		fyne.NewMenuItem("도움말", func() {
 			m.showHelpDialog()
 		}),
 	)
 
-	// 메뉴 버튼 생성 (고정 크기: 80x30, 수동 배치로 간격 제거)
-	btnWidth := float32(80)
-	btnHeight := float32(30)
-
-	fileBtn := widget.NewButton("파일", nil)
-	fileBtn.OnTapped = func() {
-		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(fileBtn)
-		pos.Y += fileBtn.Size().Height
-		widget.ShowPopUpMenuAtPosition(fileMenu, m.window.Canvas(), pos)
-	}
-	fileBtn.Resize(fyne.NewSize(btnWidth, btnHeight))
-	fileBtn.Move(fyne.NewPos(0, 0))
-
-	toolsBtn := widget.NewButton("도구", nil)
-	toolsBtn.OnTapped = func() {
-		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(toolsBtn)
-		pos.Y += toolsBtn.Size().Height
-		widget.ShowPopUpMenuAtPosition(toolsMenu, m.window.Canvas(), pos)
-	}
-	toolsBtn.Resize(fyne.NewSize(btnWidth, btnHeight))
-	toolsBtn.Move(fyne.NewPos(btnWidth, 0))
-
-	helpBtn := widget.NewButton("도움말", nil)
-	helpBtn.OnTapped = func() {
-		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(helpBtn)
-		pos.Y += helpBtn.Size().Height
-		widget.ShowPopUpMenuAtPosition(helpMenu, m.window.Canvas(), pos)
-	}
-	helpBtn.Resize(fyne.NewSize(btnWidth, btnHeight))
-	helpBtn.Move(fyne.NewPos(btnWidth*2, 0))
-
-	// 새로고침 버튼 (우측)
-	refreshBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-		switch m.tabs.SelectedIndex() {
-		case 0: // 템플릿 관리 탭
-			m.templateTab.RefreshTemplates()
-		case 1: // 장비 관리 탭
-			m.deviceTab.RefreshDevices()
-		case 2: // 배포 이력 탭
-			m.historyTab.RefreshHistory()
-		}
-	})
-
-	// DeviceTab에 새로고침 버튼 참조 설정
-	m.deviceTab.SetRefreshButton(refreshBtn)
-
-	// 좌측 메뉴 버튼들 (수동 배치로 간격 완전 제거)
-	leftMenus := container.NewWithoutLayout(fileBtn, toolsBtn, helpBtn)
-	leftMenus.Resize(fyne.NewSize(btnWidth*3, btnHeight))
-
-	// 우측 버튼
-	rightButtons := container.NewHBox(refreshBtn)
-
-	// 메뉴바 레이아웃 (좌측 메뉴, 우측 새로고침)
-	return container.NewBorder(nil, nil, leftMenus, rightButtons, nil)
+	// 네이티브 메뉴바 생성 및 설정
+	mainMenu := fyne.NewMainMenu(fileMenu, toolsMenu, helpMenu)
+	m.window.SetMainMenu(mainMenu)
 }
 
 // 설정 다이얼로그를 표시합니다.
