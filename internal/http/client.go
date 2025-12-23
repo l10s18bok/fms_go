@@ -6,12 +6,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"fms/internal/model"
 )
+
+// HTTP 에러를 분석하여 사용자 친화적인 메시지를 반환합니다.
+func AnalyzeConnectionError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	errStr := err.Error()
+
+	// 연결 거부 체크 (서버가 명시적으로 거부)
+	if strings.Contains(errStr, "connection refused") {
+		return "연결 거부"
+	}
+
+	// 그 외 모든 경우 (타임아웃, 네트워크 문제, DNS 실패 등)
+	return "응답 없음"
+}
 
 // Client는 HTTP 클라이언트를 나타냅니다.
 type Client struct {
@@ -195,6 +213,10 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 	// Direct 모드용 템플릿 형식으로 변환
 	convertedTemplate := convertTemplateForDirect(template)
 
+	log.Printf("[DEBUG] DeployDirect URL: %s", url)
+	log.Printf("[DEBUG] DeployDirect 원본 템플릿:\n%s", template)
+	log.Printf("[DEBUG] DeployDirect 변환된 템플릿:\n%s", convertedTemplate)
+
 	// 요청 데이터 생성
 	reqData := map[string]interface{}{
 		"template": convertedTemplate,
@@ -205,17 +227,23 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 		return nil, fmt.Errorf("JSON 변환 실패: %v", err)
 	}
 
+	log.Printf("[DEBUG] DeployDirect 요청 Body: %s", string(jsonData))
+
 	// POST 요청
 	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
+		log.Printf("[DEBUG] DeployDirect 연결 실패: %v", err)
 		return nil, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("[DEBUG] DeployDirect 응답 읽기 실패: %v", err)
 		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
 	}
+
+	log.Printf("[DEBUG] DeployDirect 응답: StatusCode=%d, Body=%s", resp.StatusCode, string(body))
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("장비 응답 오류: %d", resp.StatusCode)

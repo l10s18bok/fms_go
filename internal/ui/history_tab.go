@@ -223,7 +223,9 @@ func (h *HistoryTab) Content() fyne.CanvasObject {
 func (h *HistoryTab) loadHistory() {
 	histories, err := h.store.GetAllHistory()
 	if err != nil {
-		dialog.ShowError(err, h.window)
+		fyne.Do(func() {
+			dialog.ShowError(err, h.window)
+		})
 		return
 	}
 
@@ -236,8 +238,12 @@ func (h *HistoryTab) loadHistory() {
 
 	h.selectedHistoryIndex = -1
 	h.selectedHistory = nil
-	h.historyTable.Refresh()
-	h.detailTable.Refresh()
+
+	// UI 업데이트는 메인 스레드에서 실행
+	fyne.Do(func() {
+		h.historyTable.Refresh()
+		h.detailTable.Refresh()
+	})
 }
 
 // 배포 이력을 새로고침합니다.
