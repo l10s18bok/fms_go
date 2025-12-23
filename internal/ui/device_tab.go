@@ -126,8 +126,17 @@ func (d *DeviceTab) createDeployControlPanel() fyne.CanvasObject {
 		d.onDeploy()
 	})
 
+	// 상태확인 버튼 (아이콘 + 텍스트)
+	refreshBtn := widget.NewButtonWithIcon("상태확인", theme.ViewRefreshIcon(), func() {
+		d.onRefreshAll()
+	})
+	d.refreshBtn = refreshBtn
+
+	// 버튼 영역
+	buttonArea := container.NewHBox(deployBtn, refreshBtn)
+
 	return container.NewVBox(
-		container.NewBorder(nil, nil, templateSelector, deployBtn, nil),
+		container.NewBorder(nil, nil, templateSelector, buttonArea, nil),
 		widget.NewSeparator(),
 	)
 }
