@@ -511,7 +511,7 @@ func (d *DeviceTab) onDeploy() {
 	progressLabel := widget.NewLabel("배포 준비 중...")
 	progressBar := widget.NewProgressBar()
 	progressContent := container.NewVBox(progressLabel, progressBar)
-	progressDialog := dialog.NewCustom("배포 진행 중", "취소", progressContent, d.window)
+	progressDialog := dialog.NewCustomWithoutButtons("배포 진행 중", progressContent, d.window)
 	progressDialog.Show()
 
 	// 백그라운드에서 배포 실행
