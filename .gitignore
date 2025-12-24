@@ -6,6 +6,7 @@ fms.apk
 
 # 설정 디렉토리 (민감 정보 포함 가능)
 config/
+config2/
 
 # 커널 모듈 소스 (참조용, 별도 관리)
 smartfw_hs/
@@ -28,12 +29,14 @@ smartfw_hs/
 Thumbs.db
 
 # Wails 자동 생성 파일
+fms_wails/frontend/node_modules/
+fms_wails/frontend/dist/
+fms_wails/frontend/wailsjs/
 fms_wails/frontend/package-lock.json
 fms_wails/frontend/package.json.md5
-fms_wails/frontend/wailsjs/
-fms_wails/go.mod
+fms_wails/build/bin/
 
-# Go 모듈 파일
+# Go 모듈 파일 (Fyne)
 go.mod
 go.sum
 
