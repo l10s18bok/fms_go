@@ -6,12 +6,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"fms_wails/internal/model"
 )
+
+// HTTP 에러를 분석하여 사용자 친화적인 메시지를 반환합니다.
+func AnalyzeConnectionError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	errStr := err.Error()
+
+	// 연결 거부 체크 (서버가 명시적으로 거부)
+	if strings.Contains(errStr, "connection refused") {
+		return "연결 거부"
+	}
+
+	// 그 외 모든 경우 (타임아웃, 네트워크 문제, DNS 실패 등)
+	return "응답 없음"
+}
 
 // Client는 HTTP 클라이언트를 나타냅니다.
 type Client struct {
@@ -129,75 +147,16 @@ func (c *Client) DeployViaAgent(deviceIP string, template string) (*model.Deploy
 	return nil, fmt.Errorf("장비 %s의 배포 결과를 찾을 수 없습니다", deviceIP)
 }
 
-// 템플릿을 Direct 모드용 형식으로 변환합니다.
-// 입력: req|INSERT|101|INPUT|ACCEPT|192.168.44.11|TCP|ANY|9090||
-// 출력: agent -m=insert -c=INPUT -p=tcp --dport=9090 -a=ACCEPT -s=192.168.44.11
-func convertTemplateForDirect(template string) string {
-	lines := strings.Split(template, "\n")
-	var result []string
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		// req|INSERT|101|INPUT|ACCEPT|192.168.44.11|TCP|ANY|9090||
-		parts := strings.Split(line, "|")
-		if len(parts) < 9 {
-			continue
-		}
-
-		// parts[0]: req
-		// parts[1]: INSERT/DELETE/FLUSH 등
-		// parts[2]: ID
-		// parts[3]: CHAIN (INPUT/OUTPUT/FORWARD)
-		// parts[4]: ACTION (ACCEPT/DROP/REJECT)
-		// parts[5]: SRC IP
-		// parts[6]: PROTOCOL (TCP/UDP/ANY)
-		// parts[7]: DST IP (또는 ANY)
-		// parts[8]: DPORT
-
-		method := strings.ToLower(parts[1])
-		chain := parts[3]
-		action := parts[4]
-		srcIP := parts[5]
-		protocol := strings.ToLower(parts[6])
-		dport := parts[8]
-
-		// agent 명령어 형식으로 변환
-		cmd := fmt.Sprintf("agent -m=%s -c=%s", method, chain)
-
-		if protocol != "any" && protocol != "" {
-			cmd += fmt.Sprintf(" -p=%s", protocol)
-		}
-
-		if dport != "" && dport != "ANY" {
-			cmd += fmt.Sprintf(" --dport=%s", dport)
-		}
-
-		cmd += fmt.Sprintf(" -a=%s", action)
-
-		if srcIP != "" && srcIP != "ANY" {
-			cmd += fmt.Sprintf(" -s=%s", srcIP)
-		}
-
-		result = append(result, cmd)
-	}
-
-	return strings.Join(result, "\n")
-}
-
 // 직접 연결로 템플릿을 배포합니다.
 func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployResult, error) {
 	url := fmt.Sprintf("http://%s/agent/req-deploy", deviceIP)
 
-	// Direct 모드용 템플릿 형식으로 변환
-	convertedTemplate := convertTemplateForDirect(template)
+	log.Printf("[DEBUG] DeployDirect URL: %s", url)
+	log.Printf("[DEBUG] DeployDirect 템플릿:\n%s", template)
 
-	// 요청 데이터 생성
+	// 요청 데이터 생성 (템플릿을 변환 없이 그대로 전송)
 	reqData := map[string]interface{}{
-		"template": convertedTemplate,
+		"template": template,
 		"ipAddrs":  []string{deviceIP},
 	}
 	jsonData, err := json.Marshal(reqData)
@@ -205,17 +164,23 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 		return nil, fmt.Errorf("JSON 변환 실패: %v", err)
 	}
 
+	log.Printf("[DEBUG] DeployDirect 요청 Body: %s", string(jsonData))
+
 	// POST 요청
 	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
+		log.Printf("[DEBUG] DeployDirect 연결 실패: %v", err)
 		return nil, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("[DEBUG] DeployDirect 응답 읽기 실패: %v", err)
 		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
 	}
+
+	log.Printf("[DEBUG] DeployDirect 응답: StatusCode=%d, Body=%s", resp.StatusCode, string(body))
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("장비 응답 오류: %d", resp.StatusCode)

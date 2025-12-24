@@ -277,10 +277,18 @@ func (s *JSONStore) SaveFirewall(firewall *model.Firewall) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 새 장비인 경우 ID 할당
-	if firewall.Index == 0 {
+	// 기존 장비인지 확인 (Index로 판단)
+	_, exists := s.firewalls[firewall.Index]
+
+	// 새 장비인 경우에만 ID 할당 (Index가 -1인 경우)
+	if firewall.Index < 0 {
 		firewall.Index = s.nextFirewallID
 		s.nextFirewallID++
+	}
+
+	// 기존 장비가 아니고 Index >= 0인 경우, nextFirewallID 업데이트
+	if !exists && firewall.Index >= s.nextFirewallID {
+		s.nextFirewallID = firewall.Index + 1
 	}
 
 	s.firewalls[firewall.Index] = firewall.Clone()

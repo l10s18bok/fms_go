@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"strings"
+
+	"fms_wails/internal/utils"
+)
 
 // 규칙 결과 상태 상수
 const (
@@ -13,12 +17,12 @@ const (
 
 // 배포 이력을 나타냅니다.
 type DeployHistory struct {
-	ID          int          `json:"id"`              // 고유 ID (Auto Increment)
-	Timestamp   time.Time    `json:"timestamp"`       // 배포 시간
-	DeviceIP    string       `json:"deviceIp"`        // 장비 IP
-	TemplateVer string       `json:"templateVersion"` // 배포한 템플릿 버전
-	Status      string       `json:"status"`          // 배포 상태 (success/fail/error)
-	Results     []RuleResult `json:"results"`         // 규칙별 결과
+	ID          int            `json:"id"`              // 고유 ID (Auto Increment)
+	Timestamp   utils.JSONTime `json:"timestamp"`       // 배포 시간
+	DeviceIP    string         `json:"deviceIp"`        // 장비 IP
+	TemplateVer string         `json:"templateVersion"` // 배포한 템플릿 버전
+	Status      string         `json:"status"`          // 배포 상태 (success/fail/error)
+	Results     []RuleResult   `json:"results"`         // 규칙별 결과
 }
 
 // 개별 규칙의 배포 결과를 나타냅니다.
@@ -32,7 +36,7 @@ type RuleResult struct {
 // 새로운 배포 이력을 생성합니다.
 func NewDeployHistory(deviceIP, templateVer string) *DeployHistory {
 	return &DeployHistory{
-		Timestamp:   time.Now(),
+		Timestamp:   utils.Now(),
 		DeviceIP:    deviceIP,
 		TemplateVer: templateVer,
 		Status:      DeployStatusUnknown,
@@ -73,19 +77,29 @@ func (h *DeployHistory) CalculateStatus() {
 
 // 포맷된 시간 문자열을 반환합니다.
 func (h *DeployHistory) GetTimestampString() string {
-	return h.Timestamp.Format("2006-01-02 15:04:05")
+	return h.Timestamp.Time().Format("2006-01-02 15:04:05")
 }
 
 // 규칙 상태 코드를 표시 텍스트로 변환합니다.
 func GetRuleStatusText(status string) string {
-	switch status {
+	// 대소문자 구분 없이 비교
+	switch strings.ToLower(status) {
 	case RuleStatusOK:
-		return "성공"
+		return "OK"
 	case RuleStatusError, RuleStatusUnfind, RuleStatusValidation:
 		return "실패"
 	case RuleStatusWrite:
 		return "진행중"
 	default:
+		return status // 원본 상태 표시
+	}
+}
+
+// 사유를 표시용 텍스트로 변환합니다.
+func GetReasonText(reason string) string {
+	// OK 또는 빈 문자열이면 "-" 표시
+	if reason == "" || strings.ToLower(reason) == "ok" {
 		return "-"
 	}
+	return reason
 }

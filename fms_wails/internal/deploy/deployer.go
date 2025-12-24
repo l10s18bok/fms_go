@@ -49,6 +49,16 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 		result.History.Status = model.DeployStatusFail
 		fw.DeployStatus = model.DeployStatusFail
 		fw.Version = "-"
+
+		// 연결 에러 분석하여 Results에 사유 추가
+		errorReason := http.AnalyzeConnectionError(err)
+		result.History.Results = append(result.History.Results, model.RuleResult{
+			Rule:   "-",
+			Text:   "-",
+			Status: model.RuleStatusError,
+			Reason: errorReason,
+		})
+
 		return result
 	}
 

@@ -49,7 +49,8 @@ const HistoryTab = forwardRef<HistoryTabRef>((_, ref) => {
 
     const handleDelete = async (id: number) => {
         const result = await ConfirmDialog('삭제 확인', '이 배포 이력을 삭제하시겠습니까?');
-        if (result !== '확인') return;
+        // Windows에서는 "Yes", "예", "확인" 등 다양한 값이 반환될 수 있음
+        if (result !== '확인' && result !== 'Yes' && result !== '예') return;
         await DeleteHistory(id);
         await loadHistory();
         if (selectedHistory?.id === id) {
@@ -62,7 +63,8 @@ const HistoryTab = forwardRef<HistoryTabRef>((_, ref) => {
             return;
         }
         const result = await ConfirmDialog('전체 삭제', `${history.length}개의 배포 이력을 모두 삭제하시겠습니까?`);
-        if (result !== '확인') return;
+        // Windows에서는 "Yes", "예", "확인" 등 다양한 값이 반환될 수 있음
+        if (result !== '확인' && result !== 'Yes' && result !== '예') return;
 
         for (const h of history) {
             await DeleteHistory(h.id);
@@ -90,11 +92,12 @@ const HistoryTab = forwardRef<HistoryTabRef>((_, ref) => {
 
     // 규칙 결과 배지
     const getRuleStatusBadge = (status: string) => {
-        if (status === 'ok') {
+        const lowerStatus = status?.toLowerCase() || '';
+        if (lowerStatus === 'ok') {
             return <span className="badge badge-success">성공</span>;
-        } else if (status === 'error' || status === 'unfind' || status === 'validation') {
+        } else if (lowerStatus === 'error' || lowerStatus === 'unfind' || lowerStatus === 'validation') {
             return <span className="badge badge-danger">실패</span>;
-        } else if (status === 'write') {
+        } else if (lowerStatus === 'write') {
             return <span className="badge badge-warning">진행중</span>;
         }
         return <span className="badge badge-info">{status || '-'}</span>;
@@ -104,7 +107,7 @@ const HistoryTab = forwardRef<HistoryTabRef>((_, ref) => {
     const getResultStats = (results: RuleResult[]) => {
         if (!results) return { total: 0, success: 0, fail: 0 };
         const total = results.length;
-        const success = results.filter(r => r.status === 'ok').length;
+        const success = results.filter(r => r.status.toLowerCase() === 'ok').length;
         const fail = total - success;
         return { total, success, fail };
     };
@@ -204,8 +207,8 @@ const HistoryTab = forwardRef<HistoryTabRef>((_, ref) => {
                                         <tbody>
                                             {selectedHistory.results.map((r, idx) => (
                                                 <tr key={idx}>
-                                                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                                                        {r.rule.length > 50 ? r.rule.substring(0, 50) + '...' : r.rule}
+                                                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem', wordBreak: 'break-all' }}>
+                                                        {r.rule}
                                                     </td>
                                                     <td>
                                                         {getRuleStatusBadge(r.status)}

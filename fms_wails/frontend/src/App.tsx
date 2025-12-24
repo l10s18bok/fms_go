@@ -18,7 +18,6 @@ import {
     SaveConfig,
     GetConfigDir,
     ResetAll,
-    ReloadData,
     GetAllTemplates,
     GetAllFirewalls,
     GetAllHistory,
@@ -118,13 +117,24 @@ function App() {
                     alert('유효한 템플릿 데이터가 아닙니다.');
                     return;
                 }
+                let skippedCount = 0;
                 for (const item of data) {
-                    if (item.version && item.contents) {
-                        await SaveTemplate(item.version, item.contents);
-                        importedCount++;
+                    if (item.version && item.contents && item.contents.trim()) {
+                        try {
+                            await SaveTemplate(item.version, item.contents);
+                            importedCount++;
+                        } catch (err) {
+                            console.error(`템플릿 저장 실패: ${item.version}`, err);
+                            skippedCount++;
+                        }
+                    } else {
+                        skippedCount++;
                     }
                 }
                 templateTabRef.current?.refresh();
+                if (skippedCount > 0) {
+                    console.log(`${skippedCount}개 템플릿이 유효하지 않아 건너뛰었습니다.`);
+                }
             } else if (activeTab === 'device') {
                 if (!Array.isArray(data)) {
                     alert('유효한 장비 데이터가 아닙니다.');
@@ -201,7 +211,8 @@ function App() {
     // Reset 처리
     const handleReset = async () => {
         const result = await ConfirmDialog('초기화', '모든 데이터(템플릿, 장비, 배포이력)를 초기화하시겠습니까?');
-        if (result !== '확인') {
+        // Windows에서는 "Yes", "예", "확인" 등 다양한 값이 반환될 수 있음
+        if (result !== '확인' && result !== 'Yes' && result !== '예') {
             return;
         }
 
@@ -215,17 +226,6 @@ function App() {
             await AlertDialog('오류', '초기화 중 오류가 발생했습니다.');
             console.error(err);
         }
-    };
-
-    // 새로고침 처리
-    const handleRefresh = async () => {
-        // 파일에서 모든 데이터 다시 로드
-        await ReloadData();
-
-        // 모든 탭 UI 새로고침
-        templateTabRef.current?.refresh();
-        deviceTabRef.current?.refresh();
-        historyTabRef.current?.refresh();
     };
 
     // 설정 다이얼로그 열기
@@ -323,11 +323,6 @@ function App() {
                         )}
                     </div>
                 </div>
-                <div className="menubar-right">
-                    <button className="menubar-icon-btn" onClick={handleRefresh} title="새로고침">
-                        🔃
-                    </button>
-                </div>
             </header>
 
             {/* 숨겨진 파일 입력 */}
@@ -367,7 +362,7 @@ function App() {
                     <TemplateTab ref={templateTabRef} />
                 </div>
                 <div style={{ display: activeTab === 'device' ? 'block' : 'none', height: '100%' }}>
-                    <DeviceTab ref={deviceTabRef} />
+                    <DeviceTab ref={deviceTabRef} onDeployComplete={() => historyTabRef.current?.refresh()} />
                 </div>
                 <div style={{ display: activeTab === 'history' ? 'block' : 'none', height: '100%' }}>
                     <HistoryTab ref={historyTabRef} />
@@ -507,15 +502,15 @@ function App() {
                         <div className="form-group">
                             <label>Connection</label>
                             <div className="radio-group">
-                                <label className="radio-label">
+                                <label className="radio-label" style={{ opacity: 0.5 }}>
                                     <input
                                         type="radio"
                                         name="connectionMode"
                                         value="agent"
                                         checked={config.connectionMode === 'agent'}
-                                        onChange={(e) => setConfig({ ...config, connectionMode: e.target.value })}
+                                        disabled
                                     />
-                                    Agent Server
+                                    Agent Server (준비중)
                                 </label>
                                 <label className="radio-label">
                                     <input
@@ -538,7 +533,7 @@ function App() {
                                 value={config.agentServerURL}
                                 onChange={(e) => setConfig({ ...config, agentServerURL: e.target.value })}
                                 placeholder="http://172.24.10.6:8080"
-                                disabled={config.connectionMode !== 'agent'}
+                                disabled
                             />
                         </div>
 
@@ -612,14 +607,6 @@ function App() {
                             <p>• Direct: 각 장비에 직접 HTTP 연결 (포트 80)</p>
                             <p>  - 상태확인: GET http://&#123;장비IP&#125;/respCheck</p>
                             <p>  - 배포: POST http://&#123;장비IP&#125;/deploy</p>
-
-                            <h5>[규칙 포맷]</h5>
-                            <code>req|INSERT|&#123;ID&#125;|&#123;CHAIN&#125;|&#123;ACTION&#125;|&#123;PROTOCOL&#125;|&#123;SRC&#125;|&#123;DST&#125;|&#123;옵션들&#125;</code>
-
-                            <h5>예시:</h5>
-                            <code>req|INSERT|3813792919|INPUT|FLUSH|ANY|ANY|ANY|||</code>
-                            <br />
-                            <code>req|INSERT|3813792919|INPUT|ACCEPT|TCP|192.168.1.0/24|ANY|80||</code>
                         </div>
 
                         <div className="modal-footer">

@@ -18,12 +18,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("실행 파일 경로를 찾을 수 없습니다: %v", err)
 	}
-	// 심볼릭 링크 해결 (실제 경로 획득)
-	execPath, err = filepath.EvalSymlinks(execPath)
+	// 심볼릭 링크 해결 시도, 실패하면 원본 경로 사용
+	resolvedPath, err := filepath.EvalSymlinks(execPath)
 	if err != nil {
-		log.Fatalf("실행 파일 경로를 해석할 수 없습니다: %v", err)
+		log.Printf("심볼릭 링크 해결 실패, 원본 경로 사용: %v", err)
+		resolvedPath = execPath
 	}
-	execDir := filepath.Dir(execPath)
+	execDir := filepath.Dir(resolvedPath)
 	configDir := filepath.Join(execDir, "config")
 
 	// 로그 파일 설정 (config/fms.log)

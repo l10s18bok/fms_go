@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -39,14 +40,15 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 
-	execPath, err = filepath.EvalSymlinks(execPath)
+	// 심볼릭 링크 해결 시도, 실패하면 원본 경로 사용
+	resolvedPath, err := filepath.EvalSymlinks(execPath)
 	if err != nil {
-		log.Printf("실행 파일 경로를 해석할 수 없습니다: %v", err)
-		return
+		log.Printf("심볼릭 링크 해결 실패, 원본 경로 사용: %v", err)
+		resolvedPath = execPath
 	}
 
-	execDir := filepath.Dir(execPath)
-	configDir := filepath.Join(execDir, "config")
+	execDir := filepath.Dir(resolvedPath)
+	configDir := filepath.Join(execDir, "config2")
 
 	store, err := storage.NewJSONStore(configDir)
 	if err != nil {
@@ -120,9 +122,9 @@ func (a *App) SaveTemplate(version, contents string) error {
 	if a.store == nil {
 		return nil
 	}
-	template := &model.Template{
-		Version:  version,
-		Contents: contents,
+	template := model.NewTemplate(version, contents)
+	if !template.IsValid() {
+		return fmt.Errorf("유효하지 않은 템플릿입니다. 버전과 내용을 확인해주세요.")
 	}
 	return a.store.SaveTemplate(template)
 }
@@ -221,6 +223,38 @@ func (a *App) CheckAllServerStatus() {
 	}
 }
 
+// CheckSelectedServerStatus는 선택된 장비들의 상태를 병렬로 확인합니다.
+func (a *App) CheckSelectedServerStatus(indexes []int) {
+	if a.store == nil || a.deployer == nil {
+		return
+	}
+
+	// 선택된 장비들을 가져옴
+	var selectedFirewalls []*model.Firewall
+	for _, idx := range indexes {
+		fw, err := a.store.GetFirewall(idx)
+		if err == nil && fw != nil {
+			selectedFirewalls = append(selectedFirewalls, fw)
+		}
+	}
+
+	if len(selectedFirewalls) == 0 {
+		return
+	}
+
+	// Agent 모드면 배치 호출, 아니면 병렬 개별 호출
+	if a.config.IsAgentMode() {
+		a.deployer.HealthCheckBatch(selectedFirewalls)
+	} else {
+		a.deployer.HealthCheckMultiple(selectedFirewalls, nil)
+	}
+
+	// 상태 저장
+	for _, fw := range selectedFirewalls {
+		a.store.SaveFirewall(fw)
+	}
+}
+
 // ===== 배포 API =====
 
 // Deploy는 템플릿을 장비에 배포합니다.
@@ -313,14 +347,6 @@ func (a *App) ResetAll() error {
 		return nil
 	}
 	return a.store.ClearAll()
-}
-
-// ReloadData는 파일에서 모든 데이터를 다시 로드합니다.
-func (a *App) ReloadData() error {
-	if a.store == nil {
-		return nil
-	}
-	return a.store.ReloadAll()
 }
 
 // GetConfigDir은 설정 디렉토리 경로를 반환합니다.

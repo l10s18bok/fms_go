@@ -3,8 +3,7 @@ import {
     GetAllFirewalls,
     SaveFirewall,
     DeleteFirewall,
-    CheckAllServerStatus,
-    CheckServerStatus,
+    CheckSelectedServerStatus,
     GetAllTemplates,
     Deploy,
     ConfirmDialog
@@ -28,7 +27,11 @@ export interface DeviceTabRef {
     refresh: () => void;
 }
 
-const DeviceTab = forwardRef<DeviceTabRef>((_, ref) => {
+interface DeviceTabProps {
+    onDeployComplete?: () => void;
+}
+
+const DeviceTab = forwardRef<DeviceTabRef, DeviceTabProps>(({ onDeployComplete }, ref) => {
     const [firewalls, setFirewalls] = useState<Firewall[]>([]);
     const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
@@ -40,7 +43,7 @@ const DeviceTab = forwardRef<DeviceTabRef>((_, ref) => {
     const [isChecking, setIsChecking] = useState(false);
 
     const emptyFirewall: Firewall = {
-        index: 0,
+        index: -1,
         deviceName: '',
         serverStatus: '-',
         deployStatus: '-',
@@ -102,7 +105,8 @@ const DeviceTab = forwardRef<DeviceTabRef>((_, ref) => {
             return;
         }
         const result = await ConfirmDialog('삭제 확인', `${selectedIndexes.length}개 장비를 삭제하시겠습니까?`);
-        if (result !== '확인') return;
+        // Windows에서는 "Yes", "예", "확인" 등 다양한 값이 반환될 수 있음
+        if (result !== '확인' && result !== 'Yes' && result !== '예') return;
 
         for (const idx of selectedIndexes) {
             await DeleteFirewall(idx);
@@ -112,17 +116,15 @@ const DeviceTab = forwardRef<DeviceTabRef>((_, ref) => {
     };
 
     const handleCheckStatus = async () => {
+        if (selectedIndexes.length === 0) {
+            alert('상태를 확인할 장비를 선택해주세요.');
+            return;
+        }
+
         setIsChecking(true);
         try {
-            if (selectedIndexes.length === 0) {
-                // 선택된 장비가 없으면 전체 확인
-                await CheckAllServerStatus();
-            } else {
-                // 선택된 장비만 확인
-                for (const idx of selectedIndexes) {
-                    await CheckServerStatus(idx);
-                }
-            }
+            // 선택된 장비들을 병렬로 확인 (Fyne과 동일)
+            await CheckSelectedServerStatus(selectedIndexes);
             await loadFirewalls();
         } finally {
             setIsChecking(false);
@@ -189,6 +191,11 @@ const DeviceTab = forwardRef<DeviceTabRef>((_, ref) => {
 
         await loadFirewalls();
         setIsDeploying(false);
+
+        // 배포 완료 콜백 호출 (이력 탭 새로고침용)
+        if (onDeployComplete) {
+            onDeployComplete();
+        }
 
         if (failCount === 0) {
             alert(`${successCount}개 장비에 배포가 완료되었습니다.`);

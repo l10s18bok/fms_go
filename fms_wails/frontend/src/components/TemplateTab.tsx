@@ -65,6 +65,10 @@ const TemplateTab = forwardRef<TemplateTabRef>((_, ref) => {
             alert('버전을 입력하세요.');
             return;
         }
+        if (!contents.trim()) {
+            alert('규칙 내용을 입력해주세요.');
+            return;
+        }
         await SaveTemplate(version, contents);
         await loadTemplates();
         setSelectedVersion(version);
@@ -72,15 +76,27 @@ const TemplateTab = forwardRef<TemplateTabRef>((_, ref) => {
     };
 
     const handleDelete = async () => {
-        if (!selectedVersion) return;
+        if (!selectedVersion) {
+            alert('삭제할 템플릿이 선택되지 않았습니다.');
+            return;
+        }
         const result = await ConfirmDialog('삭제 확인', `"${selectedVersion}" 템플릿을 삭제하시겠습니까?`);
-        if (result !== '확인') return;
+        // Windows에서는 "Yes", "예", "확인" 등 다양한 값이 반환될 수 있음
+        if (result !== '확인' && result !== 'Yes' && result !== '예') {
+            return;
+        }
 
-        await DeleteTemplate(selectedVersion);
-        await loadTemplates();
-        setSelectedVersion('');
-        setVersion('');
-        setContents('');
+        try {
+            await DeleteTemplate(selectedVersion);
+            await loadTemplates();
+            setSelectedVersion('');
+            setVersion('');
+            setContents('');
+            setIsNew(false);
+        } catch (err) {
+            console.error('템플릿 삭제 실패:', err);
+            alert(`템플릿 삭제 실패: ${err}`);
+        }
     };
 
     return (
@@ -126,7 +142,6 @@ const TemplateTab = forwardRef<TemplateTabRef>((_, ref) => {
                                 value={version}
                                 onChange={(e) => setVersion(e.target.value)}
                                 placeholder="예: v1.0.0"
-                                disabled={!isNew}
                             />
                         </div>
 
