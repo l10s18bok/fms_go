@@ -386,10 +386,10 @@ class DeviceTabState extends State<DeviceTab> {
       columnWidths: const {
         0: FixedColumnWidth(50),
         1: FlexColumnWidth(),
-        2: FixedColumnWidth(100),
-        3: FixedColumnWidth(100),
-        4: FixedColumnWidth(100),
-        5: FixedColumnWidth(80),
+        2: FixedColumnWidth(150),
+        3: FixedColumnWidth(150),
+        4: FixedColumnWidth(150),
+        5: FixedColumnWidth(150),
       },
       border: TableBorder(
         horizontalInside: BorderSide(color: AppTheme.borderColor),
