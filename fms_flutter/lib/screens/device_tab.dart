@@ -385,11 +385,11 @@ class DeviceTabState extends State<DeviceTab> {
     return Table(
       columnWidths: const {
         0: FixedColumnWidth(50),
-        1: FlexColumnWidth(),
-        2: FixedColumnWidth(150),
-        3: FixedColumnWidth(150),
-        4: FixedColumnWidth(150),
-        5: FixedColumnWidth(150),
+        1: FixedColumnWidth(350),
+        2: FlexColumnWidth(),
+        3: FlexColumnWidth(),
+        4: FlexColumnWidth(),
+        5: FlexColumnWidth(),
       },
       border: TableBorder(
         horizontalInside: BorderSide(color: AppTheme.borderColor),
@@ -400,13 +400,10 @@ class DeviceTabState extends State<DeviceTab> {
           decoration: BoxDecoration(color: AppTheme.borderColor),
           children: [
             TableCell(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Checkbox(
-                  value: _selectedIndexes.length == _firewalls.length &&
-                      _firewalls.isNotEmpty,
-                  onChanged: _handleSelectAll,
-                ),
+              child: Checkbox(
+                value: _selectedIndexes.length == _firewalls.length &&
+                    _firewalls.isNotEmpty,
+                onChanged: _handleSelectAll,
               ),
             ),
             const TableCell(
@@ -527,7 +524,7 @@ class DeviceTabState extends State<DeviceTab> {
         TableCell(
           verticalAlignment: TableCellVerticalAlignment.middle,
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(0, 15, 80, 15),
             child: FmsButton(
               text: '편집',
               type: FmsButtonType.secondary,

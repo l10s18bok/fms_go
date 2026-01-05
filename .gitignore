@@ -4,6 +4,7 @@ fms_mac
 fms*.exe
 fms*.zip
 fms.apk
+exe/
 
 # 설정 디렉토리 (민감 정보 포함 가능)
 config/
