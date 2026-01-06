@@ -112,13 +112,13 @@ agent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP
 
 | 컬럼 | 너비 | 위젯 | 설명 |
 |------|------|------|------|
-| 삭제 | 40px | Button | 행 삭제 버튼 |
-| Chain | 100px | Select | 체인 선택 |
-| Proto | 80px | Select | 프로토콜 선택 |
-| Action | 80px | Select | 액션 선택 |
-| DPort | 60px | Entry | 목적지 포트 |
-| SIP | 120px | Entry | 소스 IP |
-| DIP | 120px | Entry | 목적지 IP |
+| 삭제 | 36px | Button | 행 삭제 버튼 |
+| Chain | 110px | Select | 체인 선택 |
+| Proto | 110px | Select | 프로토콜 선택 |
+| Action | 110px | Select | 액션 선택 |
+| DPort | 110px | Entry | 목적지 포트 |
+| SIP | 180px | Entry | 소스 IP |
+| DIP | 180px | Entry | 목적지 IP |
 | B | 30px | Check | 블랙리스트 |
 | W | 30px | Check | 화이트리스트 |
 

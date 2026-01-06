@@ -181,7 +181,7 @@
   - [ ] `agent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP`
 - [ ] 확장 필드 파싱 테스트
   - [ ] --sip, --dip 포함
-  - [ ] --black, --white, --geoip 플래그 포함
+  - [ ] --black, --white 플래그 포함
 - [ ] 규칙 -> 텍스트 변환 테스트
 - [ ] 왕복 변환 테스트 (파싱 후 다시 텍스트로)
 
