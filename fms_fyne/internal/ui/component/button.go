@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -77,6 +78,13 @@ func NewIconTextButton(label string, icon fyne.Resource, style ButtonStyle, onTa
 	return btn
 }
 
+// 아이콘, 텍스트, 스타일이 적용된 버튼을 패딩과 함께 생성합니다.
+// top, bottom, left, right 순서로 패딩을 지정합니다. (기본값: 0)
+func NewIconTextButtonWithPadding(label string, icon fyne.Resource, style ButtonStyle, onTap func(), top, bottom, left, right float32) fyne.CanvasObject {
+	btn := NewIconTextButton(label, icon, style, onTap)
+	return container.New(layout.NewCustomPaddedLayout(top, bottom, left, right), btn)
+}
+
 // 탭 이벤트를 처리하는 간단한 컨테이너입니다.
 type TappableContainer struct {
 	widget.BaseWidget
@@ -125,7 +133,78 @@ func NewRedTextButton(text string, onTap func()) fyne.CanvasObject {
 	return NewTextButton(text, color.RGBA{R: 220, G: 53, B: 69, A: 255}, onTap)
 }
 
-// 회색 배경의 버튼을 생성합니다.
+// 전천후 커스텀 버튼을 생성합니다.
+// - icon: nil이면 텍스트만 표시
+// - iconColor: 아이콘/텍스트 색상 (nil이면 자동 결정: 밝은 배경→검정, 어두운 배경→흰색)
+// - bgColor: nil이면 투명 배경 (텍스트 버튼)
+// - margin: 외부 여백 (상, 하, 좌, 우 순서, 생략 시 0)
+func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.Color, onTap func(), margin ...float32) fyne.CanvasObject {
+	// 외부 여백 기본값
+	var mTop, mBottom, mLeft, mRight float32 = 0, 0, 0, 0
+	if len(margin) >= 4 {
+		mTop, mBottom, mLeft, mRight = margin[0], margin[1], margin[2], margin[3]
+	}
+
+	// 텍스트/아이콘 색상 결정 (기본값: 흰색)
+	var textColor color.Color = color.White
+	if iconColor != nil {
+		textColor = iconColor
+	}
+
+	// 컨텐츠 생성
+	var content fyne.CanvasObject
+
+	if icon != nil && label != "" {
+		// 아이콘 + 텍스트
+		iconImg := canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
+		iconImg.SetMinSize(fyne.NewSize(16, 16))
+		iconImg.FillMode = canvas.ImageFillContain
+		text := canvas.NewText(label, textColor)
+		text.TextStyle = fyne.TextStyle{Bold: true}
+		content = container.NewHBox(iconImg, text)
+	} else if icon != nil {
+		// 아이콘만
+		iconImg := canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
+		iconImg.SetMinSize(fyne.NewSize(16, 16))
+		iconImg.FillMode = canvas.ImageFillContain
+		content = iconImg
+	} else {
+		// 텍스트만
+		text := canvas.NewText(label, textColor)
+		text.TextStyle = fyne.TextStyle{Bold: true}
+		content = text
+	}
+
+	// 내부 패딩 적용 (기본값 고정: 8, 8, 16, 16)
+	paddedContent := container.New(layout.NewCustomPaddedLayout(8, 8, 16, 16), container.NewCenter(content))
+
+	// 버튼 생성
+	var btn fyne.CanvasObject
+	if bgColor != nil {
+		bg := canvas.NewRectangle(bgColor)
+		bg.CornerRadius = 4
+		btn = NewTappableContainer(container.NewStack(bg, paddedContent), onTap)
+	} else {
+		btn = NewTappableContainer(paddedContent, onTap)
+	}
+
+	// 외부 여백 적용
+	if mTop > 0 || mBottom > 0 || mLeft > 0 || mRight > 0 {
+		return container.New(layout.NewCustomPaddedLayout(mTop, mBottom, mLeft, mRight), btn)
+	}
+
+	return btn
+}
+
+// 밝은 색상인지 판별합니다.
+func isLightColor(c color.Color) bool {
+	r, g, b, _ := c.RGBA()
+	// 밝기 계산 (0-65535 범위)
+	brightness := (r*299 + g*587 + b*114) / 1000
+	return brightness > 32767
+}
+
+// Deprecated: NewCustomButton을 사용하세요.
 func NewColoredButton(text string, style ButtonStyle, onTap func()) fyne.CanvasObject {
 	// 배경색 결정
 	var bgColor color.Color

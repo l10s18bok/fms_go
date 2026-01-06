@@ -19,59 +19,58 @@
 
 ### Step 1.1: `internal/model/rule.go` 생성
 
-- [ ] Chain 상수 정의
-  - [ ] ChainINPUT (0)
-  - [ ] ChainOUTPUT (1)
-  - [ ] ChainFORWARD (2)
-  - [ ] ChainPREROUTING (3)
-  - [ ] ChainPOSTROUTING (4)
-- [ ] Protocol 상수 정의
-  - [ ] ProtocolTCP (6)
-  - [ ] ProtocolUDP (17)
-  - [ ] ProtocolICMP (1)
-  - [ ] ProtocolANY (255)
-- [ ] Action 상수 정의
-  - [ ] ActionDROP (0)
-  - [ ] ActionACCEPT (1)
-  - [ ] ActionREJECT (2)
-- [ ] FirewallRule 구조체 정의
-- [ ] 문자열 변환 헬퍼 메서드
-  - [ ] ChainToString()
-  - [ ] StringToChain()
-  - [ ] ProtocolToString()
-  - [ ] StringToProtocol()
-  - [ ] ActionToString()
-  - [ ] StringToAction()
-  - [ ] GetChainOptions() - UI Select용
-  - [ ] GetProtocolOptions() - UI Select용
-  - [ ] GetActionOptions() - UI Select용
+- [x] Chain 상수 정의
+  - [x] ChainINPUT (0)
+  - [x] ChainOUTPUT (1)
+  - [x] ChainFORWARD (2)
+  - [x] ChainPREROUTING (3)
+  - [x] ChainPOSTROUTING (4)
+- [x] Protocol 상수 정의
+  - [x] ProtocolTCP (6)
+  - [x] ProtocolUDP (17)
+  - [x] ProtocolICMP (1)
+  - [x] ProtocolANY (255)
+- [x] Action 상수 정의
+  - [x] ActionDROP (0)
+  - [x] ActionACCEPT (1)
+  - [x] ActionREJECT (2)
+- [x] FirewallRule 구조체 정의
+- [x] 문자열 변환 헬퍼 메서드
+  - [x] ChainToString()
+  - [x] StringToChain()
+  - [x] ProtocolToString()
+  - [x] StringToProtocol()
+  - [x] ActionToString()
+  - [x] StringToAction()
+  - [x] GetChainOptions() - UI Select용
+  - [x] GetProtocolOptions() - UI Select용
+  - [x] GetActionOptions() - UI Select용
 
 ### Step 1.2: `internal/parser/rule_parser.go` 생성
 
-- [ ] ParseLine(line string) (*FirewallRule, error)
-  - [ ] 빈 줄 처리
-  - [ ] 주석 라인(#) 처리
-  - [ ] agent 형식 파싱
-  - [ ] -c= (chain) 파싱
-  - [ ] -p= (protocol) 파싱
-  - [ ] -a= (action) 파싱
-  - [ ] --dport= 파싱
-  - [ ] --sip= 파싱
-  - [ ] --dip= 파싱
-  - [ ] --black 플래그 파싱
-  - [ ] --white 플래그 파싱
-  - [ ] --geoip 플래그 파싱
-- [ ] RuleToLine(rule *FirewallRule) string
-  - [ ] agent 형식으로 변환
-  - [ ] 필수 필드 출력
-  - [ ] 선택 필드 조건부 출력
-- [ ] ParseTextToRules(text string) ([]*FirewallRule, []error)
-  - [ ] 줄 단위 분리
-  - [ ] 각 줄 파싱
-  - [ ] 오류 수집
-- [ ] RulesToText(rules []*FirewallRule) string
-  - [ ] 각 규칙 변환
-  - [ ] 줄바꿈으로 연결
+- [x] ParseLine(line string) (*FirewallRule, error)
+  - [x] 빈 줄 처리
+  - [x] 주석 라인(#) 처리
+  - [x] agent 형식 파싱
+  - [x] -c= (chain) 파싱
+  - [x] -p= (protocol) 파싱
+  - [x] -a= (action) 파싱
+  - [x] --dport= 파싱
+  - [x] --sip= 파싱
+  - [x] --dip= 파싱
+  - [x] --black 플래그 파싱
+  - [x] --white 플래그 파싱
+- [x] RuleToLine(rule *FirewallRule) string
+  - [x] agent 형식으로 변환
+  - [x] 필수 필드 출력
+  - [x] 선택 필드 조건부 출력
+- [x] ParseTextToRules(text string) ([]*FirewallRule, []error)
+  - [x] 줄 단위 분리
+  - [x] 각 줄 파싱
+  - [x] 오류 수집
+- [x] RulesToText(rules []*FirewallRule) string
+  - [x] 각 규칙 변환
+  - [x] 줄바꿈으로 연결
 
 ---
 
@@ -79,63 +78,61 @@
 
 ### Step 2.1: `internal/ui/component/rule_row.go` 생성
 
-- [ ] RuleRow 구조체 정의
-  - [ ] rule *model.FirewallRule
-  - [ ] onDelete func()
-  - [ ] onChange func()
-- [ ] UI 요소 생성
-  - [ ] 삭제 버튼 (theme.DeleteIcon)
-  - [ ] Chain Select 위젯
-  - [ ] Protocol Select 위젯
-  - [ ] Action Select 위젯
-  - [ ] DPort Entry 위젯
-  - [ ] SIP Entry 위젯
-  - [ ] DIP Entry 위젯
-  - [ ] Black Check 위젯
-  - [ ] White Check 위젯
-  - [ ] GeoIP Check 위젯
-- [ ] 컨테이너 레이아웃 (HBox)
-- [ ] NewRuleRow() 생성자
-- [ ] GetRule() 메서드
-- [ ] SetRule() 메서드
-- [ ] Content() 메서드
+- [x] RuleRow 구조체 정의
+  - [x] rule *model.FirewallRule
+  - [x] onDelete func()
+  - [x] onChange func()
+- [x] UI 요소 생성
+  - [x] 삭제 버튼 (theme.DeleteIcon)
+  - [x] Chain Select 위젯
+  - [x] Protocol Select 위젯
+  - [x] Action Select 위젯
+  - [x] DPort Entry 위젯
+  - [x] SIP Entry 위젯
+  - [x] DIP Entry 위젯
+  - [x] Black Check 위젯
+  - [x] White Check 위젯
+- [x] 컨테이너 레이아웃 (HBox)
+- [x] NewRuleRow() 생성자
+- [x] GetRule() 메서드
+- [x] SetRule() 메서드
+- [x] Content() 메서드
 
 ### Step 2.2: `internal/ui/component/rule_list.go` 생성
 
-- [ ] RuleList 구조체 정의
-  - [ ] rows []*RuleRow
-  - [ ] onChange func()
-  - [ ] container *fyne.Container
-- [ ] 헤더 행 생성
-  - [ ] 컬럼 Label들
-- [ ] 스크롤 가능한 VBox
-- [ ] NewRuleList() 생성자
-- [ ] AddRule(rule *FirewallRule) 메서드
-- [ ] RemoveRule(index int) 메서드
-- [ ] GetRules() []*FirewallRule 메서드
-- [ ] SetRules(rules []*FirewallRule) 메서드
-- [ ] Clear() 메서드
-- [ ] Content() 메서드
-- [ ] Refresh() 메서드
+- [x] RuleList 구조체 정의
+  - [x] rows []*RuleRow
+  - [x] onChange func()
+  - [x] container *fyne.Container
+- [x] 헤더 행 생성
+  - [x] 컬럼 Label들
+- [x] 스크롤 가능한 VBox
+- [x] NewRuleList() 생성자
+- [x] AddRule(rule *FirewallRule) 메서드
+- [x] RemoveRule(index int) 메서드
+- [x] GetRules() []*FirewallRule 메서드
+- [x] SetRules(rules []*FirewallRule) 메서드
+- [x] Clear() 메서드
+- [x] Content() 메서드
+- [x] Refresh() 메서드
 
 ### Step 2.3: `internal/ui/component/rule_form.go` 생성
 
-- [ ] RuleForm 구조체 정의
-  - [ ] onAdd func(*FirewallRule)
-- [ ] UI 요소 생성
-  - [ ] Chain Select (기본값: INPUT)
-  - [ ] Protocol Select (기본값: TCP)
-  - [ ] Action Select (기본값: DROP)
-  - [ ] DPort Entry
-  - [ ] SIP Entry
-  - [ ] DIP Entry
-  - [ ] Black Check
-  - [ ] White Check
-  - [ ] GeoIP Check
-  - [ ] 추가 버튼
-- [ ] NewRuleForm() 생성자
-- [ ] Reset() 메서드
-- [ ] Content() 메서드
+- [x] RuleForm 구조체 정의
+  - [x] onAdd func(*FirewallRule)
+- [x] UI 요소 생성
+  - [x] Chain Select (기본값: INPUT)
+  - [x] Protocol Select (기본값: TCP)
+  - [x] Action Select (기본값: DROP)
+  - [x] DPort Entry
+  - [x] SIP Entry
+  - [x] DIP Entry
+  - [x] Black Check
+  - [x] White Check
+  - [x] 추가 버튼
+- [x] NewRuleForm() 생성자
+- [x] Reset() 메서드
+- [x] Content() 메서드
 
 ---
 
@@ -143,34 +140,34 @@
 
 ### Step 3.1: `internal/ui/rule_builder.go` 생성
 
-- [ ] RuleBuilder 구조체 정의
-  - [ ] ruleList *component.RuleList
-  - [ ] ruleForm *component.RuleForm
-  - [ ] onChange func()
-- [ ] NewRuleBuilder() 생성자
-- [ ] Content() 메서드
-- [ ] GetRules() []*FirewallRule 메서드
-- [ ] SetRules(rules []*FirewallRule) 메서드
-- [ ] Clear() 메서드
+- [x] RuleBuilder 구조체 정의
+  - [x] ruleList *component.RuleList
+  - [x] ruleForm *component.RuleForm
+  - [x] onChange func()
+- [x] NewRuleBuilder() 생성자
+- [x] Content() 메서드
+- [x] GetRules() []*FirewallRule 메서드
+- [x] SetRules(rules []*FirewallRule) 메서드
+- [x] Clear() 메서드
 
 ### Step 3.2: `internal/ui/template_tab.go` 수정
 
-- [ ] TemplateTab 구조체 필드 추가
-  - [ ] ruleBuilder *RuleBuilder
-  - [ ] subTabs *container.AppTabs
-- [ ] createTemplateContentPanel() 수정
-  - [ ] 텍스트 편집 탭 생성
-  - [ ] 규칙 빌더 탭 생성
-  - [ ] container.NewAppTabs() 사용
-  - [ ] OnSelected 핸들러 설정
-- [ ] onSubTabChanged() 핸들러 추가
-  - [ ] 텍스트 -> 빌더: ParseTextToRules() 호출
-  - [ ] 빌더 -> 텍스트: RulesToText() 호출
-- [ ] onSaveTemplate() 수정
-  - [ ] 현재 활성 탭 확인
-  - [ ] 규칙 빌더 탭이면 텍스트로 변환 후 저장
-- [ ] onTemplateSelected() 수정
-  - [ ] 두 뷰 모두 동기화
+- [x] TemplateTab 구조체 필드 추가
+  - [x] ruleBuilder *RuleBuilder
+  - [x] subTabs *container.AppTabs
+- [x] createTemplateContentPanel() 수정
+  - [x] 텍스트 편집 탭 생성
+  - [x] 규칙 빌더 탭 생성
+  - [x] container.NewAppTabs() 사용
+  - [x] OnSelected 핸들러 설정
+- [x] onSubTabChanged() 핸들러 추가
+  - [x] 텍스트 -> 빌더: ParseTextToRules() 호출
+  - [x] 빌더 -> 텍스트: RulesToText() 호출
+- [x] onSaveTemplate() 수정
+  - [x] 현재 활성 탭 확인
+  - [x] 규칙 빌더 탭이면 텍스트로 변환 후 저장
+- [x] onTemplateSelected() 수정
+  - [x] 두 뷰 모두 동기화
 
 ---
 
@@ -190,7 +187,7 @@
 
 ### UI 테스트
 
-- [ ] 빌드 성공 확인
+- [x] 빌드 성공 확인
 - [ ] 앱 실행 확인
 - [ ] 템플릿 탭 표시 확인
 - [ ] 서브 탭 전환 확인
@@ -217,7 +214,7 @@
 ## 완료 체크
 
 - [ ] 모든 Phase 완료
-- [ ] 빌드 오류 없음
+- [x] 빌드 오류 없음
 - [ ] 기본 기능 동작 확인
 - [ ] fms_wails 적용 준비
 
@@ -225,5 +222,8 @@
 
 ## 메모
 
-(구현 중 발견한 이슈나 변경사항을 여기에 기록)
+### 2026-01-05
+- fms_fyne 규칙 빌더 구현 완료
+- 빌드 성공 확인
+- UI 테스트 필요 (사용자 확인 필요)
 

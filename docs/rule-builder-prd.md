@@ -49,7 +49,7 @@ agent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP
 
 | 필드 | 타입 | 가능한 값 | UI 컴포넌트 | 필수 |
 |------|------|-----------|-------------|------|
-| chain | int | INPUT(0), OUTPUT(1), FORWARD(2), PREROUTING(3), POSTROUTING(4) | Select | O |
+| chain | int | INPUT(0), OUTPUT(1), FORWARD(2) | Select | O |
 | protocol | int | TCP(6), UDP(17), ICMP(1), ANY(255) | Select | O |
 | action | int | DROP(0), ACCEPT(1), REJECT(2) | Select | O |
 | dport | int | 포트 번호 (0-65535) | Entry | X |
@@ -57,7 +57,6 @@ agent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP
 | dip | string | Destination IP (콤마리스트 지원) | Entry | X |
 | black | bool | 블랙리스트 규칙 여부 | Check | X |
 | white | bool | 화이트리스트 규칙 여부 | Check | X |
-| geoip | bool | GeoIP 필터링 적용 여부 | Check | X |
 
 ### 3.2 명령어 매핑
 
@@ -71,7 +70,6 @@ agent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP
 | dip | --dip= | --dip=10.0.0.1 |
 | black | --black | --black |
 | white | --white | --white |
-| geoip | --geoip | --geoip |
 
 ---
 
@@ -87,16 +85,16 @@ agent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP
 │  좌측 패널     ├─────────────────────────────────────────────────────┤
 │  (템플릿 목록) │                                                     │
 │                │  ┌───────────────────────────────────────────────┐  │
-│  ○ v1.1.0      │  │ [X]│Chain │Proto│Action│DPort│ SIP │ B │ W │G│  │
-│  ○ v1.0.0      │  ├────┼──────┼─────┼──────┼─────┼─────┼───┼───┼─┤  │
-│                │  │ X  │INPUT │ TCP │ DROP │9010 │ ANY │ □ │ □ │□│  │
-│                │  │ X  │INPUT │ TCP │ DROP │9020 │ ANY │ □ │ □ │□│  │
+│  ○ v1.1.0      │  │ [X]│Chain │Proto│Action│DPort│ SIP │ B │ W │    │
+│  ○ v1.0.0      │  ├────┼──────┼─────┼──────┼─────┼─────┼───┼───┤    │
+│                │  │ X  │INPUT │ TCP │ DROP │9010 │ ANY │ □ │ □ │    │
+│                │  │ X  │INPUT │ TCP │ DROP │9020 │ ANY │ □ │ □ │    │
 │                │  └───────────────────────────────────────────────┘  │
 │                │                                                     │
 │                │  ┌─ 규칙 추가 ────────────────────────────────────┐ │
 │                │  │ Chain:[INPUT v] Proto:[TCP v] Action:[DROP v] │ │
 │                │  │ DPort:[     ] SIP:[          ] DIP:[        ] │ │
-│                │  │ [ ] Black  [ ] White  [ ] GeoIP   [+ 추가]    │ │
+│                │  │ [ ] Black  [ ] White           [+ 추가]       │ │
 │                │  └───────────────────────────────────────────────┘ │
 ├────────────────┴─────────────────────────────────────────────────────┤
 │ v1.0.0                                         [저장] [삭제]        │
@@ -123,7 +121,6 @@ agent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP
 | DIP | 120px | Entry | 목적지 IP |
 | B | 30px | Check | 블랙리스트 |
 | W | 30px | Check | 화이트리스트 |
-| G | 30px | Check | GeoIP |
 
 ### 4.4 규칙 추가 폼
 
@@ -236,7 +233,6 @@ type FirewallRule struct {
     DIP      string
     Black    bool
     White    bool
-    GeoIP    bool
 }
 ```
 

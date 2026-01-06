@@ -6,6 +6,7 @@ import (
 
 	"fms/internal/model"
 	"fms/internal/storage"
+	"fms/internal/themes"
 	"fms/internal/ui/component"
 
 	"fyne.io/fyne/v2"
@@ -118,12 +119,12 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 	}
 
 	// 삭제 버튼 (투명 배경 + 빨간 텍스트)
-	deleteBtn := component.NewRedTextButton("이력 삭제", func() {
+	deleteBtn := component.NewCustomButton("이력 삭제", nil, themes.Colors["red"], nil, func() {
 		h.onDeleteHistory()
 	})
 
 	// 전체 삭제 버튼 (투명 배경 + 빨간 텍스트)
-	clearBtn := component.NewRedTextButton("전체 삭제", func() {
+	clearBtn := component.NewCustomButton("전체 삭제", nil, themes.Colors["red"], nil, func() {
 		h.onClearHistory()
 	})
 

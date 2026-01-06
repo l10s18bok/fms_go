@@ -4,7 +4,9 @@ import (
 	"sort"
 
 	"fms/internal/model"
+	"fms/internal/parser"
 	"fms/internal/storage"
+	"fms/internal/themes"
 	"fms/internal/ui/component"
 	"fms/internal/version"
 
@@ -24,6 +26,8 @@ type TemplateTab struct {
 	// UI 컴포넌트
 	templateList    *widget.RadioGroup // 템플릿 목록 (라디오 버튼)
 	templateContent *widget.Entry      // 템플릿 내용 편집기
+	ruleBuilder     *RuleBuilder       // 규칙 빌더
+	subTabs         *container.AppTabs // 서브 탭 (텍스트 편집 / 규칙 빌더)
 
 	// 데이터
 	templates       []*model.Template
@@ -47,7 +51,7 @@ func (t *TemplateTab) createUI() {
 	// 좌측: 템플릿 목록 패널
 	leftPanel := t.createTemplateListPanel()
 
-	// 우측: 템플릿 내용 패널
+	// 우측: 템플릿 내용 패널 (서브 탭 포함)
 	rightPanel := t.createTemplateContentPanel()
 
 	// 좌우 분할 (25% : 75%)
@@ -89,27 +93,58 @@ func (t *TemplateTab) createTemplateListPanel() fyne.CanvasObject {
 
 // 템플릿 내용 편집 패널을 생성합니다.
 func (t *TemplateTab) createTemplateContentPanel() fyne.CanvasObject {
-	// 템플릿 내용 편집기 (여러 줄)
+	// 텍스트 편집기
 	t.templateContent = widget.NewMultiLineEntry()
-	t.templateContent.SetPlaceHolder("템플릿 내용을 입력하세요...\n\n예시:\nreq|INSERT|3813792919|INPUT|FLUSH|ANY|ANY|ANY|||\nreq|INSERT|3813792919|INPUT|ACCEPT|TCP|192.168.1.0/24|ANY|80||")
+	t.templateContent.SetPlaceHolder("템플릿 내용을 입력하세요...\n\n예시:\nagent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP")
 	t.templateContent.Wrapping = fyne.TextWrapOff
 
-	// Clear 버튼
-	clearBtn := widget.NewButton("Clear", func() {
-		t.templateContent.SetText("")
-		t.selectedVersion = ""
-		t.templateList.SetSelected("")
-	})
+	// 규칙 빌더
+	t.ruleBuilder = NewRuleBuilder(nil)
 
-	// 제목과 Clear 버튼을 포함한 헤더
-	header := container.NewBorder(nil, nil, widget.NewLabel("템플릿 내용"), clearBtn, nil)
+	// 텍스트 편집 탭
+	textEditTab := container.NewTabItem("텍스트 편집", t.templateContent)
+
+	// 규칙 빌더 탭
+	ruleBuilderTab := container.NewTabItem("규칙 빌더", t.ruleBuilder.Content())
+
+	// 서브 탭 생성
+	t.subTabs = container.NewAppTabs(textEditTab, ruleBuilderTab)
+	t.subTabs.OnSelected = t.onSubTabChanged
+
+	// 저장, 삭제 버튼
+	saveBtn := component.NewCustomButton("저장", theme.ConfirmIcon(), nil, themes.Colors["blue"], func() {
+		t.onSaveTemplate()
+	}, 5, 5, 5, 5)
+	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
+		t.onDeleteTemplate()
+	}, 5, 5, 5, 5)
+	buttons := container.NewHBox(saveBtn, deleteBtn)
+
+	// 헤더: "템플릿 내용" + 저장/삭제 버튼
+	header := container.NewBorder(nil, nil, widget.NewLabel("템플릿 내용"), buttons, nil)
 
 	// 제목과 함께 반환
 	return container.NewBorder(
 		header,
 		nil, nil, nil,
-		t.templateContent,
+		t.subTabs,
 	)
+}
+
+// onSubTabChanged 서브 탭 전환 시 호출
+func (t *TemplateTab) onSubTabChanged(tab *container.TabItem) {
+	if tab.Text == "규칙 빌더" {
+		// 텍스트 -> 규칙 빌더로 변환
+		rules, comments, _ := parser.ParseTextToRules(t.templateContent.Text)
+		t.ruleBuilder.SetRules(rules)
+		t.ruleBuilder.SetComments(comments)
+	} else {
+		// 규칙 빌더 -> 텍스트로 변환
+		rules := t.ruleBuilder.GetRules()
+		comments := t.ruleBuilder.GetComments()
+		text := parser.RulesToText(rules, comments)
+		t.templateContent.SetText(text)
+	}
 }
 
 // 하단 버튼/입력 영역을 생성합니다.
@@ -117,18 +152,8 @@ func (t *TemplateTab) createBottomPanel() fyne.CanvasObject {
 	// 앱 버전 표시
 	appVersionLabel := widget.NewLabel(version.GetVersionString())
 
-	// 버튼들 (컴포넌트 사용)
-	saveBtn := component.NewIconTextButton("저장", theme.ConfirmIcon(), component.ButtonPrimary, func() {
-		t.onSaveTemplate()
-	})
-
-	deleteBtn := component.NewIconTextButton("삭제", theme.DeleteIcon(), component.ButtonDanger, func() {
-		t.onDeleteTemplate()
-	})
-
-	// 버튼 그룹 (간격 추가)
-	spacer := widget.NewLabel("  ")
-	buttons := container.NewHBox(saveBtn, spacer, deleteBtn)
+	// 버튼 그룹 없음 (저장/삭제는 규칙 빌더로 이동)
+	buttons := container.NewHBox()
 
 	// 하단 레이아웃
 	return container.NewVBox(
@@ -168,6 +193,7 @@ func (t *TemplateTab) loadTemplates() {
 	if t.selectedVersion == "" {
 		t.templateList.SetSelected("")
 		t.templateContent.SetText("")
+		t.ruleBuilder.Clear()
 	}
 	t.templateList.Refresh()
 }
@@ -182,6 +208,7 @@ func (t *TemplateTab) ClearSelection() {
 	t.selectedVersion = ""
 	t.templateList.SetSelected("")
 	t.templateContent.SetText("")
+	t.ruleBuilder.Clear()
 }
 
 // 모든 템플릿 버전 목록을 반환합니다.
@@ -213,14 +240,31 @@ func (t *TemplateTab) onTemplateSelected(version string) {
 	for _, tmpl := range t.templates {
 		if tmpl.Version == version {
 			t.templateContent.SetText(tmpl.Contents)
+
+			// 규칙 빌더도 동기화
+			rules, comments, _ := parser.ParseTextToRules(tmpl.Contents)
+			t.ruleBuilder.SetRules(rules)
+			t.ruleBuilder.SetComments(comments)
 			return
 		}
 	}
 }
 
+// getCurrentContents 현재 활성 탭에서 내용 가져오기
+func (t *TemplateTab) getCurrentContents() string {
+	if t.subTabs.Selected().Text == "규칙 빌더" {
+		// 규칙 빌더에서 텍스트로 변환
+		rules := t.ruleBuilder.GetRules()
+		comments := t.ruleBuilder.GetComments()
+		return parser.RulesToText(rules, comments)
+	}
+	// 텍스트 편집기에서 직접 반환
+	return t.templateContent.Text
+}
+
 // 템플릿 저장 시 호출됩니다.
 func (t *TemplateTab) onSaveTemplate() {
-	contents := t.templateContent.Text
+	contents := t.getCurrentContents()
 
 	if contents == "" {
 		dialog.ShowInformation("알림", "템플릿 내용을 입력해주세요.", t.window)
@@ -287,7 +331,7 @@ func (t *TemplateTab) onDeleteTemplate() {
 		t.templateList.SetSelected("")
 		t.selectedVersion = ""
 		t.templateContent.SetText("")
+		t.ruleBuilder.Clear()
 		t.loadTemplates()
 	}, t.window)
 }
-

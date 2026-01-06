@@ -11,7 +11,6 @@ Go Fyne 패키지를 이용하여 구현하는 방화벽 관리 시스템(FMS) �
 
 ### 기존 코드 수정 금지
 
-- **`smartfw_hs/` 폴더 내의 모든 파일 수정 금지**
 - **`index.html` 파일 수정 금지**
 - 기존 코드의 함수명, 변수명 등을 임의로 수정하면 안됨
 - 기존 코드는 참조용으로만 사용
@@ -37,6 +36,9 @@ fms_go/
 ├── CLAUDE.md               # Claude 개발 가이드 (현재 파일)
 ├── flutter_wails_fyne.md   # 프레임워크 비교 문서
 ├── index.html              # 원본 웹 애플리케이션 (참조용, 수정 금지)
+├── docs/                   # 개발 문서
+│   ├── rule-builder-prd.md       # 규칙 빌더 PRD 문서
+│   └── rule-builder-checklist.md # 규칙 빌더 구현 체크리스트
 ├── fms_fyne/               # Go Fyne 프로젝트
 ├── fms_flutter/            # Flutter 프로젝트
 └── fms_wails/              # Wails 프로젝트
@@ -155,10 +157,9 @@ req|INSERT|3813792919|INPUT|ACCEPT|TCP|192.168.1.0/24|ANY|80||
 
 ## 참조 문서
 
-- [FMS_SPEC.md](FMS_SPEC.md) - 상세 기능 명세 및 구현 예시 코드
-- [DEV_PROC.md](DEV_PROC.md) - 개발 절차서, UI 레이아웃, 반응형 가이드, 커스텀 컴포넌트
 - [index.html](index.html) - 원본 웹 애플리케이션 (참조용)
-- [smartfw_hs/Makefile](smartfw_hs/Makefile) - 규칙 포맷 및 SSH 설정 참조
+- [docs/rule-builder-prd.md](docs/rule-builder-prd.md) - 규칙 빌더 PRD (기능 요구사항, UI 설계, 기술 사양)
+- [docs/rule-builder-checklist.md](docs/rule-builder-checklist.md) - 규칙 빌더 구현 체크리스트
 
 ---
 
@@ -166,14 +167,79 @@ req|INSERT|3813792919|INPUT|ACCEPT|TCP|192.168.1.0/24|ANY|80||
 
 ### 빌드 파일명 규칙
 
-| 플랫폼 | 파일명 | 비고 |
-|--------|--------|------|
-| Windows | `fms_fyne.exe` | 운영 환경 |
+| 프로젝트 | 파일명 | 비고 |
+|----------|--------|------|
+| fms_fyne | `fms_fyne.exe` | Go Fyne GUI |
+| fms_wails | `fms_wails.exe` | Wails + React |
 
-### Windows에서 빌드
+### fms_fyne 빌드 (Windows)
+
+**CMD / Git Bash:**
 ```bash
 cd fms_fyne
 go mod download
 go mod tidy
 go build -ldflags "-H windowsgui -s -w" -o fms_fyne.exe .
 ```
+
+**PowerShell:**
+```powershell
+cd fms_fyne
+go mod download
+go mod tidy
+go build -ldflags '-H windowsgui -s -w' -o fms_fyne.exe .
+```
+
+### fms_wails 빌드 (Windows)
+
+**CMD / Git Bash / PowerShell:**
+```bash
+cd fms_wails
+wails build
+# 또는 개발 모드
+wails dev
+```
+빌드 결과: `build/bin/fms_wails.exe`
+
+### 빌드 옵션 설명
+
+`-ldflags "-H windowsgui -s -w"` 옵션의 의미:
+
+| 옵션 | 설명 |
+|------|------|
+| `-H windowsgui` | Windows GUI 애플리케이션으로 빌드 (콘솔 창 없음) |
+| `-s` | 심볼 테이블 제거 (파일 크기 감소) |
+| `-w` | DWARF 디버그 정보 제거 (파일 크기 감소) |
+
+**중요**: 이 옵션 없이 빌드하면 exe 파일이 실행되지 않을 수 있음
+
+---
+
+## 문제 해결
+
+### exe 파일 실행 오류: "이 OS 플랫폼에 올바른 응용 프로그램이 아닙니다"
+
+**증상:**
+- PowerShell에서 `.\fms_fyne.exe` 실행 시 오류 발생
+- 파일 관리자에서 더블클릭 시 "현재 이 PC에서 실행할 수 없습니다" 오류
+
+**원인:**
+1. `-ldflags "-H windowsgui -s -w"` 옵션 없이 빌드한 경우
+2. Go 빌드 캐시 문제
+3. Windows Defender가 빌드 중 파일 손상
+
+**해결 방법:**
+```bash
+# 1. 기존 exe 및 캐시 정리
+cd fms_fyne
+rm -f fms_fyne.exe __debug_bin*
+go clean -cache
+
+# 2. 올바른 옵션으로 다시 빌드
+go build -ldflags "-H windowsgui -s -w" -o fms_fyne.exe .
+```
+
+**예방:**
+- Windows Defender에서 프로젝트 폴더를 제외 목록에 추가
+  - Windows 보안 → 바이러스 및 위협 방지 → 설정 관리 → 제외 추가
+  - 폴더: `D:\ProjectSBLee\fms_go\fms_fyne`

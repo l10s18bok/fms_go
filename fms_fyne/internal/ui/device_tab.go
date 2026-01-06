@@ -10,6 +10,7 @@ import (
 	"fms/internal/deploy"
 	"fms/internal/model"
 	"fms/internal/storage"
+	"fms/internal/themes"
 	"fms/internal/ui/component"
 
 	"fyne.io/fyne/v2"
@@ -103,11 +104,11 @@ func (d *DeviceTab) createDeployControlPanel() fyne.CanvasObject {
 	d.statusRedLabel = widget.NewLabel("0")
 
 	// 색상이 있는 상태 표시 (canvas.Text 사용)
-	greenDot := canvas.NewText("●", color.RGBA{R: 0, G: 200, B: 0, A: 255})
+	greenDot := canvas.NewText("●", themes.Colors["green"])
 	greenDot.TextSize = 21
-	yellowDot := canvas.NewText("●", color.RGBA{R: 255, G: 200, B: 0, A: 255})
+	yellowDot := canvas.NewText("●", themes.Colors["yellow"])
 	yellowDot.TextSize = 21
-	redDot := canvas.NewText("●", color.RGBA{R: 220, G: 20, B: 20, A: 255})
+	redDot := canvas.NewText("●", themes.Colors["red"])
 	redDot.TextSize = 21
 
 	// 상태 요약 컨테이너
@@ -122,11 +123,11 @@ func (d *DeviceTab) createDeployControlPanel() fyne.CanvasObject {
 	templateSelector := container.NewHBox(d.templateSelect, widget.NewLabel("  "), statusSummary)
 
 	// 배포 버튼 (텍스트만, 진한 회색 커스텀 버튼)
-	deployBtn := component.NewColoredButton("선택장비에 배포", component.ButtonDark, func() {
+	deployBtn := component.NewCustomButton("선택장비에 배포", nil, nil, themes.Colors["darkgray"], func() {
 		d.onDeploy()
 	})
 
-	// 상태확인 버튼 (아이콘 + 텍스트)
+	// 상태확인 버튼 (아이콘 + 텍스트) - Disable/Enable 필요하므로 widget.Button 유지
 	refreshBtn := widget.NewButtonWithIcon("상태확인", theme.ViewRefreshIcon(), func() {
 		d.onRefreshAll()
 	})
@@ -239,13 +240,13 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 						switch fw.ServerStatus {
 						case model.ServerStatusRunning:
 							// 정상: 녹색 LED
-							ledText.Color = color.RGBA{R: 0, G: 200, B: 0, A: 255}
+							ledText.Color = themes.Colors["green"]
 						case model.ServerStatusStop:
 							// 정지: 빨간색 LED
-							ledText.Color = color.RGBA{R: 220, G: 20, B: 20, A: 255}
+							ledText.Color = themes.Colors["red"]
 						default:
 							// 알 수 없음: 노란색 LED
-							ledText.Color = color.RGBA{R: 255, G: 200, B: 0, A: 255}
+							ledText.Color = themes.Colors["yellow"]
 						}
 						ledText.Refresh()
 					default:
@@ -300,16 +301,16 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 	}
 
 	// 버튼들
-	selectAllBtn := widget.NewButton("전체선택", func() {
+	selectAllBtn := component.NewCustomButton("전체선택", nil, nil, themes.Colors["lightgray"], func() {
 		d.onSelectAll(true)
 	})
-	deselectAllBtn := widget.NewButton("전체해제", func() {
+	deselectAllBtn := component.NewCustomButton("전체해제", nil, nil, themes.Colors["lightgray"], func() {
 		d.onSelectAll(false)
 	})
-	deleteBtn := component.NewIconTextButton("삭제", theme.DeleteIcon(), component.ButtonDanger, func() {
+	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
 		d.onDeleteDevices()
 	})
-	saveBtn := component.NewIconTextButton("저장", theme.ConfirmIcon(), component.ButtonPrimary, func() {
+	saveBtn := component.NewCustomButton("저장", theme.ConfirmIcon(), nil, themes.Colors["blue"], func() {
 		d.onSaveDevices()
 	})
 
@@ -343,7 +344,7 @@ func (d *DeviceTab) createDetailPanel() fyne.CanvasObject {
 	d.ipErrorLabel.Hidden = true
 
 	// 적용 버튼
-	applyBtn := component.NewColoredButton("추가/수정", component.ButtonBlack, func() {
+	applyBtn := component.NewCustomButton("추가/수정", nil, nil, themes.Colors["black"], func() {
 		d.onApplyDetail()
 	})
 
