@@ -7,6 +7,104 @@ import (
 	"fms/internal/model"
 )
 
+// ParseProtocolWithOptions 프로토콜 문자열을 파싱
+// 입력: "tcp?flags=syn/syn" 또는 "tcp"
+// 출력: Protocol, *ProtocolOptions, error
+func ParseProtocolWithOptions(s string) (model.Protocol, *model.ProtocolOptions, error) {
+	// "?" 기준으로 분리
+	parts := strings.SplitN(s, "?", 2)
+	protocol := model.StringToProtocol(parts[0])
+
+	if len(parts) == 1 {
+		// 옵션 없음
+		return protocol, nil, nil
+	}
+
+	// 쿼리 스트링 파싱
+	opts := &model.ProtocolOptions{}
+	params := strings.Split(parts[1], "&")
+
+	for _, param := range params {
+		kv := strings.SplitN(param, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+
+		switch kv[0] {
+		case "flags":
+			opts.TCPFlags = kv[1]
+		case "type":
+			opts.ICMPType = kv[1]
+		case "code":
+			opts.ICMPCode = kv[1]
+		}
+	}
+
+	return protocol, opts, nil
+}
+
+// FormatProtocolWithOptions 프로토콜과 옵션을 문자열로 변환
+// 입력: Protocol=TCP, Options={TCPFlags: "syn/syn"}
+// 출력: "tcp?flags=syn/syn"
+func FormatProtocolWithOptions(p model.Protocol, opts *model.ProtocolOptions) string {
+	base := model.ProtocolToString(p)
+
+	if opts == nil || opts.IsEmpty() {
+		return base
+	}
+
+	var params []string
+
+	// TCP flags
+	if opts.TCPFlags != "" {
+		params = append(params, "flags="+opts.TCPFlags)
+	}
+
+	// ICMP type
+	if opts.ICMPType != "" {
+		params = append(params, "type="+opts.ICMPType)
+	}
+
+	// ICMP code
+	if opts.ICMPCode != "" {
+		params = append(params, "code="+opts.ICMPCode)
+	}
+
+	if len(params) == 0 {
+		return base
+	}
+
+	return base + "?" + strings.Join(params, "&")
+}
+
+// FormatOptionsOnly 옵션만 문자열로 변환 (프로토콜 제외)
+// 입력: Options={TCPFlags: "syn/syn"}
+// 출력: "flags=syn/syn"
+func FormatOptionsOnly(opts *model.ProtocolOptions) string {
+	if opts == nil || opts.IsEmpty() {
+		return ""
+	}
+
+	var params []string
+
+	// TCP flags
+	if opts.TCPFlags != "" {
+		params = append(params, "flags="+opts.TCPFlags)
+	}
+
+	// ICMP type
+	if opts.ICMPType != "" {
+		params = append(params, "type="+opts.ICMPType)
+	}
+
+	// ICMP code
+	if opts.ICMPCode != "" {
+		params = append(params, "code="+opts.ICMPCode)
+	}
+
+	return strings.Join(params, "&")
+}
+
 // ParseLine 단일 라인을 파싱하여 FirewallRule로 변환
 // 빈 줄이나 주석은 nil을 반환
 func ParseLine(line string) (*model.FirewallRule, error) {
@@ -35,7 +133,10 @@ func ParseLine(line string) (*model.FirewallRule, error) {
 		case strings.HasPrefix(part, "-c="):
 			rule.Chain = model.StringToChain(part[3:])
 		case strings.HasPrefix(part, "-p="):
-			rule.Protocol = model.StringToProtocol(part[3:])
+			// 프로토콜 옵션 파싱 (쿼리 스트링 형식 지원)
+			proto, opts, _ := ParseProtocolWithOptions(part[3:])
+			rule.Protocol = proto
+			rule.Options = opts
 		case strings.HasPrefix(part, "-a="):
 			rule.Action = model.StringToAction(part[3:])
 		case strings.HasPrefix(part, "--dport="):
@@ -64,7 +165,8 @@ func RuleToLine(rule *model.FirewallRule) string {
 	parts = append(parts, "agent")
 	parts = append(parts, "-m=insert")
 	parts = append(parts, fmt.Sprintf("-c=%s", model.ChainToString(rule.Chain)))
-	parts = append(parts, fmt.Sprintf("-p=%s", model.ProtocolToString(rule.Protocol)))
+	// 프로토콜 옵션 포함하여 포맷
+	parts = append(parts, fmt.Sprintf("-p=%s", FormatProtocolWithOptions(rule.Protocol, rule.Options)))
 	parts = append(parts, fmt.Sprintf("-a=%s", model.ActionToString(rule.Action)))
 
 	// 선택 필드 (값이 있을 때만 출력)

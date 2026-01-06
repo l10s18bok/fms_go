@@ -1,6 +1,10 @@
 package model
 
-import "strings"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 // Chain 방화벽 체인 타입
 type Chain int
@@ -32,10 +36,45 @@ const (
 	ActionREJECT Action = 2
 )
 
+// ProtocolOptions 프로토콜별 세부 옵션
+type ProtocolOptions struct {
+	// TCP 옵션
+	TCPFlags string // 예: "syn/syn", "syn,ack/syn"
+
+	// ICMP 옵션
+	ICMPType string // 예: "echo-request", "8"
+	ICMPCode string // 예: "0", "3" (선택)
+}
+
+// IsEmpty 옵션이 비어있는지 확인
+func (o *ProtocolOptions) IsEmpty() bool {
+	if o == nil {
+		return true
+	}
+	return o.TCPFlags == "" && o.ICMPType == "" && o.ICMPCode == ""
+}
+
+// HasTCPOptions TCP 옵션이 있는지 확인
+func (o *ProtocolOptions) HasTCPOptions() bool {
+	if o == nil {
+		return false
+	}
+	return o.TCPFlags != ""
+}
+
+// HasICMPOptions ICMP 옵션이 있는지 확인
+func (o *ProtocolOptions) HasICMPOptions() bool {
+	if o == nil {
+		return false
+	}
+	return o.ICMPType != "" || o.ICMPCode != ""
+}
+
 // FirewallRule 방화벽 규칙 구조체
 type FirewallRule struct {
 	Chain    Chain
 	Protocol Protocol
+	Options  *ProtocolOptions // 프로토콜 옵션
 	Action   Action
 	DPort    string // Destination 포트
 	SIP      string // Source IP (콤마리스트 지원)
@@ -163,4 +202,219 @@ func GetProtocolOptions() []string {
 // GetActionOptions UI Select용 Action 옵션 목록
 func GetActionOptions() []string {
 	return []string{"DROP", "ACCEPT", "REJECT"}
+}
+
+// TCPFlagsPreset TCP Flags 프리셋 정의
+type TCPFlagsPreset struct {
+	Name        string   // 프리셋 이름 (UI 표시용)
+	MaskFlags   []string // 검사할 플래그
+	SetFlags    []string // 설정된 플래그
+	Description string   // 설명
+}
+
+// ToFlagsString 프리셋을 flags 문자열로 변환
+// 예: "syn,rst,ack,fin/syn"
+func (p *TCPFlagsPreset) ToFlagsString() string {
+	if len(p.MaskFlags) == 0 {
+		return ""
+	}
+	mask := strings.Join(p.MaskFlags, ",")
+	set := strings.Join(p.SetFlags, ",")
+	return mask + "/" + set
+}
+
+// GetTCPFlagsPresets 프리셋 목록 반환
+func GetTCPFlagsPresets() []TCPFlagsPreset {
+	return []TCPFlagsPreset{
+		{
+			Name:        "없음",
+			MaskFlags:   nil,
+			SetFlags:    nil,
+			Description: "모든 TCP 패킷 매칭",
+		},
+		{
+			Name:        "새 연결만 (SYN)",
+			MaskFlags:   []string{"syn", "rst", "ack", "fin"},
+			SetFlags:    []string{"syn"},
+			Description: "새 연결 요청만 매칭",
+		},
+		{
+			Name:        "확립된 연결 (ACK)",
+			MaskFlags:   []string{"ack"},
+			SetFlags:    []string{"ack"},
+			Description: "기존 연결 패킷만 매칭",
+		},
+		{
+			Name:        "NULL 스캔 차단",
+			MaskFlags:   []string{"syn", "rst", "ack", "fin", "psh", "urg"},
+			SetFlags:    nil,
+			Description: "플래그 없는 비정상 패킷",
+		},
+		{
+			Name:        "XMAS 스캔 차단",
+			MaskFlags:   []string{"syn", "rst", "ack", "fin", "psh", "urg"},
+			SetFlags:    []string{"fin", "psh", "urg"},
+			Description: "비정상 플래그 조합",
+		},
+		{
+			Name:        "SYN+FIN 차단",
+			MaskFlags:   []string{"syn", "fin"},
+			SetFlags:    []string{"syn", "fin"},
+			Description: "비정상 플래그 조합",
+		},
+		{
+			Name:        "커스텀",
+			MaskFlags:   nil,
+			SetFlags:    nil,
+			Description: "직접 체크박스 설정",
+		},
+	}
+}
+
+// FindPresetByFlags flags 문자열에 매칭되는 프리셋 찾기
+// 매칭되는 프리셋 없으면 "커스텀" 반환
+func FindPresetByFlags(flags string) *TCPFlagsPreset {
+	presets := GetTCPFlagsPresets()
+
+	// 빈 문자열은 "없음"
+	if flags == "" {
+		return &presets[0]
+	}
+
+	// 각 프리셋과 비교
+	for i, preset := range presets {
+		if preset.Name == "커스텀" {
+			continue
+		}
+		if preset.ToFlagsString() == flags {
+			return &presets[i]
+		}
+	}
+
+	// 매칭되지 않으면 커스텀
+	return &presets[len(presets)-1]
+}
+
+// GetTCPFlagsList TCP flags 옵션 목록 (체크박스용)
+func GetTCPFlagsList() []string {
+	return []string{"syn", "ack", "fin", "rst", "psh", "urg"}
+}
+
+// GetICMPTypeOptions ICMP type 옵션 목록 (UI Select용)
+func GetICMPTypeOptions() []string {
+	return []string{
+		"없음",
+		"echo-request (8)",
+		"echo-reply (0)",
+		"destination-unreachable (3)",
+		"time-exceeded (11)",
+		"redirect (5)",
+		"커스텀 숫자...",
+	}
+}
+
+// icmpTypeMap ICMP 타입 이름 → 숫자 매핑
+var icmpTypeMap = map[string]int{
+	"echo-reply":              0,
+	"destination-unreachable": 3,
+	"source-quench":           4,
+	"redirect":                5,
+	"echo-request":            8,
+	"time-exceeded":           11,
+	"parameter-problem":       12,
+	"timestamp-request":       13,
+	"timestamp-reply":         14,
+}
+
+// icmpTypeReverseMap ICMP 타입 숫자 → 이름 매핑
+var icmpTypeReverseMap = map[int]string{
+	0:  "echo-reply",
+	3:  "destination-unreachable",
+	4:  "source-quench",
+	5:  "redirect",
+	8:  "echo-request",
+	11: "time-exceeded",
+	12: "parameter-problem",
+	13: "timestamp-request",
+	14: "timestamp-reply",
+}
+
+// ICMPTypeNameToNumber ICMP type 이름을 숫자로 변환
+func ICMPTypeNameToNumber(name string) (int, error) {
+	// 이름으로 찾기
+	if num, ok := icmpTypeMap[name]; ok {
+		return num, nil
+	}
+
+	// 숫자 문자열인 경우
+	if num, err := strconv.Atoi(name); err == nil {
+		return num, nil
+	}
+
+	return 0, fmt.Errorf("알 수 없는 ICMP 타입: %s", name)
+}
+
+// ICMPTypeNumberToName ICMP type 숫자를 이름으로 변환
+func ICMPTypeNumberToName(num int) string {
+	if name, ok := icmpTypeReverseMap[num]; ok {
+		return name
+	}
+	return strconv.Itoa(num)
+}
+
+// GetICMPCodeOptions ICMP code 옵션 목록 (Type 3: destination-unreachable 전용)
+func GetICMPCodeOptions() []string {
+	return []string{
+		"없음",
+		"net-unreachable (0)",
+		"host-unreachable (1)",
+		"protocol-unreachable (2)",
+		"port-unreachable (3)",
+		"fragmentation-needed (4)",
+		"source-route-failed (5)",
+		"커스텀 숫자...",
+	}
+}
+
+// icmpCodeMap ICMP Code 이름 → 숫자 매핑 (Type 3: destination-unreachable)
+var icmpCodeMap = map[string]int{
+	"net-unreachable":       0,
+	"host-unreachable":      1,
+	"protocol-unreachable":  2,
+	"port-unreachable":      3,
+	"fragmentation-needed":  4,
+	"source-route-failed":   5,
+}
+
+// icmpCodeReverseMap ICMP Code 숫자 → 이름 매핑
+var icmpCodeReverseMap = map[int]string{
+	0: "net-unreachable",
+	1: "host-unreachable",
+	2: "protocol-unreachable",
+	3: "port-unreachable",
+	4: "fragmentation-needed",
+	5: "source-route-failed",
+}
+
+// ICMPCodeNameToNumber ICMP code 이름을 숫자로 변환
+func ICMPCodeNameToNumber(name string) (int, error) {
+	// 이름으로 찾기
+	if num, ok := icmpCodeMap[name]; ok {
+		return num, nil
+	}
+
+	// 숫자 문자열인 경우
+	if num, err := strconv.Atoi(name); err == nil {
+		return num, nil
+	}
+
+	return 0, fmt.Errorf("알 수 없는 ICMP 코드: %s", name)
+}
+
+// ICMPCodeNumberToName ICMP code 숫자를 이름으로 변환
+func ICMPCodeNumberToName(num int) string {
+	if name, ok := icmpCodeReverseMap[num]; ok {
+		return name
+	}
+	return strconv.Itoa(num)
 }

@@ -2,6 +2,7 @@ package component
 
 import (
 	"fms/internal/model"
+	"fms/internal/parser"
 	"fms/internal/themes"
 
 	"fyne.io/fyne/v2"
@@ -17,16 +18,19 @@ type RuleRow struct {
 	onChange func()
 
 	// UI 요소
-	deleteBtn   fyne.CanvasObject
-	chainSel    *widget.Select
-	protoSel    *widget.Select
-	actionSel   *widget.Select
-	dportEntry  *widget.Entry
-	sipEntry    *widget.Entry
-	dipEntry    *widget.Entry
-	blackCheck  *widget.Check
-	whiteCheck  *widget.Check
-	content     *fyne.Container
+	deleteBtn    fyne.CanvasObject
+	chainSel     *widget.Select
+	protoSel     *widget.Select
+	actionSel    *widget.Select
+	dportEntry   *widget.Entry
+	sipEntry     *widget.Entry
+	dipEntry     *widget.Entry
+	blackCheck   *widget.Check
+	whiteCheck   *widget.Check
+	content      *fyne.Container
+	optionsLabel *widget.Label // 옵션 문자열 표시 (읽기 전용)
+
+	syncing bool // syncFromRule 중인지 여부 (콜백 무시용)
 }
 
 // NewRuleRow 새 규칙 행 생성
@@ -63,8 +67,16 @@ func (r *RuleRow) createUI() {
 	// Protocol 선택
 	r.protoSel = widget.NewSelect(model.GetProtocolOptions(), func(s string) {
 		r.rule.Protocol = model.StringToProtocol(s)
+		// syncFromRule 중에는 옵션 초기화하지 않음 (기존 옵션 유지)
+		if !r.syncing {
+			r.rule.Options = nil
+			r.updateOptionsLabel()
+		}
 		r.triggerChange()
 	})
+
+	// 옵션 레이블 (읽기 전용)
+	r.optionsLabel = widget.NewLabel("-")
 
 	// Action 선택
 	r.actionSel = widget.NewSelect(model.GetActionOptions(), func(s string) {
@@ -109,19 +121,33 @@ func (r *RuleRow) createUI() {
 	// 레이아웃 구성
 	r.content = container.NewHBox(
 		container.NewGridWrap(fyne.NewSize(36, 36), r.deleteBtn),
-		container.NewGridWrap(fyne.NewSize(110, 36), r.chainSel),
-		container.NewGridWrap(fyne.NewSize(110, 36), r.protoSel),
-		container.NewGridWrap(fyne.NewSize(110, 36), r.actionSel),
-		container.NewGridWrap(fyne.NewSize(110, 36), r.dportEntry),
-		container.NewGridWrap(fyne.NewSize(180, 36), r.sipEntry),
-		container.NewGridWrap(fyne.NewSize(180, 36), r.dipEntry),
+		container.NewGridWrap(fyne.NewSize(100, 36), r.chainSel),
+		container.NewGridWrap(fyne.NewSize(80, 36), r.protoSel),
+		container.NewGridWrap(fyne.NewSize(150, 36), r.optionsLabel), // 옵션 문자열 표시
+		container.NewGridWrap(fyne.NewSize(90, 36), r.actionSel),
+		container.NewGridWrap(fyne.NewSize(80, 36), r.dportEntry),
+		container.NewGridWrap(fyne.NewSize(140, 36), r.sipEntry),
+		container.NewGridWrap(fyne.NewSize(140, 36), r.dipEntry),
 		container.NewGridWrap(fyne.NewSize(30, 36), r.blackCheck),
 		container.NewGridWrap(fyne.NewSize(30, 36), r.whiteCheck),
 	)
 }
 
+// updateOptionsLabel 옵션 레이블 업데이트
+func (r *RuleRow) updateOptionsLabel() {
+	optStr := parser.FormatOptionsOnly(r.rule.Options)
+	if optStr == "" {
+		r.optionsLabel.SetText("-")
+	} else {
+		r.optionsLabel.SetText(optStr)
+	}
+}
+
 // syncFromRule 규칙 데이터를 UI에 반영
 func (r *RuleRow) syncFromRule() {
+	r.syncing = true
+	defer func() { r.syncing = false }()
+
 	r.chainSel.SetSelected(model.ChainToString(r.rule.Chain))
 	r.protoSel.SetSelected(model.ProtocolToString(r.rule.Protocol))
 	r.actionSel.SetSelected(model.ActionToString(r.rule.Action))
@@ -130,6 +156,7 @@ func (r *RuleRow) syncFromRule() {
 	r.dipEntry.SetText(r.rule.DIP)
 	r.blackCheck.SetChecked(r.rule.Black)
 	r.whiteCheck.SetChecked(r.rule.White)
+	r.updateOptionsLabel()
 }
 
 // triggerChange 변경 콜백 호출
@@ -153,4 +180,9 @@ func (r *RuleRow) SetRule(rule *model.FirewallRule) {
 // Content UI 컨테이너 반환
 func (r *RuleRow) Content() *fyne.Container {
 	return r.content
+}
+
+// GetOptionsString 옵션을 문자열로 반환 (포맷팅용)
+func (r *RuleRow) GetOptionsString() string {
+	return parser.FormatProtocolWithOptions(r.rule.Protocol, r.rule.Options)
 }

@@ -1,6 +1,8 @@
 package component
 
 import (
+	"strings"
+
 	"fms/internal/model"
 
 	"fyne.io/fyne/v2"
@@ -44,12 +46,34 @@ type RuleForm struct {
 	whiteCheck *widget.Check
 	addBtn     fyne.CanvasObject
 	content    *fyne.Container
+
+	// TCP Flags 옵션 UI
+	tcpFlagsPresetSel *widget.Select
+	tcpMaskChecks     map[string]*widget.Check // 검사할 플래그
+	tcpSetChecks      map[string]*widget.Check // 설정된 플래그
+	tcpOptionsBox     *fyne.Container
+
+	// ICMP 옵션 UI
+	icmpTypeSel    *widget.Select
+	icmpTypeEntry  *widget.Entry     // 커스텀 숫자용
+	icmpCodeSel    *widget.Select    // Code 드롭다운
+	icmpCodeEntry  *widget.Entry     // Code 커스텀 숫자용
+	icmpCodeRow    *fyne.Container   // Code 행 (조건부 표시용)
+	icmpOptionsBox *fyne.Container
+
+	// 옵션 컨테이너
+	optionsContainer *fyne.Container
+
+	// 플래그: 프리셋 변경 중 체크박스 이벤트 무시
+	updatingFromPreset bool
 }
 
 // NewRuleForm 새 규칙 추가 폼 생성
 func NewRuleForm(onAdd func(*model.FirewallRule)) *RuleForm {
 	form := &RuleForm{
-		onAdd: onAdd,
+		onAdd:         onAdd,
+		tcpMaskChecks: make(map[string]*widget.Check),
+		tcpSetChecks:  make(map[string]*widget.Check),
 	}
 	form.createUI()
 	form.Reset()
@@ -64,8 +88,10 @@ func (f *RuleForm) createUI() {
 	// Chain 선택
 	f.chainSel = NewFixedWidthSelect(model.GetChainOptions(), nil, selectWidth)
 
-	// Protocol 선택
-	f.protoSel = NewFixedWidthSelect(model.GetProtocolOptions(), nil, selectWidth)
+	// Protocol 선택 (OnChanged 핸들러 추가)
+	f.protoSel = NewFixedWidthSelect(model.GetProtocolOptions(), func(s string) {
+		f.onProtocolChanged(s)
+	}, selectWidth)
 
 	// Action 선택
 	f.actionSel = NewFixedWidthSelect(model.GetActionOptions(), nil, selectWidth)
@@ -90,6 +116,15 @@ func (f *RuleForm) createUI() {
 	f.addBtn = NewColoredButton("+ 추가", ButtonDark, func() {
 		f.submitRule()
 	})
+
+	// TCP Flags 옵션 UI 생성
+	f.createTCPFlagsUI()
+
+	// ICMP 옵션 UI 생성
+	f.createICMPOptionsUI()
+
+	// 옵션 컨테이너 (프로토콜에 따라 동적으로 표시)
+	f.optionsContainer = container.NewVBox()
 
 	// 레이블 너비 통일
 	labelWidth := float32(50)
@@ -122,7 +157,7 @@ func (f *RuleForm) createUI() {
 	)
 
 	// 전체 폼 레이아웃
-	formContent := container.NewVBox(row1, row2, row3)
+	formContent := container.NewVBox(row1, row2, f.optionsContainer, row3)
 
 	// 헤더: "규칙 추가" 레이블 + 오른쪽에 추가 버튼
 	header := container.NewBorder(
@@ -139,6 +174,262 @@ func (f *RuleForm) createUI() {
 	)
 }
 
+// createTCPFlagsUI TCP Flags 옵션 UI 생성
+func (f *RuleForm) createTCPFlagsUI() {
+	// 프리셋 목록 생성
+	presets := model.GetTCPFlagsPresets()
+	presetNames := make([]string, len(presets))
+	for i, p := range presets {
+		presetNames[i] = p.Name
+	}
+
+	f.tcpFlagsPresetSel = widget.NewSelect(presetNames, func(s string) {
+		f.onTCPPresetChanged(s)
+	})
+
+	// 플래그 체크박스 생성
+	flags := model.GetTCPFlagsList()
+	rowHeight := float32(30)
+
+	// 검사할 플래그 행
+	maskRow := container.NewHBox(widget.NewLabel("검사:"))
+	for _, flag := range flags {
+		check := widget.NewCheck(strings.ToUpper(flag), func(b bool) {
+			if !f.updatingFromPreset {
+				f.tcpFlagsPresetSel.SetSelected("커스텀")
+			}
+		})
+		f.tcpMaskChecks[flag] = check
+		maskRow.Add(container.NewGridWrap(fyne.NewSize(60, rowHeight), check))
+	}
+
+	// 설정된 플래그 행
+	setRow := container.NewHBox(widget.NewLabel("설정:"))
+	for _, flag := range flags {
+		check := widget.NewCheck(strings.ToUpper(flag), func(b bool) {
+			if !f.updatingFromPreset {
+				f.tcpFlagsPresetSel.SetSelected("커스텀")
+			}
+		})
+		f.tcpSetChecks[flag] = check
+		setRow.Add(container.NewGridWrap(fyne.NewSize(60, rowHeight), check))
+	}
+
+	// 프리셋 행
+	presetRow := container.NewHBox(
+		widget.NewLabel("프리셋:"),
+		container.NewGridWrap(fyne.NewSize(180, 36), f.tcpFlagsPresetSel),
+	)
+
+	f.tcpOptionsBox = container.NewVBox(
+		widget.NewLabel("TCP Flags 옵션"),
+		presetRow,
+		maskRow,
+		setRow,
+	)
+}
+
+// createICMPOptionsUI ICMP 옵션 UI 생성
+func (f *RuleForm) createICMPOptionsUI() {
+	// ICMP Type 선택
+	f.icmpTypeSel = widget.NewSelect(model.GetICMPTypeOptions(), func(s string) {
+		f.onICMPTypeChanged(s)
+	})
+
+	// Type 커스텀 숫자 입력
+	f.icmpTypeEntry = widget.NewEntry()
+	f.icmpTypeEntry.SetPlaceHolder("Type 숫자")
+	f.icmpTypeEntry.Hide()
+
+	// Code 드롭다운 (destination-unreachable 전용)
+	f.icmpCodeSel = widget.NewSelect(model.GetICMPCodeOptions(), func(s string) {
+		f.onICMPCodeChanged(s)
+	})
+
+	// Code 커스텀 숫자 입력
+	f.icmpCodeEntry = widget.NewEntry()
+	f.icmpCodeEntry.SetPlaceHolder("Code 숫자")
+	f.icmpCodeEntry.Hide()
+
+	rowHeight := float32(36)
+
+	typeRow := container.NewHBox(
+		widget.NewLabel("Type:"),
+		container.NewGridWrap(fyne.NewSize(200, rowHeight), f.icmpTypeSel),
+		container.NewGridWrap(fyne.NewSize(80, rowHeight), f.icmpTypeEntry),
+	)
+
+	// Code 행 (조건부 표시)
+	f.icmpCodeRow = container.NewHBox(
+		widget.NewLabel("Code:"),
+		container.NewGridWrap(fyne.NewSize(200, rowHeight), f.icmpCodeSel),
+		container.NewGridWrap(fyne.NewSize(80, rowHeight), f.icmpCodeEntry),
+	)
+	f.icmpCodeRow.Hide() // 기본적으로 숨김
+
+	f.icmpOptionsBox = container.NewVBox(
+		widget.NewLabel("ICMP 옵션"),
+		typeRow,
+		f.icmpCodeRow,
+	)
+}
+
+// onProtocolChanged 프로토콜 변경 시 옵션 UI 전환
+func (f *RuleForm) onProtocolChanged(proto string) {
+	f.optionsContainer.Objects = nil
+
+	switch strings.ToLower(proto) {
+	case "tcp":
+		f.optionsContainer.Add(f.tcpOptionsBox)
+	case "icmp":
+		f.optionsContainer.Add(f.icmpOptionsBox)
+	}
+
+	f.optionsContainer.Refresh()
+}
+
+// onTCPPresetChanged TCP 프리셋 변경 시 체크박스 업데이트
+func (f *RuleForm) onTCPPresetChanged(presetName string) {
+	if presetName == "커스텀" {
+		return
+	}
+
+	f.updatingFromPreset = true
+	defer func() { f.updatingFromPreset = false }()
+
+	// 프리셋 찾기
+	presets := model.GetTCPFlagsPresets()
+	var preset *model.TCPFlagsPreset
+	for i, p := range presets {
+		if p.Name == presetName {
+			preset = &presets[i]
+			break
+		}
+	}
+
+	if preset == nil {
+		return
+	}
+
+	// 모든 체크박스 초기화
+	for _, check := range f.tcpMaskChecks {
+		check.SetChecked(false)
+	}
+	for _, check := range f.tcpSetChecks {
+		check.SetChecked(false)
+	}
+
+	// 프리셋에 따라 체크박스 설정
+	for _, flag := range preset.MaskFlags {
+		if check, ok := f.tcpMaskChecks[flag]; ok {
+			check.SetChecked(true)
+		}
+	}
+	for _, flag := range preset.SetFlags {
+		if check, ok := f.tcpSetChecks[flag]; ok {
+			check.SetChecked(true)
+		}
+	}
+}
+
+// onICMPTypeChanged ICMP Type 변경 시 처리
+func (f *RuleForm) onICMPTypeChanged(typeName string) {
+	// 커스텀 숫자 선택 시 Type Entry 표시
+	if typeName == "커스텀 숫자..." {
+		f.icmpTypeEntry.Show()
+	} else {
+		f.icmpTypeEntry.Hide()
+		f.icmpTypeEntry.SetText("")
+	}
+
+	// destination-unreachable (3) 선택 시에만 Code 드롭다운 표시
+	if strings.HasPrefix(typeName, "destination-unreachable") {
+		f.icmpCodeRow.Show()
+		f.icmpCodeSel.SetSelected("없음")
+	} else {
+		f.icmpCodeRow.Hide()
+		f.icmpCodeSel.SetSelected("없음")
+		f.icmpCodeEntry.SetText("")
+		f.icmpCodeEntry.Hide()
+	}
+
+	f.icmpOptionsBox.Refresh()
+}
+
+// onICMPCodeChanged ICMP Code 변경 시 처리
+func (f *RuleForm) onICMPCodeChanged(codeName string) {
+	if codeName == "커스텀 숫자..." {
+		f.icmpCodeEntry.Show()
+	} else {
+		f.icmpCodeEntry.Hide()
+		f.icmpCodeEntry.SetText("")
+	}
+}
+
+// getTCPFlags 체크박스에서 TCP flags 문자열 생성
+func (f *RuleForm) getTCPFlags() string {
+	var maskFlags, setFlags []string
+
+	flags := model.GetTCPFlagsList()
+	for _, flag := range flags {
+		if check, ok := f.tcpMaskChecks[flag]; ok && check.Checked {
+			maskFlags = append(maskFlags, flag)
+		}
+		if check, ok := f.tcpSetChecks[flag]; ok && check.Checked {
+			setFlags = append(setFlags, flag)
+		}
+	}
+
+	if len(maskFlags) == 0 {
+		return ""
+	}
+
+	return strings.Join(maskFlags, ",") + "/" + strings.Join(setFlags, ",")
+}
+
+// getICMPType ICMP type 값 가져오기
+func (f *RuleForm) getICMPType() string {
+	selected := f.icmpTypeSel.Selected
+	if selected == "없음" || selected == "" {
+		return ""
+	}
+
+	if selected == "커스텀 숫자..." {
+		return f.icmpTypeEntry.Text
+	}
+
+	// "echo-request (8)" 형식에서 이름만 추출
+	parts := strings.Split(selected, " ")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return ""
+}
+
+// getICMPCode ICMP code 값 가져오기
+func (f *RuleForm) getICMPCode() string {
+	// Code 드롭다운이 숨겨져 있으면 빈 값 반환
+	if !f.icmpCodeRow.Visible() {
+		return ""
+	}
+
+	selected := f.icmpCodeSel.Selected
+	if selected == "없음" || selected == "" {
+		return ""
+	}
+
+	if selected == "커스텀 숫자..." {
+		return strings.TrimSpace(f.icmpCodeEntry.Text)
+	}
+
+	// "net-unreachable (0)" 형식에서 이름만 추출
+	parts := strings.Split(selected, " ")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return ""
+}
+
 // submitRule 규칙 생성 및 콜백 호출
 func (f *RuleForm) submitRule() {
 	rule := &model.FirewallRule{
@@ -150,6 +441,26 @@ func (f *RuleForm) submitRule() {
 		DIP:      f.dipEntry.Text,
 		Black:    f.blackCheck.Checked,
 		White:    f.whiteCheck.Checked,
+	}
+
+	// 프로토콜 옵션 설정
+	proto := strings.ToLower(f.protoSel.Selected)
+
+	switch proto {
+	case "tcp":
+		tcpFlags := f.getTCPFlags()
+		if tcpFlags != "" {
+			rule.Options = &model.ProtocolOptions{TCPFlags: tcpFlags}
+		}
+	case "icmp":
+		icmpType := f.getICMPType()
+		icmpCode := f.getICMPCode()
+		if icmpType != "" || icmpCode != "" {
+			rule.Options = &model.ProtocolOptions{
+				ICMPType: icmpType,
+				ICMPCode: icmpCode,
+			}
+		}
 	}
 
 	if f.onAdd != nil {
@@ -169,6 +480,27 @@ func (f *RuleForm) Reset() {
 	f.dipEntry.SetText("")
 	f.blackCheck.SetChecked(false)
 	f.whiteCheck.SetChecked(false)
+
+	// TCP Flags 초기화
+	f.tcpFlagsPresetSel.SetSelected("없음")
+	for _, check := range f.tcpMaskChecks {
+		check.SetChecked(false)
+	}
+	for _, check := range f.tcpSetChecks {
+		check.SetChecked(false)
+	}
+
+	// ICMP 옵션 초기화
+	f.icmpTypeSel.SetSelected("없음")
+	f.icmpTypeEntry.SetText("")
+	f.icmpTypeEntry.Hide()
+	f.icmpCodeSel.SetSelected("없음")
+	f.icmpCodeEntry.SetText("")
+	f.icmpCodeEntry.Hide()
+	f.icmpCodeRow.Hide()
+
+	// 프로토콜에 따른 옵션 UI 표시
+	f.onProtocolChanged(f.protoSel.Selected)
 }
 
 // Content UI 컨테이너 반환

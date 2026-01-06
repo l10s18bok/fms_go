@@ -31,15 +31,16 @@ func NewRuleList(onChange func()) *RuleList {
 
 // createUI UI 생성
 func (l *RuleList) createUI() {
-	// 헤더 행 생성
+	// 헤더 행 생성 (옵션 컬럼 추가)
 	l.header = container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(36, 30), widget.NewLabel("")),      // 삭제 버튼 자리
-		container.NewGridWrap(fyne.NewSize(110, 30), widget.NewLabel("Chain")),
-		container.NewGridWrap(fyne.NewSize(110, 30), widget.NewLabel("Proto")),
-		container.NewGridWrap(fyne.NewSize(110, 30), widget.NewLabel("Action")),
-		container.NewGridWrap(fyne.NewSize(110, 30), widget.NewLabel("Port")),
-		container.NewGridWrap(fyne.NewSize(180, 30), widget.NewLabel("SIP")),
-		container.NewGridWrap(fyne.NewSize(180, 30), widget.NewLabel("DIP")),
+		container.NewGridWrap(fyne.NewSize(36, 30), widget.NewLabel("")),       // 삭제 버튼 자리
+		container.NewGridWrap(fyne.NewSize(100, 30), widget.NewLabel("Chain")),
+		container.NewGridWrap(fyne.NewSize(80, 30), widget.NewLabel("Proto")),
+		container.NewGridWrap(fyne.NewSize(150, 30), widget.NewLabel("옵션")),   // 옵션 컬럼
+		container.NewGridWrap(fyne.NewSize(90, 30), widget.NewLabel("Action")),
+		container.NewGridWrap(fyne.NewSize(80, 30), widget.NewLabel("Port")),
+		container.NewGridWrap(fyne.NewSize(140, 30), widget.NewLabel("SIP")),
+		container.NewGridWrap(fyne.NewSize(140, 30), widget.NewLabel("DIP")),
 		container.NewGridWrap(fyne.NewSize(30, 30), widget.NewLabel("B")),
 		container.NewGridWrap(fyne.NewSize(30, 30), widget.NewLabel("W")),
 	)
