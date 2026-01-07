@@ -31,7 +31,7 @@ func (s *FixedWidthSelect) MinSize() fyne.Size {
 	return fyne.NewSize(s.fixedWidth, min.Height)
 }
 
-// RuleForm 규칙 추가 폼 컴포넌트
+// RuleForm 규칙 추가 폼 컴포넌트 (일반 규칙용)
 type RuleForm struct {
 	onAdd func(*model.FirewallRule)
 
@@ -42,8 +42,6 @@ type RuleForm struct {
 	dportEntry *widget.Entry
 	sipEntry   *widget.Entry
 	dipEntry   *widget.Entry
-	blackCheck *widget.Check
-	whiteCheck *widget.Check
 	addBtn     fyne.CanvasObject
 	content    *fyne.Container
 
@@ -108,9 +106,6 @@ func (f *RuleForm) createUI() {
 	f.dipEntry = widget.NewEntry()
 	f.dipEntry.SetPlaceHolder("Dest IP")
 
-	// 체크박스들
-	f.blackCheck = widget.NewCheck("Black", nil)
-	f.whiteCheck = widget.NewCheck("White", nil)
 
 	// 추가 버튼 (진한 회색 배경)
 	f.addBtn = NewColoredButton("+ 추가", ButtonDark, func() {
@@ -150,14 +145,8 @@ func (f *RuleForm) createUI() {
 		container.NewGridWrap(fyne.NewSize(230, rowHeight), f.dipEntry),
 	)
 
-	// 세 번째 행: 체크박스
-	row3 := container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(80, rowHeight), f.blackCheck),
-		container.NewGridWrap(fyne.NewSize(80, rowHeight), f.whiteCheck),
-	)
-
-	// 전체 폼 레이아웃
-	formContent := container.NewVBox(row1, row2, f.optionsContainer, row3)
+	// 전체 폼 레이아웃 (Black/White 체크박스 제거됨 - BlackWhiteForm에서 별도 처리)
+	formContent := container.NewVBox(row1, row2, f.optionsContainer)
 
 	// 헤더: "규칙 추가" 레이블 + 오른쪽에 추가 버튼
 	header := container.NewBorder(
@@ -439,8 +428,8 @@ func (f *RuleForm) submitRule() {
 		DPort:    f.dportEntry.Text,
 		SIP:      f.sipEntry.Text,
 		DIP:      f.dipEntry.Text,
-		Black:    f.blackCheck.Checked,
-		White:    f.whiteCheck.Checked,
+		Black:    false, // 일반 규칙은 Black/White 아님
+		White:    false,
 	}
 
 	// 프로토콜 옵션 설정
@@ -478,8 +467,6 @@ func (f *RuleForm) Reset() {
 	f.dportEntry.SetText("")
 	f.sipEntry.SetText("")
 	f.dipEntry.SetText("")
-	f.blackCheck.SetChecked(false)
-	f.whiteCheck.SetChecked(false)
 
 	// TCP Flags 초기화
 	f.tcpFlagsPresetSel.SetSelected("없음")

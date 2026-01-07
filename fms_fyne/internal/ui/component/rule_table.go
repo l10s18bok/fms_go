@@ -26,23 +26,28 @@ const (
 	colCount // 총 컬럼 수 = 10
 )
 
-// 컬럼별 비율 (합계 = 1.0)
+// 고정 너비 컬럼 (픽셀)
+const (
+	fixedWidthDelete    = 36 // 삭제 버튼
+	fixedWidthBlack     = 55 // Black 체크박스
+	fixedWidthWhite     = 55 // White 체크박스
+	scrollbarWidth      = 32 // 스크롤바 및 테이블 여백
+)
+
+// 가변 컬럼별 비율 (합계 = 1.0, 고정 컬럼 제외한 나머지에 적용)
 var columnRatios = []float32{
-	0.04, // 삭제 버튼
-	0.10, // Chain
-	0.08, // Proto
-	0.16, // 옵션
-	0.10, // Action
+	0.12, // Chain
+	0.10, // Proto
+	0.14, // 옵션
+	0.12, // Action
 	0.08, // Port
-	0.16, // SIP
-	0.16, // DIP
-	0.06, // Black
-	0.06, // White
+	0.22, // SIP
+	0.22, // DIP
 }
 
 // 헤더 텍스트
 var headerTexts = []string{
-	"", "Chain", "Proto", "옵션", "Action", "Port", "SIP", "DIP", "B", "W",
+	"", "Chain", "Proto", "옵션", "Action", "Port", "SIP", "DIP", "Black", "White",
 }
 
 // RuleTable widget.Table 기반 규칙 테이블
@@ -68,7 +73,7 @@ func NewRuleTable(onChange func()) *RuleTable {
 
 // createTable 테이블 생성
 func (t *RuleTable) createTable() {
-	t.table = widget.NewTableWithHeaders(
+	t.table = widget.NewTable(
 		// Length: 행/열 수 반환
 		func() (rows, cols int) {
 			return len(t.rules), colCount
@@ -96,7 +101,9 @@ func (t *RuleTable) createTable() {
 		},
 	)
 
-	// 헤더 설정
+	// 헤더 설정 (컬럼 헤더만, 행 번호 헤더 없음)
+	t.table.ShowHeaderRow = true
+	t.table.ShowHeaderColumn = false
 	t.table.CreateHeader = func() fyne.CanvasObject {
 		return widget.NewLabel("")
 	}
@@ -253,13 +260,26 @@ func (t *RuleTable) updateCell(id widget.TableCellID, obj fyne.CanvasObject) {
 	}
 }
 
-// updateColumnWidths 컬럼 너비 업데이트 (비율 기반)
+// updateColumnWidths 컬럼 너비 업데이트 (고정 + 비율 기반)
 func (t *RuleTable) updateColumnWidths(totalWidth float32) {
 	if totalWidth <= 0 {
 		return
 	}
-	for i, ratio := range columnRatios {
-		t.table.SetColumnWidth(i, totalWidth*ratio)
+
+	// 고정 너비 컬럼 설정
+	t.table.SetColumnWidth(colDelete, fixedWidthDelete)
+	t.table.SetColumnWidth(colBlack, fixedWidthBlack)
+	t.table.SetColumnWidth(colWhite, fixedWidthWhite)
+
+	// 가변 너비 계산 (전체 - 고정 컬럼들 - 스크롤바 너비)
+	flexibleWidth := totalWidth - fixedWidthDelete - fixedWidthBlack - fixedWidthWhite - scrollbarWidth
+
+	// 가변 컬럼에 비율 적용
+	flexibleCols := []int{colChain, colProto, colOptions, colAction, colPort, colSIP, colDIP}
+	for i, col := range flexibleCols {
+		if i < len(columnRatios) {
+			t.table.SetColumnWidth(col, flexibleWidth*columnRatios[i])
+		}
 	}
 }
 

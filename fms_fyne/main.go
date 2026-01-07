@@ -57,7 +57,7 @@ func main() {
 		log.Println("모바일 환경 감지됨")
 	} else {
 		// 데스크톱: 지정 크기로 설정
-		w.Resize(fyne.NewSize(1200, 800))
+		w.Resize(fyne.NewSize(1400, 800))
 		log.Println("데스크톱 환경 감지됨")
 	}
 

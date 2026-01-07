@@ -10,10 +10,12 @@ import (
 
 // RuleBuilder 규칙 빌더 패널
 type RuleBuilder struct {
-	ruleTable *component.RuleTable
-	ruleForm  *component.RuleForm
-	onChange  func()
-	comments  []string // 주석 라인 보존
+	ruleTable      *component.RuleTable
+	generalForm    *component.RuleForm       // 일반 규칙 폼
+	blackWhiteForm *component.BlackWhiteForm // Black/White 폼
+	formTabs       *container.AppTabs        // 폼 전환 탭
+	onChange       func()
+	comments       []string // 주석 라인 보존
 
 	content *fyne.Container
 }
@@ -33,18 +35,32 @@ func (b *RuleBuilder) createUI() {
 	// 규칙 테이블
 	b.ruleTable = component.NewRuleTable(b.onChange)
 
-	// 규칙 추가 폼
-	b.ruleForm = component.NewRuleForm(func(rule *model.FirewallRule) {
+	// 일반 규칙 추가 폼
+	b.generalForm = component.NewRuleForm(func(rule *model.FirewallRule) {
 		b.ruleTable.AddRule(rule)
 		if b.onChange != nil {
 			b.onChange()
 		}
 	})
 
-	// 전체 레이아웃: 테이블 위, 폼 아래
+	// Black/White 규칙 추가 폼
+	b.blackWhiteForm = component.NewBlackWhiteForm(func(rule *model.FirewallRule) {
+		b.ruleTable.AddRule(rule)
+		if b.onChange != nil {
+			b.onChange()
+		}
+	})
+
+	// 폼 전환 탭
+	b.formTabs = container.NewAppTabs(
+		container.NewTabItem("일반 규칙", b.generalForm.Content()),
+		container.NewTabItem("Black/White", b.blackWhiteForm.Content()),
+	)
+
+	// 전체 레이아웃: 테이블 위, 폼 탭 아래
 	b.content = container.NewBorder(
 		nil,
-		b.ruleForm.Content(),
+		b.formTabs,
 		nil,
 		nil,
 		b.ruleTable.Content(),
