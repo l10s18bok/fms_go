@@ -37,6 +37,7 @@ fms_wails/frontend/wailsjs/
 fms_wails/frontend/package-lock.json
 fms_wails/frontend/package.json.md5
 fms_wails/build/bin/
+smartfw
 
 # Flutter 빌드 디렉토리
 fms_flutter/build/

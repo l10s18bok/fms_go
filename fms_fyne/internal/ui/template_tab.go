@@ -27,7 +27,8 @@ type TemplateTab struct {
 	templateList    *widget.RadioGroup // 템플릿 목록 (라디오 버튼)
 	templateContent *widget.Entry      // 템플릿 내용 편집기
 	ruleBuilder     *RuleBuilder       // 규칙 빌더
-	subTabs         *container.AppTabs // 서브 탭 (텍스트 편집 / 규칙 빌더)
+	natBuilder      *NATBuilder        // NAT 규칙 빌더
+	subTabs         *container.AppTabs // 서브 탭 (텍스트 편집 / 규칙 빌더 / NAT 규칙)
 
 	// 데이터
 	templates       []*model.Template
@@ -101,14 +102,20 @@ func (t *TemplateTab) createTemplateContentPanel() fyne.CanvasObject {
 	// 규칙 빌더
 	t.ruleBuilder = NewRuleBuilder(nil)
 
+	// NAT 규칙 빌더
+	t.natBuilder = NewNATBuilder(nil)
+
 	// 텍스트 편집 탭
 	textEditTab := container.NewTabItem("텍스트 편집", t.templateContent)
 
 	// 규칙 빌더 탭
 	ruleBuilderTab := container.NewTabItem("규칙 빌더", t.ruleBuilder.Content())
 
+	// NAT 규칙 탭
+	natBuilderTab := container.NewTabItem("NAT 규칙", t.natBuilder.Content())
+
 	// 서브 탭 생성
-	t.subTabs = container.NewAppTabs(textEditTab, ruleBuilderTab)
+	t.subTabs = container.NewAppTabs(textEditTab, ruleBuilderTab, natBuilderTab)
 	t.subTabs.OnSelected = t.onSubTabChanged
 
 	// 저장, 삭제 버튼
@@ -133,18 +140,46 @@ func (t *TemplateTab) createTemplateContentPanel() fyne.CanvasObject {
 
 // onSubTabChanged 서브 탭 전환 시 호출
 func (t *TemplateTab) onSubTabChanged(tab *container.TabItem) {
-	if tab.Text == "규칙 빌더" {
-		// 텍스트 -> 규칙 빌더로 변환
+	switch tab.Text {
+	case "규칙 빌더":
+		// 텍스트 -> 규칙 빌더로 변환 (필터 규칙만)
 		rules, comments, _ := parser.ParseTextToRules(t.templateContent.Text)
 		t.ruleBuilder.SetRules(rules)
 		t.ruleBuilder.SetComments(comments)
-	} else {
-		// 규칙 빌더 -> 텍스트로 변환
-		rules := t.ruleBuilder.GetRules()
-		comments := t.ruleBuilder.GetComments()
-		text := parser.RulesToText(rules, comments)
-		t.templateContent.SetText(text)
+	case "NAT 규칙":
+		// 텍스트 -> NAT 빌더로 변환 (NAT 규칙만)
+		natRules, comments, _ := parser.ParseTextToNATRules(t.templateContent.Text)
+		t.natBuilder.SetRules(natRules)
+		t.natBuilder.SetComments(comments)
+	case "텍스트 편집":
+		// 모든 빌더의 내용을 텍스트로 통합
+		t.syncBuildersToText()
 	}
+}
+
+// syncBuildersToText 빌더 내용을 텍스트로 동기화
+func (t *TemplateTab) syncBuildersToText() {
+	// 필터 규칙
+	filterRules := t.ruleBuilder.GetRules()
+	filterComments := t.ruleBuilder.GetComments()
+	filterText := parser.RulesToText(filterRules, filterComments)
+
+	// NAT 규칙
+	natRules := t.natBuilder.GetRules()
+	natComments := t.natBuilder.GetComments()
+	natText := parser.NATRulesToText(natRules, natComments)
+
+	// 통합
+	var finalText string
+	if filterText != "" && natText != "" {
+		finalText = filterText + "\n" + natText
+	} else if filterText != "" {
+		finalText = filterText
+	} else {
+		finalText = natText
+	}
+
+	t.templateContent.SetText(finalText)
 }
 
 // 하단 버튼/입력 영역을 생성합니다.
@@ -194,6 +229,7 @@ func (t *TemplateTab) loadTemplates() {
 		t.templateList.SetSelected("")
 		t.templateContent.SetText("")
 		t.ruleBuilder.Clear()
+		t.natBuilder.Clear()
 	}
 	t.templateList.Refresh()
 }
@@ -209,6 +245,7 @@ func (t *TemplateTab) ClearSelection() {
 	t.templateList.SetSelected("")
 	t.templateContent.SetText("")
 	t.ruleBuilder.Clear()
+	t.natBuilder.Clear()
 }
 
 // 모든 템플릿 버전 목록을 반환합니다.
@@ -241,10 +278,15 @@ func (t *TemplateTab) onTemplateSelected(version string) {
 		if tmpl.Version == version {
 			t.templateContent.SetText(tmpl.Contents)
 
-			// 규칙 빌더도 동기화
+			// 규칙 빌더도 동기화 (필터 규칙)
 			rules, comments, _ := parser.ParseTextToRules(tmpl.Contents)
 			t.ruleBuilder.SetRules(rules)
 			t.ruleBuilder.SetComments(comments)
+
+			// NAT 빌더도 동기화 (NAT 규칙)
+			natRules, natComments, _ := parser.ParseTextToNATRules(tmpl.Contents)
+			t.natBuilder.SetRules(natRules)
+			t.natBuilder.SetComments(natComments)
 			return
 		}
 	}
@@ -252,14 +294,21 @@ func (t *TemplateTab) onTemplateSelected(version string) {
 
 // getCurrentContents 현재 활성 탭에서 내용 가져오기
 func (t *TemplateTab) getCurrentContents() string {
-	if t.subTabs.Selected().Text == "규칙 빌더" {
-		// 규칙 빌더에서 텍스트로 변환
-		rules := t.ruleBuilder.GetRules()
-		comments := t.ruleBuilder.GetComments()
-		return parser.RulesToText(rules, comments)
+	selectedTab := t.subTabs.Selected().Text
+
+	switch selectedTab {
+	case "규칙 빌더":
+		// 규칙 빌더에서 텍스트로 변환 + NAT 규칙 포함
+		t.syncBuildersToText()
+		return t.templateContent.Text
+	case "NAT 규칙":
+		// NAT 빌더에서 텍스트로 변환 + 필터 규칙 포함
+		t.syncBuildersToText()
+		return t.templateContent.Text
+	default:
+		// 텍스트 편집기에서 직접 반환
+		return t.templateContent.Text
 	}
-	// 텍스트 편집기에서 직접 반환
-	return t.templateContent.Text
 }
 
 // 템플릿 저장 시 호출됩니다.
@@ -332,6 +381,7 @@ func (t *TemplateTab) onDeleteTemplate() {
 		t.selectedVersion = ""
 		t.templateContent.SetText("")
 		t.ruleBuilder.Clear()
+		t.natBuilder.Clear()
 		t.loadTemplates()
 	}, t.window)
 }

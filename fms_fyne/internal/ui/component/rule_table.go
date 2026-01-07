@@ -47,7 +47,7 @@ var columnRatios = []float32{
 
 // 헤더 텍스트
 var headerTexts = []string{
-	"", "Chain", "Proto", "옵션", "Action", "Port", "SIP", "DIP", "Black", "White",
+	"", "Chain", "Proto", "Options", "Action", "Port", "SIP", "DIP", "Black", "White",
 }
 
 // RuleTable widget.Table 기반 규칙 테이블

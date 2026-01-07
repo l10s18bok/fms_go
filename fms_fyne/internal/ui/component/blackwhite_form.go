@@ -50,7 +50,7 @@ func (f *BlackWhiteForm) createUI() {
 
 	// 입력 행: 타입, IP
 	row := container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("타입:")),
+		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Type:")),
 		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.typeSel),
 		container.NewGridWrap(fyne.NewSize(30, rowHeight), widget.NewLabel("IP:")),
 		container.NewGridWrap(fyne.NewSize(300, rowHeight), f.sipEntry),
@@ -59,7 +59,7 @@ func (f *BlackWhiteForm) createUI() {
 	// 헤더: "Black/White 규칙 추가" 레이블 + 오른쪽에 추가 버튼
 	header := container.NewBorder(
 		nil, nil, // top, bottom
-		widget.NewLabel("Black/White 규칙 추가"), // left
+		widget.NewLabel("Black/White 규칙 추가"),                  // left
 		container.NewGridWrap(fyne.NewSize(80, 36), f.addBtn), // right
 	)
 
