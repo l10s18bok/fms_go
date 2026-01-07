@@ -76,38 +76,34 @@
 
 ## Phase 2: UI 컴포넌트
 
-### Step 2.1: `internal/ui/component/rule_row.go` 생성
+### Step 2.1: `internal/ui/component/rule_table.go` 생성 (widget.Table 사용)
 
-- [x] RuleRow 구조체 정의
-  - [x] rule *model.FirewallRule
-  - [x] onDelete func()
+- [x] RuleTable 구조체 정의
+  - [x] rules []*model.FirewallRule
+  - [x] table *widget.Table
   - [x] onChange func()
-- [x] UI 요소 생성
-  - [x] 삭제 버튼 (theme.DeleteIcon)
-  - [x] Chain Select 위젯
-  - [x] Protocol Select 위젯
-  - [x] Action Select 위젯
-  - [x] DPort Entry 위젯
-  - [x] SIP Entry 위젯
-  - [x] DIP Entry 위젯
-  - [x] Black Check 위젯
-  - [x] White Check 위젯
-- [x] 컨테이너 레이아웃 (HBox)
-- [x] NewRuleRow() 생성자
-- [x] GetRule() 메서드
-- [x] SetRule() 메서드
-- [x] Content() 메서드
-
-### Step 2.2: `internal/ui/component/rule_list.go` 생성
-
-- [x] RuleList 구조체 정의
-  - [x] rows []*RuleRow
-  - [x] onChange func()
-  - [x] container *fyne.Container
-- [x] 헤더 행 생성
-  - [x] 컬럼 Label들
-- [x] 스크롤 가능한 VBox
-- [x] NewRuleList() 생성자
+  - [x] lastWidth float32 (중복 업데이트 방지)
+- [x] widget.Table 생성 (NewTableWithHeaders 사용)
+  - [x] Length 콜백: (rows, cols) 반환
+  - [x] CreateCell 콜백: Stack에 모든 위젯 타입 포함
+    - [x] canvas.Rectangle 배경 (Select hover 투명 문제 해결)
+    - [x] 컬럼 0: 삭제 버튼 (Button)
+    - [x] 컬럼 1: Chain (Select)
+    - [x] 컬럼 2: Protocol (Select)
+    - [x] 컬럼 3: 옵션 (Hyperlink - 클릭 시 팝업)
+    - [x] 컬럼 4: Action (Select)
+    - [x] 컬럼 5: DPort (Entry)
+    - [x] 컬럼 6: SIP (Entry)
+    - [x] 컬럼 7: DIP (Entry)
+    - [x] 컬럼 8: Black (Check)
+    - [x] 컬럼 9: White (Check)
+  - [x] UpdateCell 콜백: 셀 데이터 업데이트
+  - [x] CreateHeader/UpdateHeader: 헤더 설정
+- [x] 컬럼 너비 자동 조절 (비율 기반)
+  - [x] columnRatios 배열 정의 (합계 1.0)
+  - [x] table.SetColumnWidth() 사용
+  - [x] Resize() 메서드로 창 크기에 따라 비율 조절
+- [x] NewRuleTable() 생성자
 - [x] AddRule(rule *FirewallRule) 메서드
 - [x] RemoveRule(index int) 메서드
 - [x] GetRules() []*FirewallRule 메서드
@@ -115,6 +111,13 @@
 - [x] Clear() 메서드
 - [x] Content() 메서드
 - [x] Refresh() 메서드
+- [x] CreateRenderer() 메서드 (커스텀 위젯)
+
+### Step 2.2: 기존 파일 정리
+
+- [x] `rule_row.go` 삭제
+- [x] `rule_list.go` 삭제
+- [x] `rule_builder.go`에서 RuleTable 사용하도록 수정
 
 ### Step 2.3: `internal/ui/component/rule_form.go` 생성
 
@@ -216,6 +219,7 @@
 - [x] 모든 Phase 완료
 - [x] 빌드 오류 없음
 - [x] 기본 기능 동작 확인
+- [x] 불필요 파일 정리 완료 (rule_row.go, rule_list.go 삭제)
 - [ ] fms_wails 적용 준비
 
 ---
@@ -226,4 +230,19 @@
 - fms_fyne 규칙 빌더 구현 완료
 - 빌드 성공 확인
 - UI 테스트 필요 (사용자 확인 필요)
+
+### 2026-01-07
+- **widget.Table 기반 RuleTable 구현 완료**
+  - 기존 VBox+HBox+GridWrap 조합에서 widget.Table로 전환
+  - 창 크기에 따라 자동으로 컬럼 너비 비율 조절
+  - widget.BaseWidget 상속하여 커스텀 위젯으로 구현
+- **Select hover 투명 문제 해결**
+  - 각 셀에 canvas.Rectangle 불투명 배경 추가
+  - Stack의 첫 번째 요소로 배경 배치
+- **옵션 컬럼 클릭 시 팝업 기능 추가**
+  - Label에서 Hyperlink로 변경
+  - 클릭 시 오른쪽에 전체 옵션 내용 팝업 표시
+  - widget.PopUp 사용
+- rule_builder.go에서 RuleList → RuleTable 교체 완료
+- 빌드 성공 확인
 

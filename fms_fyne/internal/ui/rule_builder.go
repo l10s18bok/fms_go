@@ -10,10 +10,10 @@ import (
 
 // RuleBuilder 규칙 빌더 패널
 type RuleBuilder struct {
-	ruleList *component.RuleList
-	ruleForm *component.RuleForm
-	onChange func()
-	comments []string // 주석 라인 보존
+	ruleTable *component.RuleTable
+	ruleForm  *component.RuleForm
+	onChange  func()
+	comments  []string // 주석 라인 보존
 
 	content *fyne.Container
 }
@@ -30,24 +30,24 @@ func NewRuleBuilder(onChange func()) *RuleBuilder {
 
 // createUI UI 생성
 func (b *RuleBuilder) createUI() {
-	// 규칙 목록
-	b.ruleList = component.NewRuleList(b.onChange)
+	// 규칙 테이블
+	b.ruleTable = component.NewRuleTable(b.onChange)
 
 	// 규칙 추가 폼
 	b.ruleForm = component.NewRuleForm(func(rule *model.FirewallRule) {
-		b.ruleList.AddRule(rule)
+		b.ruleTable.AddRule(rule)
 		if b.onChange != nil {
 			b.onChange()
 		}
 	})
 
-	// 전체 레이아웃: 목록 위, 폼 아래
+	// 전체 레이아웃: 테이블 위, 폼 아래
 	b.content = container.NewBorder(
 		nil,
 		b.ruleForm.Content(),
 		nil,
 		nil,
-		b.ruleList.Content(),
+		b.ruleTable.Content(),
 	)
 }
 
@@ -58,12 +58,12 @@ func (b *RuleBuilder) Content() *fyne.Container {
 
 // GetRules 모든 규칙 반환
 func (b *RuleBuilder) GetRules() []*model.FirewallRule {
-	return b.ruleList.GetRules()
+	return b.ruleTable.GetRules()
 }
 
 // SetRules 규칙 목록 설정
 func (b *RuleBuilder) SetRules(rules []*model.FirewallRule) {
-	b.ruleList.SetRules(rules)
+	b.ruleTable.SetRules(rules)
 }
 
 // GetComments 주석 반환
@@ -78,11 +78,11 @@ func (b *RuleBuilder) SetComments(comments []string) {
 
 // Clear 초기화
 func (b *RuleBuilder) Clear() {
-	b.ruleList.Clear()
+	b.ruleTable.Clear()
 	b.comments = []string{}
 }
 
 // Refresh UI 새로고침
 func (b *RuleBuilder) Refresh() {
-	b.ruleList.Refresh()
+	b.ruleTable.Refresh()
 }
