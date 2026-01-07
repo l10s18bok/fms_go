@@ -204,31 +204,3 @@ func isLightColor(c color.Color) bool {
 	return brightness > 32767
 }
 
-// Deprecated: NewCustomButton을 사용하세요.
-func NewColoredButton(text string, style ButtonStyle, onTap func()) fyne.CanvasObject {
-	// 배경색 결정
-	var bgColor color.Color
-	switch style {
-	case ButtonDark:
-		bgColor = color.RGBA{R: 80, G: 80, B: 80, A: 255}
-	case ButtonBlack:
-		bgColor = color.RGBA{R: 40, G: 40, B: 40, A: 255}
-	default:
-		bgColor = color.RGBA{R: 100, G: 100, B: 100, A: 255}
-	}
-
-	// 배경
-	bg := canvas.NewRectangle(bgColor)
-	bg.CornerRadius = 4
-
-	// 텍스트
-	label := canvas.NewText(text, color.White)
-	label.TextStyle = fyne.TextStyle{Bold: true}
-
-	// 패딩 적용 (상, 하, 좌, 우)
-	paddedLabel := container.New(layout.NewCustomPaddedLayout(8, 8, 16, 16), container.NewCenter(label))
-
-	// 배경 + 텍스트를 TappableContainer로 감싸기
-	content := container.NewStack(bg, paddedLabel)
-	return NewTappableContainer(content, onTap)
-}

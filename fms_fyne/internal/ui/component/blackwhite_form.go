@@ -2,6 +2,7 @@ package component
 
 import (
 	"fms/internal/model"
+	"fms/internal/themes"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -40,7 +41,7 @@ func (f *BlackWhiteForm) createUI() {
 	f.sipEntry.SetPlaceHolder("차단/허용할 IP (예: 192.168.1.100)")
 
 	// 추가 버튼
-	f.addBtn = NewColoredButton("+ 추가", ButtonDark, func() {
+	f.addBtn = NewCustomButton("+ 추가", nil, nil, themes.Colors["darkgray"], func() {
 		f.submitRule()
 	})
 

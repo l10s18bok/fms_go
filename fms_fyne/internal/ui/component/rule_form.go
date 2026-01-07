@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"fms/internal/model"
+	"fms/internal/themes"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -107,7 +108,7 @@ func (f *RuleForm) createUI() {
 	f.dipEntry.SetPlaceHolder("Dest IP")
 
 	// 추가 버튼 (진한 회색 배경)
-	f.addBtn = NewColoredButton("+ 추가", ButtonDark, func() {
+	f.addBtn = NewCustomButton("+ 추가", nil, nil, themes.Colors["darkgray"], func() {
 		f.submitRule()
 	})
 
