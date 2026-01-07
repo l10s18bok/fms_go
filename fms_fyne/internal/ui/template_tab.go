@@ -83,10 +83,21 @@ func (t *TemplateTab) createTemplateListPanel() fyne.CanvasObject {
 	// 목록 영역 (스크롤 가능)
 	listContainer := container.NewVScroll(t.templateList)
 
+	// 새 템플릿 버튼
+	newBtn := component.NewCustomButton("+ 새 템플릿", nil, themes.Colors["black"], themes.Colors["lightgray"], func() {
+		t.onNewTemplate()
+	}, 5, 0, 0, 5)
+
+	// 헤더: "템플릿 목록" + 오른쪽에 새 템플릿 버튼
+	header := container.NewBorder(nil, nil,
+		widget.NewLabel("템플릿 목록"),
+		newBtn,
+	)
+
 	// 패널 레이아웃
 	return container.NewBorder(
-		widget.NewLabel("템플릿 목록"), // 상단 제목
-		nil,                       // 하단 버튼 삭제
+		header, // 상단 헤더
+		nil,    // 하단
 		nil, nil,
 		listContainer, // 중앙 목록
 	)
@@ -273,6 +284,9 @@ func (t *TemplateTab) onTemplateSelected(version string) {
 		return
 	}
 
+	// 모든 탭 위치 초기화
+	t.resetAllTabs()
+
 	// 선택된 템플릿 찾기
 	for _, tmpl := range t.templates {
 		if tmpl.Version == version {
@@ -290,6 +304,35 @@ func (t *TemplateTab) onTemplateSelected(version string) {
 			return
 		}
 	}
+}
+
+// onNewTemplate 새 템플릿 생성
+func (t *TemplateTab) onNewTemplate() {
+	// 선택 해제
+	t.templateList.SetSelected("")
+	t.selectedVersion = ""
+
+	// 내용 초기화
+	t.templateContent.SetText("")
+	t.ruleBuilder.Clear()
+	t.natBuilder.Clear()
+
+	// 탭 위치 초기화
+	t.resetAllTabs()
+}
+
+// resetAllTabs 모든 탭 위치를 첫 번째 탭으로 초기화
+func (t *TemplateTab) resetAllTabs() {
+	// 서브 탭 (텍스트 편집 / 규칙 빌더 / NAT 규칙) 초기화
+	if len(t.subTabs.Items) > 0 {
+		t.subTabs.SelectIndex(0)
+	}
+
+	// 규칙 빌더 내부 폼 탭 초기화
+	t.ruleBuilder.ResetTabs()
+
+	// NAT 빌더 내부 폼 탭 초기화
+	t.natBuilder.ResetTabs()
 }
 
 // getCurrentContents 현재 활성 탭에서 내용 가져오기

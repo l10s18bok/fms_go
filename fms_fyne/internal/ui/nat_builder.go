@@ -107,3 +107,10 @@ func (b *NATBuilder) Clear() {
 func (b *NATBuilder) Refresh() {
 	b.natTable.Refresh()
 }
+
+// ResetTabs 폼 탭 위치 초기화 (첫 번째 탭으로)
+func (b *NATBuilder) ResetTabs() {
+	if len(b.formTabs.Items) > 0 {
+		b.formTabs.SelectIndex(0)
+	}
+}

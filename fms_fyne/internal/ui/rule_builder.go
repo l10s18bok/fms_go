@@ -102,3 +102,10 @@ func (b *RuleBuilder) Clear() {
 func (b *RuleBuilder) Refresh() {
 	b.ruleTable.Refresh()
 }
+
+// ResetTabs 폼 탭 위치 초기화 (첫 번째 탭으로)
+func (b *RuleBuilder) ResetTabs() {
+	if len(b.formTabs.Items) > 0 {
+		b.formTabs.SelectIndex(0)
+	}
+}
