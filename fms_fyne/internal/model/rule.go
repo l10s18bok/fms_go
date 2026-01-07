@@ -316,19 +316,19 @@ func GetTCPFlagsList() []string {
 func GetICMPTypeOptions() []string {
 	return []string{
 		"None",
-		"echo-reply (0)",
-		"destination-unreachable (3)",
-		"source-quench (4)",
-		"echo-redirect (5)",
-		"echo-request (8)",
-		"time-exceeded (11)",
-		"parameter-problem (12)",
-		"timestamp-request (13)",
-		"timestamp-reply (14)",
-		"information-request (15)",
-		"information-reply (16)",
-		"addressmask-request (17)",
-		"addressmask-reply (18)",
+		"echo-reply",
+		"destination-unreachable",
+		"source-quench",
+		"echo-redirect",
+		"echo-request",
+		"time-exceeded",
+		"parameter-problem",
+		"timestamp-request",
+		"timestamp-reply",
+		"information-request",
+		"information-reply",
+		"addressmask-request",
+		"addressmask-reply",
 	}
 }
 

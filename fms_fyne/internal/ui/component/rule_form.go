@@ -179,9 +179,12 @@ func (f *RuleForm) createTCPFlagsUI() {
 	// 플래그 체크박스 생성
 	flags := model.GetTCPFlagsList()
 	rowHeight := float32(30)
+	labelWidth := float32(50) // 레이블 너비 통일
 
 	// 검사할 플래그 행
-	maskRow := container.NewHBox(widget.NewLabel("Mask:"))
+	maskRow := container.NewHBox(
+		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Mask:")),
+	)
 	for _, flag := range flags {
 		check := widget.NewCheck(strings.ToUpper(flag), func(b bool) {
 			if !f.updatingFromPreset {
@@ -193,7 +196,9 @@ func (f *RuleForm) createTCPFlagsUI() {
 	}
 
 	// 설정된 플래그 행
-	setRow := container.NewHBox(widget.NewLabel("Set:"))
+	setRow := container.NewHBox(
+		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Set:")),
+	)
 	for _, flag := range flags {
 		check := widget.NewCheck(strings.ToUpper(flag), func(b bool) {
 			if !f.updatingFromPreset {
@@ -206,8 +211,8 @@ func (f *RuleForm) createTCPFlagsUI() {
 
 	// 프리셋 행
 	presetRow := container.NewHBox(
-		widget.NewLabel("Preset:"),
-		container.NewGridWrap(fyne.NewSize(180, 36), f.tcpFlagsPresetSel),
+		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Preset:")),
+		container.NewGridWrap(fyne.NewSize(180, rowHeight), f.tcpFlagsPresetSel),
 	)
 
 	f.tcpOptionsBox = container.NewVBox(
@@ -373,13 +378,7 @@ func (f *RuleForm) getICMPType() string {
 	if selected == "None" || selected == "" {
 		return ""
 	}
-
-	// "echo-request (8)" 형식에서 이름만 추출
-	parts := strings.Split(selected, " ")
-	if len(parts) > 0 {
-		return parts[0]
-	}
-	return ""
+	return selected
 }
 
 // getICMPCode ICMP code 값 가져오기
