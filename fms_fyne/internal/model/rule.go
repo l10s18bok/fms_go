@@ -201,7 +201,7 @@ func GetProtocolOptions() []string {
 
 // GetActionOptions UI Select용 Action 옵션 목록
 func GetActionOptions() []string {
-	return []string{"DROP", "ACCEPT", "REJECT"}
+	return []string{"DROP", "ACCEPT"}
 }
 
 // TCPFlagsPreset TCP Flags 프리셋 정의
@@ -227,63 +227,75 @@ func (p *TCPFlagsPreset) ToFlagsString() string {
 func GetTCPFlagsPresets() []TCPFlagsPreset {
 	return []TCPFlagsPreset{
 		{
-			Name:        "없음",
+			Name:        "None",
 			MaskFlags:   nil,
 			SetFlags:    nil,
-			Description: "모든 TCP 패킷 매칭",
+			Description: "Match all TCP packets",
 		},
 		{
-			Name:        "새 연결만 (SYN)",
+			Name:        "New Connection (SYN)",
 			MaskFlags:   []string{"syn", "rst", "ack", "fin"},
 			SetFlags:    []string{"syn"},
-			Description: "새 연결 요청만 매칭",
+			Description: "Match new connection requests",
 		},
 		{
-			Name:        "확립된 연결 (ACK)",
+			Name:        "Established (ACK)",
 			MaskFlags:   []string{"ack"},
 			SetFlags:    []string{"ack"},
-			Description: "기존 연결 패킷만 매칭",
+			Description: "Match established connections",
 		},
 		{
-			Name:        "NULL 스캔 차단",
+			Name:        "Block NULL Scan",
 			MaskFlags:   []string{"syn", "rst", "ack", "fin", "psh", "urg"},
 			SetFlags:    nil,
-			Description: "플래그 없는 비정상 패킷",
+			Description: "Block packets with no flags",
 		},
 		{
-			Name:        "XMAS 스캔 차단",
+			Name:        "Block XMAS Scan",
 			MaskFlags:   []string{"syn", "rst", "ack", "fin", "psh", "urg"},
 			SetFlags:    []string{"fin", "psh", "urg"},
-			Description: "비정상 플래그 조합",
+			Description: "Block abnormal flag combination",
 		},
 		{
-			Name:        "SYN+FIN 차단",
+			Name:        "Block SYN+FIN",
 			MaskFlags:   []string{"syn", "fin"},
 			SetFlags:    []string{"syn", "fin"},
-			Description: "비정상 플래그 조합",
+			Description: "Block abnormal flag combination",
 		},
 		{
-			Name:        "커스텀",
+			Name:        "Block SYN+RST",
+			MaskFlags:   []string{"syn", "rst"},
+			SetFlags:    []string{"syn", "rst"},
+			Description: "Block abnormal flag combination",
+		},
+		{
+			Name:        "Block FIN+RST",
+			MaskFlags:   []string{"fin", "rst"},
+			SetFlags:    []string{"fin", "rst"},
+			Description: "Block abnormal flag combination",
+		},
+		{
+			Name:        "Custom",
 			MaskFlags:   nil,
 			SetFlags:    nil,
-			Description: "직접 체크박스 설정",
+			Description: "Manual checkbox selection",
 		},
 	}
 }
 
 // FindPresetByFlags flags 문자열에 매칭되는 프리셋 찾기
-// 매칭되는 프리셋 없으면 "커스텀" 반환
+// 매칭되는 프리셋 없으면 "Custom" 반환
 func FindPresetByFlags(flags string) *TCPFlagsPreset {
 	presets := GetTCPFlagsPresets()
 
-	// 빈 문자열은 "없음"
+	// 빈 문자열은 "None"
 	if flags == "" {
 		return &presets[0]
 	}
 
 	// 각 프리셋과 비교
 	for i, preset := range presets {
-		if preset.Name == "커스텀" {
+		if preset.Name == "Custom" {
 			continue
 		}
 		if preset.ToFlagsString() == flags {
@@ -291,7 +303,7 @@ func FindPresetByFlags(flags string) *TCPFlagsPreset {
 		}
 	}
 
-	// 매칭되지 않으면 커스텀
+	// 매칭되지 않으면 Custom
 	return &presets[len(presets)-1]
 }
 
@@ -300,43 +312,58 @@ func GetTCPFlagsList() []string {
 	return []string{"syn", "ack", "fin", "rst", "psh", "urg"}
 }
 
-// GetICMPTypeOptions ICMP type 옵션 목록 (UI Select용)
+// GetICMPTypeOptions ICMP type 옵션 목록 (UI Select용, smartfw 순서와 동일)
 func GetICMPTypeOptions() []string {
 	return []string{
-		"없음",
-		"echo-request (8)",
+		"None",
 		"echo-reply (0)",
 		"destination-unreachable (3)",
+		"source-quench (4)",
+		"echo-redirect (5)",
+		"echo-request (8)",
 		"time-exceeded (11)",
-		"redirect (5)",
-		"커스텀 숫자...",
+		"parameter-problem (12)",
+		"timestamp-request (13)",
+		"timestamp-reply (14)",
+		"information-request (15)",
+		"information-reply (16)",
+		"addressmask-request (17)",
+		"addressmask-reply (18)",
 	}
 }
 
-// icmpTypeMap ICMP 타입 이름 → 숫자 매핑
+// icmpTypeMap ICMP 타입 이름 → 숫자 매핑 (smartfw 동일)
 var icmpTypeMap = map[string]int{
 	"echo-reply":              0,
 	"destination-unreachable": 3,
 	"source-quench":           4,
-	"redirect":                5,
+	"echo-redirect":           5,
 	"echo-request":            8,
 	"time-exceeded":           11,
 	"parameter-problem":       12,
 	"timestamp-request":       13,
 	"timestamp-reply":         14,
+	"information-request":     15,
+	"information-reply":       16,
+	"addressmask-request":     17,
+	"addressmask-reply":       18,
 }
 
-// icmpTypeReverseMap ICMP 타입 숫자 → 이름 매핑
+// icmpTypeReverseMap ICMP 타입 숫자 → 이름 매핑 (smartfw 동일)
 var icmpTypeReverseMap = map[int]string{
 	0:  "echo-reply",
 	3:  "destination-unreachable",
 	4:  "source-quench",
-	5:  "redirect",
+	5:  "echo-redirect",
 	8:  "echo-request",
 	11: "time-exceeded",
 	12: "parameter-problem",
 	13: "timestamp-request",
 	14: "timestamp-reply",
+	15: "information-request",
+	16: "information-reply",
+	17: "addressmask-request",
+	18: "addressmask-reply",
 }
 
 // ICMPTypeNameToNumber ICMP type 이름을 숫자로 변환
@@ -365,14 +392,14 @@ func ICMPTypeNumberToName(num int) string {
 // GetICMPCodeOptions ICMP code 옵션 목록 (Type 3: destination-unreachable 전용)
 func GetICMPCodeOptions() []string {
 	return []string{
-		"없음",
+		"None",
 		"net-unreachable (0)",
 		"host-unreachable (1)",
 		"protocol-unreachable (2)",
 		"port-unreachable (3)",
 		"fragmentation-needed (4)",
 		"source-route-failed (5)",
-		"커스텀 숫자...",
+		"Custom...",
 	}
 }
 
