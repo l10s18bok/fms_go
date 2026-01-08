@@ -426,14 +426,13 @@ const TemplateTab = forwardRef<TemplateTabRef>((_, ref) => {
 
                         {/* 텍스트 편집 탭 */}
                         {subTab === 'text' && (
-                            <div className="form-group">
+                            <div className="form-group flex-grow">
                                 <label>규칙 내용</label>
                                 <textarea
                                     className="textarea"
                                     value={contents}
                                     onChange={(e) => setContents(e.target.value)}
                                     placeholder="방화벽 규칙을 입력하세요..."
-                                    style={{ minHeight: '300px' }}
                                 />
                             </div>
                         )}
