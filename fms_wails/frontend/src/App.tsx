@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
+import { APP_HELP } from './constants/helpTexts';
 import TemplateTab, { TemplateTabRef } from './components/TemplateTab';
 import DeviceTab, { DeviceTabRef } from './components/DeviceTab';
 import HistoryTab, { HistoryTabRef } from './components/HistoryTab';
@@ -583,30 +584,34 @@ function App() {
                         </div>
 
                         <div className="help-content">
-                            <h4>FMS - Firewall Management System</h4>
+                            <h4>{APP_HELP.title}</h4>
                             <p>버전: {appVersion}</p>
 
-                            <h5>[템플릿 관리]</h5>
-                            <p>• 방화벽 규칙 템플릿을 생성/수정/삭제합니다</p>
-
-                            <h5>[장비 관리]</h5>
-                            <p>• 관리할 방화벽 장비(IP)를 등록합니다</p>
-                            <p>• 서버 상태를 확인하고 템플릿을 배포합니다</p>
-
-                            <h5>[배포 이력]</h5>
-                            <p>• 배포 결과를 확인할 수 있습니다</p>
-                            <p>• 규칙별 성공/실패 상태를 상세히 확인합니다</p>
-
-                            <h5>[Import/Export]</h5>
-                            <p>• 현재 탭의 데이터를 JSON 파일로 내보내거나 가져옵니다</p>
+                            {APP_HELP.sections.map((section, i) => (
+                                <div key={i}>
+                                    <h5>[{section.name}]</h5>
+                                    {section.items.map((item, j) => (
+                                        <p key={j}>• {item}</p>
+                                    ))}
+                                </div>
+                            ))}
 
                             <h5>[연결 모드] (설정에서 변경)</h5>
-                            <p>• Agent Server: Agent 서버(예: http://172.24.10.6:8080)를 통해 연결</p>
-                            <p>  - 상태확인: POST /agent/req-respCheck</p>
-                            <p>  - 배포: POST /agent/req-deploy</p>
-                            <p>• Direct: 각 장비에 직접 HTTP 연결 (포트 80)</p>
-                            <p>  - 상태확인: GET http://&#123;장비IP&#125;/respCheck</p>
-                            <p>  - 배포: POST http://&#123;장비IP&#125;/deploy</p>
+                            {APP_HELP.connectionModes.map((mode, i) => (
+                                <div key={i}>
+                                    <p>• {mode.name}: {mode.desc}</p>
+                                    {mode.endpoints.map((ep, j) => (
+                                        <p key={j}>  - {ep}</p>
+                                    ))}
+                                </div>
+                            ))}
+
+                            <h5>[규칙 포맷]</h5>
+                            <p><code>{APP_HELP.ruleFormat.pattern}</code></p>
+                            <p>예시:</p>
+                            {APP_HELP.ruleFormat.examples.map((ex, i) => (
+                                <p key={i}><code>{ex}</code></p>
+                            ))}
                         </div>
 
                         <div className="modal-footer">
