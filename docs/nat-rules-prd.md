@@ -300,6 +300,45 @@ func NATRuleToSmartfw(rule *NATRule, id string) string {
 | 인터페이스 | 120px | IN/OUT |
 | 설명 | 150px | 규칙 설명 |
 
+### 6.5 도움말 버튼
+
+DNAT 및 SNAT 폼에 도움말 버튼(?)을 제공하여 사용자가 각 필드에 대한 설명을 확인할 수 있습니다.
+
+```
+┌─ 포트 포워딩 (DNAT) 추가 [?] ───────────────────────────────────────┐
+│ ...                                                                  │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌─ 소스 NAT (SNAT/MASQUERADE) 추가 [?] ────────────────────────────────┐
+│ ...                                                                  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+- **[?] 버튼 클릭**: 모달 팝업으로 해당 NAT 유형에 대한 상세 설명 표시
+- **팝업 구성**: 제목 + 스크롤 가능한 내용 + 닫기 버튼
+- **도움말 텍스트**: `help_texts.go` 파일에서 중앙 관리
+
+#### DNAT 도움말 내용
+
+| 필드 | 설명 |
+|------|------|
+| Proto | 프로토콜 (TCP/UDP/ANY) |
+| ExtPort | 외부에서 접속할 포트 번호 |
+| SIP | 접속을 허용할 소스 IP (비우면 모두 허용) |
+| DIP | 포워딩할 내부 서버 IP 주소 |
+| DPort | 내부 서버의 실제 포트 번호 |
+
+#### SNAT/MASQUERADE 도움말 내용
+
+| 필드 | 설명 |
+|------|------|
+| Type | NAT 타입 (SNAT: 고정 IP, MASQUERADE: 동적 IP) |
+| Proto | 프로토콜 (TCP/UDP/ANY) |
+| SIP | SNAT를 적용할 소스 네트워크 (CIDR 형식) |
+| InIF | 내부 네트워크 인터페이스 (예: eth1) |
+| OutIF | 외부 네트워크 인터페이스 (예: eth0) |
+| TransIP | 변환할 IP 주소 (SNAT만 해당, 비우면 자동) |
+
 ---
 
 ## 7. 파일 구조
@@ -313,6 +352,7 @@ func NATRuleToSmartfw(rule *NATRule, id string) string {
 | `internal/ui/component/nat_table.go` | NAT 규칙 테이블 (widget.Table 기반) |
 | `internal/ui/component/dnat_form.go` | DNAT 규칙 추가 폼 |
 | `internal/ui/component/snat_form.go` | SNAT/MASQ 규칙 추가 폼 |
+| `internal/ui/component/help_texts.go` | 도움말 텍스트 및 공통 팝업 함수 |
 | `internal/ui/nat_builder.go` | NAT 빌더 패널 (테이블 + 폼 탭) |
 
 > **Note**: 필터 규칙 빌더(RuleTable, RuleForm, BlackWhiteForm)와 동일한 패턴 적용
