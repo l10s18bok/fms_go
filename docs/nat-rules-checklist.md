@@ -2,7 +2,7 @@
 
 **Status**: 🔄 In Progress
 **Started**: 2026-01-06
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-08
 **Related PRD**: [nat-rules-prd.md](./nat-rules-prd.md)
 
 ---
@@ -259,33 +259,35 @@ go test ./test/parser/... -cover
   - [ ] Resize() - 크기 변경 시 컬럼 너비 재계산
   - [ ] CRUD 메서드: AddRule(), RemoveRule(), GetRules(), SetRules(), Clear()
 
-- [ ] **Task 3.2**: `internal/ui/component/dnat_form.go` 생성
-  - [ ] DNATForm 구조체 정의
+- [x] **Task 3.2**: `internal/ui/component/dnat_form.go` 생성
+  - [x] DNATForm 구조체 정의
     - protocol Select
     - matchPort Entry (외부 포트)
+    - matchIP Entry (소스 IP, 선택)
     - translateIP Entry (내부 IP)
     - translatePort Entry (내부 포트)
-    - description Entry (선택)
     - onAdd func(*NATRule)
-  - [ ] DNAT 전용 폼 레이아웃
-  - [ ] NewDNATForm() 생성자
-  - [ ] submitRule() - NATType=DNAT 고정
-  - [ ] Reset(), Content() 메서드
+  - [x] DNAT 전용 폼 레이아웃
+  - [x] NewDNATForm() 생성자
+  - [x] submitRule() - NATType=DNAT 고정
+  - [x] Reset(), Content() 메서드
+  - [x] 도움말 버튼 추가 (showDNATHelp)
 
-- [ ] **Task 3.3**: `internal/ui/component/snat_form.go` 생성
-  - [ ] SNATForm 구조체 정의
+- [x] **Task 3.3**: `internal/ui/component/snat_form.go` 생성
+  - [x] SNATForm 구조체 정의
     - natTypeSel Select (SNAT / MASQUERADE)
     - protocol Select
     - matchIP Entry (소스 네트워크)
     - inInterface Entry
     - outInterface Entry
     - translateIP Entry (선택, SNAT만)
-    - description Entry (선택)
     - onAdd func(*NATRule)
-  - [ ] SNAT/MASQ 폼 레이아웃
-  - [ ] NewSNATForm() 생성자
-  - [ ] submitRule()
-  - [ ] Reset(), Content() 메서드
+  - [x] SNAT/MASQ 폼 레이아웃
+  - [x] NewSNATForm() 생성자
+  - [x] submitRule()
+  - [x] Reset(), Content() 메서드
+  - [x] 도움말 버튼 추가 (showSNATHelp)
+  - [x] NAT 타입 변경 시 TransIP 행 표시/숨김 (onNATTypeChanged)
 
 - [ ] **Task 3.4**: `internal/ui/nat_builder.go` 생성
   - [ ] NATBuilder 구조체 정의 (RuleBuilder 패턴 참조)
@@ -308,8 +310,13 @@ go test ./test/parser/... -cover
   - [ ] onTemplateSelected() 수정
     - NAT 규칙도 로드
 
+- [x] **Task 3.6**: `internal/ui/component/help_texts.go` 도움말 텍스트 추가
+  - [x] DNATHelpText 상수 정의
+  - [x] SNATHelpText 상수 정의
+  - [x] ShowHelpPopup() 공통 함수 활용
+
 **🔵 REFACTOR: Clean Up Code**
-- [ ] **Task 3.6**: UI 코드 품질 개선
+- [ ] **Task 3.7**: UI 코드 품질 개선
   - [ ] 중복 UI 로직 추출
   - [ ] 이벤트 핸들러 정리
 
@@ -408,12 +415,12 @@ go build -ldflags "-H windowsgui -s -w" -o fms_fyne.exe .
 ## 📊 Progress Tracking
 
 ### Completion Status
-- **Phase 1**: ⏳ 0%
-- **Phase 2**: ⏳ 0%
-- **Phase 3**: ⏳ 0%
-- **Phase 4**: ⏳ 0%
+- **Phase 1**: ⏳ 0% (데이터 모델)
+- **Phase 2**: ⏳ 0% (파서)
+- **Phase 3**: 🔄 40% (UI 컴포넌트 - DNAT/SNAT 폼 완료, 테이블/빌더 미완)
+- **Phase 4**: ⏳ 0% (테스트)
 
-**Overall Progress**: 0% complete
+**Overall Progress**: 15% complete
 
 ---
 
@@ -423,6 +430,20 @@ go build -ldflags "-H windowsgui -s -w" -o fms_fyne.exe .
 - PRD 문서 작성 완료
 - 체크리스트를 feature-planner 형식으로 업데이트
 - 백엔드 Agent 서버의 NAT 지원 여부 확인 필요
+
+### 2026-01-08
+- **DNAT 폼 구현 완료** (dnat_form.go)
+  - 프로토콜 선택, 외부 포트, 소스 IP, 내부 IP/포트 필드
+  - 규칙 빌더와 동일한 레이아웃 패턴 적용
+  - 도움말 버튼 추가
+- **SNAT 폼 구현 완료** (snat_form.go)
+  - NAT 타입 선택 (SNAT/MASQUERADE)
+  - MASQUERADE 선택 시 TransIP 행 자동 숨김
+  - 도움말 버튼 추가
+- **도움말 텍스트 중앙 관리**
+  - help_texts.go에 DNATHelpText, SNATHelpText 상수 추가
+  - ShowHelpPopup() 공통 함수로 통일된 UI 제공
+  - 모달 팝업 + 스크롤 가능한 컨텐츠 영역
 
 ---
 

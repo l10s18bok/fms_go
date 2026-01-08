@@ -2,7 +2,7 @@
 
 **Status**: ✅ Completed
 **Started**: 2026-01-06
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-08
 **Related PRD**: [protocol-options-prd.md](./protocol-options-prd.md)
 
 ---
@@ -267,8 +267,28 @@ fms_fyne/
   - [x] 헤더에 "옵션" 컬럼 추가
   - [x] 컬럼 너비 조정
 
+- [x] **Task 3.4**: 프로토콜별 필드 활성화/비활성화
+  - [x] ICMP 선택 시 포트 필드 비활성화 ("N/A" placeholder)
+  - [x] UDP/ANY 선택 시 TCP Flags 옵션 영역 비활성화 (회색 표시)
+  - [x] setTCPOptionsEnabled() 헬퍼 함수
+  - [x] setICMPOptionsEnabled() 헬퍼 함수
+
+- [x] **Task 3.5**: 도움말 버튼 추가
+  - [x] TCP Flags 영역에 "?" 버튼 추가
+  - [x] ICMP Options 영역에 "?" 버튼 추가
+  - [x] 모달 팝업으로 도움말 표시 (widget.NewModalPopUp)
+  - [x] 스크롤 가능한 컨텐츠
+
+- [x] **Task 3.6**: `internal/ui/component/help_texts.go` 생성 (신규)
+  - [x] ShowHelpPopup() 공통 함수
+  - [x] TCPFlagsHelpText 상수
+  - [x] ICMPOptionsHelpText 상수
+  - [x] AppHelpText 상수
+  - [x] DNATHelpText 상수
+  - [x] SNATHelpText 상수
+
 **🔵 REFACTOR: Clean Up Code**
-- [x] **Task 3.4**: UI 코드 품질 개선
+- [x] **Task 3.7**: UI 코드 품질 개선
   - [x] 중복 UI 로직 추출
   - [x] 이벤트 핸들러 정리
 
@@ -376,6 +396,21 @@ fms_fyne/
   - 문제: protoSel.SetSelected() 호출 시 OnChanged 콜백이 실행되어 Options를 nil로 초기화
   - 해결: `syncing` 플래그 추가하여 syncFromRule() 실행 중에는 옵션 초기화 건너뜀
   - defer로 syncing 플래그 복원 보장
+
+### 2026-01-08
+- **프로토콜별 필드 활성화/비활성화 구현**
+  - ICMP 선택 시 포트 필드 비활성화 및 "N/A" placeholder 표시
+  - UDP/ANY 선택 시 TCP Flags 옵션 영역 비활성화 (회색 표시)
+  - `setTCPOptionsEnabled()`, `setICMPOptionsEnabled()` 헬퍼 함수 추가
+- **도움말 버튼 추가**
+  - TCP Flags, ICMP Options 영역에 "?" 버튼 추가
+  - `widget.NewModalPopUp`으로 중앙 모달 팝업 구현
+  - 스크롤 가능한 컨텐츠 영역
+- **help_texts.go 파일 생성**
+  - 모든 도움말 텍스트 중앙 관리
+  - `ShowHelpPopup()` 공통 함수로 통일된 UI 제공
+  - TCPFlagsHelpText, ICMPOptionsHelpText 상수 정의
+  - DNAT, SNAT 도움말도 함께 관리
 
 ---
 
