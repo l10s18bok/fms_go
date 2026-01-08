@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -151,9 +150,6 @@ func (c *Client) DeployViaAgent(deviceIP string, template string) (*model.Deploy
 func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployResult, error) {
 	url := fmt.Sprintf("http://%s/agent/req-deploy", deviceIP)
 
-	log.Printf("[DEBUG] DeployDirect URL: %s", url)
-	log.Printf("[DEBUG] DeployDirect 템플릿:\n%s", template)
-
 	// 요청 데이터 생성 (템플릿을 변환 없이 그대로 전송)
 	reqData := map[string]interface{}{
 		"template": template,
@@ -164,23 +160,17 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 		return nil, fmt.Errorf("JSON 변환 실패: %v", err)
 	}
 
-	log.Printf("[DEBUG] DeployDirect 요청 Body: %s", string(jsonData))
-
 	// POST 요청
 	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("[DEBUG] DeployDirect 연결 실패: %v", err)
 		return nil, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("[DEBUG] DeployDirect 응답 읽기 실패: %v", err)
 		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
 	}
-
-	log.Printf("[DEBUG] DeployDirect 응답: StatusCode=%d, Body=%s", resp.StatusCode, string(body))
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("장비 응답 오류: %d", resp.StatusCode)

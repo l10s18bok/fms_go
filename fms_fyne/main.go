@@ -27,16 +27,6 @@ func main() {
 	execDir := filepath.Dir(resolvedPath)
 	configDir := filepath.Join(execDir, "config")
 
-	// 로그 파일 설정 (config/fms.log)
-	// logFile, err := os.OpenFile(filepath.Join(configDir, "fms.log"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	// if err == nil {
-	// 	// GUI 모드에서는 stdout이 없으므로 파일에만 출력
-	// 	log.SetOutput(logFile)
-	// 	defer logFile.Close()
-	// }
-	// log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	// log.Println("=== FMS 애플리케이션 시작 ===")
-
 	// 저장소 초기화
 	store, err := storage.NewJSONStore(configDir)
 	if err != nil {

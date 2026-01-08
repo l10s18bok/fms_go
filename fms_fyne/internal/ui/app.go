@@ -344,15 +344,16 @@ func (m *MainUI) showImportDialog() {
 	openDialog.SetFilter(fynestorage.NewExtensionFileFilter([]string{".json"}))
 
 	// 실행 파일 위치의 config 폴더를 시작 경로로 설정, 없으면 실행 파일 디렉토리
-	exePath, _ := os.Executable()
-	exeDir := filepath.Dir(exePath)
-	configDir := filepath.Join(exeDir, "config")
-	if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(configDir)); err == nil {
-		openDialog.SetLocation(uri)
-	} else {
-		// config 폴더가 없으면 실행 파일 디렉토리로 설정
-		if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(exeDir)); err == nil {
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		configDir := filepath.Join(exeDir, "config")
+		if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(configDir)); err == nil {
 			openDialog.SetLocation(uri)
+		} else {
+			// config 폴더가 없으면 실행 파일 디렉토리로 설정
+			if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(exeDir)); err == nil {
+				openDialog.SetLocation(uri)
+			}
 		}
 	}
 
@@ -415,13 +416,25 @@ func (m *MainUI) showExportDialog() {
 		// 현재 탭에 따라 처리
 		switch tabIndex {
 		case 0: // 템플릿 탭
-			templates, _ := m.store.GetAllTemplates()
+			templates, err := m.store.GetAllTemplates()
+			if err != nil {
+				dialog.ShowError(err, m.window)
+				return
+			}
 			data, jsonErr = json.MarshalIndent(templates, "", "  ")
 		case 1: // 장비 관리 탭
-			firewalls, _ := m.store.GetAllFirewalls()
+			firewalls, err := m.store.GetAllFirewalls()
+			if err != nil {
+				dialog.ShowError(err, m.window)
+				return
+			}
 			data, jsonErr = json.MarshalIndent(firewalls, "", "  ")
 		case 2: // 배포 이력 탭
-			histories, _ := m.store.GetAllHistory()
+			histories, err := m.store.GetAllHistory()
+			if err != nil {
+				dialog.ShowError(err, m.window)
+				return
+			}
 			data, jsonErr = json.MarshalIndent(histories, "", "  ")
 		}
 
@@ -449,15 +462,16 @@ func (m *MainUI) showExportDialog() {
 	}
 
 	// 실행 파일 위치의 config 폴더를 시작 경로로 설정, 없으면 실행 파일 디렉토리
-	exePath, _ := os.Executable()
-	exeDir := filepath.Dir(exePath)
-	configDir := filepath.Join(exeDir, "config")
-	if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(configDir)); err == nil {
-		saveDialog.SetLocation(uri)
-	} else {
-		// config 폴더가 없으면 실행 파일 디렉토리로 설정
-		if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(exeDir)); err == nil {
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		configDir := filepath.Join(exeDir, "config")
+		if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(configDir)); err == nil {
 			saveDialog.SetLocation(uri)
+		} else {
+			// config 폴더가 없으면 실행 파일 디렉토리로 설정
+			if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(exeDir)); err == nil {
+				saveDialog.SetLocation(uri)
+			}
 		}
 	}
 
