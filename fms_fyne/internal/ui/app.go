@@ -10,6 +10,7 @@ import (
 
 	"fms/internal/model"
 	"fms/internal/storage"
+	"fms/internal/ui/component"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -203,47 +204,7 @@ func (m *MainUI) showSettingsDialog() {
 
 // 도움말 다이얼로그를 표시합니다.
 func (m *MainUI) showHelpDialog() {
-	helpText := `FMS - Firewall Management System
-
-버전: 1.1.0
-
-[템플릿 관리]
-• 방화벽 규칙 템플릿을 생성/수정/삭제합니다
-
-[장비 관리]
-• 관리할 방화벽 장비(IP)를 등록합니다
-• 서버 상태를 확인하고 템플릿을 배포합니다
-
-[배포 이력]
-• 배포 결과를 확인할 수 있습니다
-• 규칙별 성공/실패 상태를 상세히 확인합니다
-
-[Import/Export]
-• 현재 탭의 데이터를 JSON 파일로 내보내거나 가져옵니다
-
-[연결 모드] (설정에서 변경)
-• Agent Server: Agent 서버(예: http://172.24.10.6:8080)를 통해 연결
-  - 상태확인: POST /agent/req-respCheck
-  - 배포: POST /agent/req-deploy
-• Direct: 각 장비에 직접 HTTP 연결 (포트 80)
-  - 상태확인: GET http://{장비IP}/respCheck
-  - 배포: POST http://{장비IP}/deploy
-
-[규칙 포맷]
-req|INSERT|{ID}|{CHAIN}|{ACTION}|{PROTOCOL}|{SRC}|{DST}|{옵션들}
-
-예시:
-req|INSERT|3813792919|INPUT|FLUSH|ANY|ANY|ANY|||
-req|INSERT|3813792919|INPUT|ACCEPT|TCP|192.168.1.0/24|ANY|80||`
-
-	// 도움말 내용 표시
-	helpLabel := widget.NewLabel(helpText)
-	helpLabel.Wrapping = fyne.TextWrapWord
-
-	scrollContent := container.NewScroll(helpLabel)
-	scrollContent.SetMinSize(fyne.NewSize(500, 400))
-
-	dialog.ShowCustom("도움말", "닫기", scrollContent, m.window)
+	component.ShowHelpPopup("도움말", component.AppHelpText, m.window.Canvas().Content())
 }
 
 // Import 다이얼로그를 표시합니다.

@@ -8,6 +8,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -215,12 +216,28 @@ func (f *RuleForm) createTCPFlagsUI() {
 		container.NewGridWrap(fyne.NewSize(180, rowHeight), f.tcpFlagsPresetSel),
 	)
 
-	f.tcpOptionsBox = container.NewVBox(
+	// 헬프 버튼 ("?" 아이콘)
+	helpBtn := widget.NewButtonWithIcon("", theme.QuestionIcon(), func() {
+		f.showTCPFlagsHelp()
+	})
+
+	// 헤더: "TCP Flags" + 헬프 버튼
+	headerRow := container.NewHBox(
 		widget.NewLabel("TCP Flags"),
+		helpBtn,
+	)
+
+	f.tcpOptionsBox = container.NewVBox(
+		headerRow,
 		presetRow,
 		maskRow,
 		setRow,
 	)
+}
+
+// showTCPFlagsHelp TCP Flags 옵션 헬프 팝업 표시
+func (f *RuleForm) showTCPFlagsHelp() {
+	ShowHelpPopup("TCP Flags 도움말", TCPFlagsHelpText, f.content)
 }
 
 // createICMPOptionsUI ICMP 옵션 UI 생성
@@ -261,25 +278,98 @@ func (f *RuleForm) createICMPOptionsUI() {
 	)
 	f.icmpCodeRow.Hide() // 기본적으로 숨김
 
-	f.icmpOptionsBox = container.NewVBox(
+	// 헬프 버튼 ("?" 아이콘)
+	helpBtn := widget.NewButtonWithIcon("", theme.QuestionIcon(), func() {
+		f.showICMPHelp()
+	})
+
+	// 헤더: "ICMP Options" + 헬프 버튼
+	headerRow := container.NewHBox(
 		widget.NewLabel("ICMP Options"),
+		helpBtn,
+	)
+
+	f.icmpOptionsBox = container.NewVBox(
+		headerRow,
 		typeRow,
 		f.icmpCodeRow,
 	)
 }
 
-// onProtocolChanged 프로토콜 변경 시 옵션 UI 전환
+// showICMPHelp ICMP 옵션 헬프 팝업 표시
+func (f *RuleForm) showICMPHelp() {
+	ShowHelpPopup("ICMP Options 도움말", ICMPOptionsHelpText, f.content)
+}
+
+// onProtocolChanged 프로토콜 변경 시 옵션 UI 전환 및 포트 필드 활성/비활성화
 func (f *RuleForm) onProtocolChanged(proto string) {
 	f.optionsContainer.Objects = nil
 
 	switch strings.ToLower(proto) {
 	case "tcp":
 		f.optionsContainer.Add(f.tcpOptionsBox)
+		f.setTCPOptionsEnabled(true)
+		f.dportEntry.Enable()
+		f.dportEntry.SetPlaceHolder("포트")
+	case "udp":
+		// UDP: TCP 옵션 박스 표시하되 비활성화
+		f.optionsContainer.Add(f.tcpOptionsBox)
+		f.setTCPOptionsEnabled(false)
+		f.dportEntry.Enable()
+		f.dportEntry.SetPlaceHolder("포트")
 	case "icmp":
 		f.optionsContainer.Add(f.icmpOptionsBox)
+		f.setICMPOptionsEnabled(true)
+		// ICMP는 포트 개념이 없음
+		f.dportEntry.Disable()
+		f.dportEntry.SetText("")
+		f.dportEntry.SetPlaceHolder("N/A")
+	case "any":
+		// ANY: TCP 옵션 박스 표시하되 비활성화
+		f.optionsContainer.Add(f.tcpOptionsBox)
+		f.setTCPOptionsEnabled(false)
+		f.dportEntry.Enable()
+		f.dportEntry.SetPlaceHolder("포트")
+	default:
+		f.optionsContainer.Add(f.tcpOptionsBox)
+		f.setTCPOptionsEnabled(false)
+		f.dportEntry.Enable()
+		f.dportEntry.SetPlaceHolder("포트")
 	}
 
 	f.optionsContainer.Refresh()
+}
+
+// setTCPOptionsEnabled TCP 옵션 위젯들 활성/비활성화
+func (f *RuleForm) setTCPOptionsEnabled(enabled bool) {
+	if enabled {
+		f.tcpFlagsPresetSel.Enable()
+		for _, check := range f.tcpMaskChecks {
+			check.Enable()
+		}
+		for _, check := range f.tcpSetChecks {
+			check.Enable()
+		}
+	} else {
+		f.tcpFlagsPresetSel.Disable()
+		for _, check := range f.tcpMaskChecks {
+			check.Disable()
+		}
+		for _, check := range f.tcpSetChecks {
+			check.Disable()
+		}
+	}
+}
+
+// setICMPOptionsEnabled ICMP 옵션 위젯들 활성/비활성화
+func (f *RuleForm) setICMPOptionsEnabled(enabled bool) {
+	if enabled {
+		f.icmpTypeSel.Enable()
+		f.icmpCodeSel.Enable()
+	} else {
+		f.icmpTypeSel.Disable()
+		f.icmpCodeSel.Disable()
+	}
 }
 
 // onTCPPresetChanged TCP 프리셋 변경 시 체크박스 업데이트

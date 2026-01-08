@@ -6,6 +6,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -103,10 +104,19 @@ func (f *SNATForm) createUI() {
 		container.NewGridWrap(fyne.NewSize(180, rowHeight), f.transIPEntry),
 	)
 
-	// 헤더: "소스 NAT (SNAT/MASQ)" 레이블 + 오른쪽에 추가 버튼
+	// 헬프 버튼 ("?" 아이콘)
+	helpBtn := widget.NewButtonWithIcon("", theme.QuestionIcon(), func() {
+		f.showSNATHelp()
+	})
+
+	// 헤더: "소스 NAT (SNAT/MASQ)" 레이블 + 헬프 버튼 + 오른쪽에 추가 버튼
+	headerLeft := container.NewHBox(
+		widget.NewLabel("소스 NAT (SNAT/MASQUERADE) 추가"),
+		helpBtn,
+	)
 	header := container.NewBorder(
 		nil, nil,
-		widget.NewLabel("소스 NAT (SNAT/MASQUERADE) 추가"),
+		headerLeft,
 		container.NewGridWrap(fyne.NewSize(80, 36), f.addBtn),
 	)
 
@@ -118,6 +128,11 @@ func (f *SNATForm) createUI() {
 		row2,
 		f.transIPRow,
 	)
+}
+
+// showSNATHelp SNAT 도움말 팝업 표시
+func (f *SNATForm) showSNATHelp() {
+	ShowHelpPopup("SNAT/MASQUERADE 도움말", SNATHelpText, f.content)
 }
 
 // onNATTypeChanged NAT 타입 변경 시 변환 IP 행 표시/숨김

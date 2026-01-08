@@ -6,6 +6,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -88,10 +89,19 @@ func (f *DNATForm) createUI() {
 		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.transPortEntry),
 	)
 
-	// 헤더: "포트 포워딩 (DNAT)" 레이블 + 오른쪽에 추가 버튼
+	// 헬프 버튼 ("?" 아이콘)
+	helpBtn := widget.NewButtonWithIcon("", theme.QuestionIcon(), func() {
+		f.showDNATHelp()
+	})
+
+	// 헤더: "포트 포워딩 (DNAT)" 레이블 + 헬프 버튼 + 오른쪽에 추가 버튼
+	headerLeft := container.NewHBox(
+		widget.NewLabel("포트 포워딩 (DNAT) 추가"),
+		helpBtn,
+	)
 	header := container.NewBorder(
 		nil, nil,
-		widget.NewLabel("포트 포워딩 (DNAT) 추가"),
+		headerLeft,
 		container.NewGridWrap(fyne.NewSize(80, 36), f.addBtn),
 	)
 
@@ -102,6 +112,11 @@ func (f *DNATForm) createUI() {
 		row1,
 		row2,
 	)
+}
+
+// showDNATHelp DNAT 도움말 팝업 표시
+func (f *DNATForm) showDNATHelp() {
+	ShowHelpPopup("DNAT 도움말", DNATHelpText, f.content)
 }
 
 // submitRule 규칙 생성 및 콜백 호출
