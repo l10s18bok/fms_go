@@ -25,6 +25,9 @@ import {
     SaveTemplate,
     SaveFirewall,
     SaveHistory,
+    DeleteAllTemplates,
+    DeleteAllFirewalls,
+    DeleteAllHistory,
     SaveFileDialog,
     WriteFileContent,
     ConfirmDialog,
@@ -110,6 +113,25 @@ function App() {
             const text = await file.text();
             const data = JSON.parse(text);
 
+            // 탭별 데이터 타입명
+            const tabNames: Record<TabType, string> = {
+                template: '템플릿',
+                device: '장비',
+                history: '배포 이력'
+            };
+            const tabName = tabNames[activeTab];
+
+            // 확인 팝업 표시
+            const confirmed = await ConfirmDialog(
+                'Import 확인',
+                `기존 ${tabName} 데이터가 모두 삭제되고 새로운 데이터로 교체됩니다.\n계속 진행하시겠습니까?`
+            );
+
+            if (!confirmed) {
+                e.target.value = '';
+                return;
+            }
+
             // 현재 탭에 따라 데이터 타입 확인 및 저장
             let importedCount = 0;
 
@@ -118,6 +140,9 @@ function App() {
                     alert('유효한 템플릿 데이터가 아닙니다.');
                     return;
                 }
+                // 기존 데이터 모두 삭제
+                await DeleteAllTemplates();
+
                 let skippedCount = 0;
                 for (const item of data) {
                     if (item.version && item.contents && item.contents.trim()) {
@@ -141,6 +166,9 @@ function App() {
                     alert('유효한 장비 데이터가 아닙니다.');
                     return;
                 }
+                // 기존 데이터 모두 삭제
+                await DeleteAllFirewalls();
+
                 for (const item of data) {
                     if (item.deviceName) {
                         await SaveFirewall(JSON.stringify(item));
@@ -153,6 +181,9 @@ function App() {
                     alert('유효한 배포 이력 데이터가 아닙니다.');
                     return;
                 }
+                // 기존 데이터 모두 삭제
+                await DeleteAllHistory();
+
                 for (const item of data) {
                     if (item.deviceIp && item.templateVersion) {
                         await SaveHistory(JSON.stringify(item));

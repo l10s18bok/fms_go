@@ -246,6 +246,15 @@ func (s *JSONStore) DeleteTemplate(version string) error {
 	return s.saveTemplates()
 }
 
+// DeleteAllTemplates는 모든 템플릿을 삭제합니다.
+func (s *JSONStore) DeleteAllTemplates() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.templates = make(map[string]*model.Template)
+	return s.saveTemplates()
+}
+
 // ===== Firewall 메서드 =====
 
 // GetAllFirewalls는 모든 장비를 반환합니다.
@@ -308,6 +317,16 @@ func (s *JSONStore) DeleteFirewall(index int) error {
 	return s.saveFirewalls()
 }
 
+// DeleteAllFirewalls는 모든 장비를 삭제합니다.
+func (s *JSONStore) DeleteAllFirewalls() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.firewalls = make(map[int]*model.Firewall)
+	s.nextFirewallID = 0
+	return s.saveFirewalls()
+}
+
 // ===== History 메서드 =====
 
 // GetAllHistory는 모든 배포 이력을 반환합니다.
@@ -353,6 +372,16 @@ func (s *JSONStore) DeleteHistory(id int) error {
 	}
 
 	delete(s.history, id)
+	return s.saveHistory()
+}
+
+// DeleteAllHistory는 모든 배포 이력을 삭제합니다.
+func (s *JSONStore) DeleteAllHistory() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.history = make(map[int]*model.DeployHistory)
+	s.nextHistoryID = 0
 	return s.saveHistory()
 }
 

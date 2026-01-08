@@ -138,6 +138,14 @@ func (a *App) DeleteTemplate(version string) error {
 	return a.store.DeleteTemplate(version)
 }
 
+// DeleteAllTemplates는 모든 템플릿을 삭제합니다.
+func (a *App) DeleteAllTemplates() error {
+	if a.store == nil {
+		return nil
+	}
+	return a.store.DeleteAllTemplates()
+}
+
 // ===== 장비 API =====
 
 // GetAllFirewalls는 모든 장비를 반환합니다.
@@ -179,6 +187,14 @@ func (a *App) DeleteFirewall(index int) error {
 		return nil
 	}
 	return a.store.DeleteFirewall(index)
+}
+
+// DeleteAllFirewalls는 모든 장비를 삭제합니다.
+func (a *App) DeleteAllFirewalls() error {
+	if a.store == nil {
+		return nil
+	}
+	return a.store.DeleteAllFirewalls()
 }
 
 // CheckServerStatus는 서버 상태를 확인합니다.
@@ -302,6 +318,14 @@ func (a *App) DeleteHistory(id int) error {
 		return nil
 	}
 	return a.store.DeleteHistory(id)
+}
+
+// DeleteAllHistory는 모든 배포 이력을 삭제합니다.
+func (a *App) DeleteAllHistory() error {
+	if a.store == nil {
+		return nil
+	}
+	return a.store.DeleteAllHistory()
 }
 
 // SaveHistory는 배포 이력을 저장합니다. (Import용)
