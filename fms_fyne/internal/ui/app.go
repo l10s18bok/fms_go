@@ -212,6 +212,10 @@ func (m *MainUI) showImportDialog() {
 	// 현재 탭에 따라 데이터 종류 결정
 	tabIndex := m.tabs.SelectedIndex()
 
+	// 탭별 데이터 타입명
+	tabNames := []string{"템플릿", "장비", "배포 이력"}
+	tabName := tabNames[tabIndex]
+
 	// 파일 선택 다이얼로그
 	openDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 		if err != nil {
@@ -230,81 +234,111 @@ func (m *MainUI) showImportDialog() {
 			return
 		}
 
-		// 현재 탭에 따라 처리
-		switch tabIndex {
-		case 0: // 템플릿 탭
-			var templates []*model.Template
-			if err := json.Unmarshal(data, &templates); err != nil {
-				dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
-				return
-			}
-			// 템플릿 형식 검증: version과 contents가 유효한지 확인
-			validCount := 0
-			for _, tmpl := range templates {
-				if tmpl.Version == "" || tmpl.Version == "-" || tmpl.Contents == "" || tmpl.Contents == "-" {
-					continue // 유효하지 않은 템플릿은 건너뜀
-				}
-				if err := m.store.SaveTemplate(tmpl); err != nil {
-					dialog.ShowError(err, m.window)
+		// 확인 팝업 표시
+		dialog.ShowConfirm("Import 확인",
+			fmt.Sprintf("기존 %s 데이터가 모두 삭제되고 새로운 데이터로 교체됩니다.\n계속 진행하시겠습니까?", tabName),
+			func(confirmed bool) {
+				if !confirmed {
 					return
 				}
-				validCount++
-			}
-			if validCount == 0 {
-				dialog.ShowError(fmt.Errorf("유효한 템플릿 데이터가 없습니다. 템플릿 형식의 JSON 파일을 선택해주세요."), m.window)
-				return
-			}
-			dialog.ShowInformation("성공", fmt.Sprintf("%d개의 템플릿이 가져오기 되었습니다.", validCount), m.window)
-			m.templateTab.RefreshTemplates()
-		case 1: // 장비 관리 탭
-			var firewalls []*model.Firewall
-			if err := json.Unmarshal(data, &firewalls); err != nil {
-				dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
-				return
-			}
-			// 장비 형식 검증: deviceName이 유효한지 확인
-			validCount := 0
-			for _, fw := range firewalls {
-				if fw.DeviceName == "" || fw.DeviceName == "-" {
-					continue // 유효하지 않은 장비는 건너뜀
+
+				// 현재 탭에 따라 처리
+				switch tabIndex {
+				case 0: // 템플릿 탭
+					var templates []*model.Template
+					if err := json.Unmarshal(data, &templates); err != nil {
+						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
+						return
+					}
+
+					// 기존 데이터 모두 삭제
+					if err := m.store.ClearTemplates(); err != nil {
+						dialog.ShowError(err, m.window)
+						return
+					}
+
+					// 템플릿 형식 검증: version과 contents가 유효한지 확인
+					validCount := 0
+					for _, tmpl := range templates {
+						if tmpl.Version == "" || tmpl.Version == "-" || tmpl.Contents == "" || tmpl.Contents == "-" {
+							continue // 유효하지 않은 템플릿은 건너뜀
+						}
+						if err := m.store.SaveTemplate(tmpl); err != nil {
+							dialog.ShowError(err, m.window)
+							return
+						}
+						validCount++
+					}
+					if validCount == 0 {
+						dialog.ShowError(fmt.Errorf("유효한 템플릿 데이터가 없습니다. 템플릿 형식의 JSON 파일을 선택해주세요."), m.window)
+						return
+					}
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 템플릿이 가져오기 되었습니다.", validCount), m.window)
+					m.templateTab.RefreshTemplates()
+				case 1: // 장비 관리 탭
+					var firewalls []*model.Firewall
+					if err := json.Unmarshal(data, &firewalls); err != nil {
+						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
+						return
+					}
+
+					// 기존 데이터 모두 삭제
+					if err := m.store.ClearFirewalls(); err != nil {
+						dialog.ShowError(err, m.window)
+						return
+					}
+
+					// 장비 형식 검증: deviceName이 유효한지 확인
+					validCount := 0
+					for _, fw := range firewalls {
+						if fw.DeviceName == "" || fw.DeviceName == "-" {
+							continue // 유효하지 않은 장비는 건너뜀
+						}
+						if err := m.store.SaveFirewall(fw); err != nil {
+							dialog.ShowError(err, m.window)
+							return
+						}
+						validCount++
+					}
+					if validCount == 0 {
+						dialog.ShowError(fmt.Errorf("유효한 장비 데이터가 없습니다. 장비 형식의 JSON 파일을 선택해주세요."), m.window)
+						return
+					}
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 장비 정보가 가져오기 되었습니다.", validCount), m.window)
+					m.deviceTab.ReloadDevices()
+				case 2: // 배포 이력 탭
+					var histories []*model.DeployHistory
+					if err := json.Unmarshal(data, &histories); err != nil {
+						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
+						return
+					}
+
+					// 기존 데이터 모두 삭제
+					if err := m.store.ClearHistory(); err != nil {
+						dialog.ShowError(err, m.window)
+						return
+					}
+
+					// 배포 이력 형식 검증: deviceIp와 templateVersion이 유효한지 확인
+					validCount := 0
+					for _, h := range histories {
+						if h.DeviceIP == "" || h.DeviceIP == "-" || h.TemplateVer == "" || h.TemplateVer == "-" {
+							continue // 유효하지 않은 이력은 건너뜀
+						}
+						if err := m.store.SaveHistory(h); err != nil {
+							dialog.ShowError(err, m.window)
+							return
+						}
+						validCount++
+					}
+					if validCount == 0 {
+						dialog.ShowError(fmt.Errorf("유효한 배포 이력 데이터가 없습니다. 배포 이력 형식의 JSON 파일을 선택해주세요."), m.window)
+						return
+					}
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 배포 이력이 가져오기 되었습니다.", validCount), m.window)
+					m.historyTab.RefreshHistory()
 				}
-				if err := m.store.SaveFirewall(fw); err != nil {
-					dialog.ShowError(err, m.window)
-					return
-				}
-				validCount++
-			}
-			if validCount == 0 {
-				dialog.ShowError(fmt.Errorf("유효한 장비 데이터가 없습니다. 장비 형식의 JSON 파일을 선택해주세요."), m.window)
-				return
-			}
-			dialog.ShowInformation("성공", fmt.Sprintf("%d개의 장비 정보가 가져오기 되었습니다.", validCount), m.window)
-			m.deviceTab.ReloadDevices()
-		case 2: // 배포 이력 탭
-			var histories []*model.DeployHistory
-			if err := json.Unmarshal(data, &histories); err != nil {
-				dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
-				return
-			}
-			// 배포 이력 형식 검증: deviceIp와 templateVersion이 유효한지 확인
-			validCount := 0
-			for _, h := range histories {
-				if h.DeviceIP == "" || h.DeviceIP == "-" || h.TemplateVer == "" || h.TemplateVer == "-" {
-					continue // 유효하지 않은 이력은 건너뜀
-				}
-				if err := m.store.SaveHistory(h); err != nil {
-					dialog.ShowError(err, m.window)
-					return
-				}
-				validCount++
-			}
-			if validCount == 0 {
-				dialog.ShowError(fmt.Errorf("유효한 배포 이력 데이터가 없습니다. 배포 이력 형식의 JSON 파일을 선택해주세요."), m.window)
-				return
-			}
-			dialog.ShowInformation("성공", fmt.Sprintf("%d개의 배포 이력이 가져오기 되었습니다.", validCount), m.window)
-			m.historyTab.RefreshHistory()
-		}
+			}, m.window)
 	}, m.window)
 
 	openDialog.SetFilter(fynestorage.NewExtensionFileFilter([]string{".json"}))
