@@ -9,21 +9,11 @@ import {
     GetICMPTypeOptions
 } from '../../wailsjs/go/main/App';
 import { TCP_FLAGS_HELP, ICMP_HELP } from '../constants/helpTexts';
-
-// Chain 상수
-const CHAIN_INPUT = 0;
-const CHAIN_OUTPUT = 1;
-const CHAIN_FORWARD = 2;
-
-// Protocol 상수
-const PROTOCOL_TCP = 0;
-const PROTOCOL_UDP = 1;
-const PROTOCOL_ICMP = 2;
-const PROTOCOL_ANY = 3;
-
-// Action 상수
-const ACTION_DROP = 0;
-const ACTION_ACCEPT = 1;
+import {
+    CHAIN_INPUT, CHAIN_OUTPUT, CHAIN_FORWARD,
+    PROTOCOL_TCP, PROTOCOL_UDP, PROTOCOL_ICMP, PROTOCOL_ANY,
+    ACTION_DROP, ACTION_ACCEPT,
+} from '../constants/ruleConstants';
 
 // 문자열을 Chain 값으로 변환
 const stringToChain = (s: string): number => {

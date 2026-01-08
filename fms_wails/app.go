@@ -494,7 +494,9 @@ func (a *App) RulesToText(rulesJSON string, commentsJSON string) string {
 
 	var comments []string
 	if commentsJSON != "" {
-		json.Unmarshal([]byte(commentsJSON), &comments)
+		if err := json.Unmarshal([]byte(commentsJSON), &comments); err != nil {
+			comments = nil // 파싱 실패 시 빈 배열로 처리
+		}
 	}
 
 	return parser.RulesToText(rules, comments)
@@ -577,7 +579,9 @@ func (a *App) NATRulesToText(rulesJSON string, commentsJSON string) string {
 
 	var comments []string
 	if commentsJSON != "" {
-		json.Unmarshal([]byte(commentsJSON), &comments)
+		if err := json.Unmarshal([]byte(commentsJSON), &comments); err != nil {
+			comments = nil // 파싱 실패 시 빈 배열로 처리
+		}
 	}
 
 	return parser.NATRulesToText(rules, comments)

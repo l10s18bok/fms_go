@@ -1,16 +1,11 @@
 import { useState, useEffect } from 'react';
 import { model } from '../../wailsjs/go/models';
 import { BLACK_WHITE_HELP } from '../constants/helpTexts';
-
-// Chain 상수
-const CHAIN_INPUT = 0;
-
-// Protocol 상수
-const PROTOCOL_ANY = 3;
-
-// Action 상수
-const ACTION_DROP = 0;
-const ACTION_ACCEPT = 1;
+import {
+    CHAIN_INPUT,
+    PROTOCOL_ANY,
+    ACTION_DROP, ACTION_ACCEPT,
+} from '../constants/ruleConstants';
 
 interface BlackWhiteFormProps {
     onAdd: (rule: model.FirewallRule) => void;

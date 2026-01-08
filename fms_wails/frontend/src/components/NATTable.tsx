@@ -1,34 +1,18 @@
 import { model } from '../../wailsjs/go/models';
-
-// NATType 상수
-const NAT_TYPE_DNAT = 0;
-const NAT_TYPE_SNAT = 1;
-const NAT_TYPE_MASQUERADE = 2;
-
-// Protocol 상수
-const PROTOCOL_TCP = 0;
-const PROTOCOL_UDP = 1;
-const PROTOCOL_ANY = 3;
+import {
+    PROTOCOL_TCP, PROTOCOL_UDP, PROTOCOL_ANY,
+    NAT_TYPE_DNAT, NAT_TYPE_SNAT, NAT_TYPE_MASQUERADE,
+    PROTOCOL_NAMES, NAT_TYPE_NAMES,
+} from '../constants/ruleConstants';
 
 // NATType 값을 문자열로 변환
 const natTypeToString = (natType: number): string => {
-    switch (natType) {
-        case NAT_TYPE_DNAT: return 'DNAT';
-        case NAT_TYPE_SNAT: return 'SNAT';
-        case NAT_TYPE_MASQUERADE: return 'MASQ';
-        default: return 'DNAT';
-    }
+    if (natType === NAT_TYPE_MASQUERADE) return 'MASQ';
+    return NAT_TYPE_NAMES[natType] || 'DNAT';
 };
 
 // Protocol 값을 문자열로 변환
-const protocolToString = (protocol: number): string => {
-    switch (protocol) {
-        case PROTOCOL_TCP: return 'tcp';
-        case PROTOCOL_UDP: return 'udp';
-        case PROTOCOL_ANY: return 'any';
-        default: return 'tcp';
-    }
-};
+const protocolToString = (protocol: number): string => (PROTOCOL_NAMES[protocol] || 'TCP').toLowerCase();
 
 interface NATTableProps {
     rules: model.NATRule[];

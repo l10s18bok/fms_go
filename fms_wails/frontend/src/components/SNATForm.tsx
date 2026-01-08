@@ -2,15 +2,10 @@ import { useState, useEffect } from 'react';
 import { model } from '../../wailsjs/go/models';
 import { GetProtocolOptions, GetSNATTypeOptions } from '../../wailsjs/go/main/App';
 import { SNAT_HELP } from '../constants/helpTexts';
-
-// NATType 상수
-const NAT_TYPE_SNAT = 1;
-const NAT_TYPE_MASQUERADE = 2;
-
-// Protocol 상수
-const PROTOCOL_TCP = 0;
-const PROTOCOL_UDP = 1;
-const PROTOCOL_ANY = 3;
+import {
+    PROTOCOL_TCP, PROTOCOL_UDP, PROTOCOL_ANY,
+    NAT_TYPE_SNAT, NAT_TYPE_MASQUERADE,
+} from '../constants/ruleConstants';
 
 // 문자열을 NATType 값으로 변환
 const stringToNATType = (s: string): number => {

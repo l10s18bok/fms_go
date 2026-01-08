@@ -584,7 +584,9 @@
 
 /* 규칙 테이블 스타일 */
 .rule-table-container {
-    max-height: 400px;
+    flex: 2;
+    min-height: 300px;
+    max-height: 50vh;
     overflow-y: auto;
     border: 1px solid #0f3460;
     border-radius: 8px;
@@ -646,10 +648,19 @@
 
 /* 규칙 폼 스타일 */
 .rule-form {
+    flex: 1;
     background-color: #1a1a2e;
     border: 1px solid #0f3460;
     border-radius: 8px;
     padding: 16px;
+}
+
+/* 규칙 빌더 컨테이너 (테이블 + 폼) */
+.rule-builder-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 16px;
 }
 
 .rule-form-title {

@@ -439,7 +439,7 @@ const TemplateTab = forwardRef<TemplateTabRef>((_, ref) => {
 
                         {/* 규칙 빌더 탭 */}
                         {subTab === 'builder' && (
-                            <>
+                            <div className="rule-builder-container">
                                 {/* 파싱 에러 표시 */}
                                 {parseErrors.length > 0 && (
                                     <div className="protocol-options" style={{ marginBottom: '16px', borderColor: '#e74c3c' }}>
@@ -509,12 +509,12 @@ const TemplateTab = forwardRef<TemplateTabRef>((_, ref) => {
                                         onCancel={handleCancelEdit}
                                     />
                                 )}
-                            </>
+                            </div>
                         )}
 
                         {/* NAT 규칙 탭 */}
                         {subTab === 'nat' && (
-                            <>
+                            <div className="rule-builder-container">
                                 {/* 파싱 에러 표시 */}
                                 {natParseErrors.length > 0 && (
                                     <div className="protocol-options" style={{ marginBottom: '16px', borderColor: '#e74c3c' }}>
@@ -584,7 +584,7 @@ const TemplateTab = forwardRef<TemplateTabRef>((_, ref) => {
                                         onCancel={handleCancelNatEdit}
                                     />
                                 )}
-                            </>
+                            </div>
                         )}
                     </>
                 ) : (

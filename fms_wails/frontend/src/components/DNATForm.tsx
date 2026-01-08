@@ -2,11 +2,7 @@ import { useState, useEffect } from 'react';
 import { model } from '../../wailsjs/go/models';
 import { GetProtocolOptions } from '../../wailsjs/go/main/App';
 import { DNAT_HELP } from '../constants/helpTexts';
-
-// Protocol 상수
-const PROTOCOL_TCP = 0;
-const PROTOCOL_UDP = 1;
-const PROTOCOL_ANY = 3;
+import { PROTOCOL_TCP, PROTOCOL_UDP, PROTOCOL_ANY } from '../constants/ruleConstants';
 
 // 문자열을 Protocol 값으로 변환
 const stringToProtocol = (s: string): number => {

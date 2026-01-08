@@ -1,49 +1,19 @@
 import { model } from '../../wailsjs/go/models';
-
-// Chain 상수
-const CHAIN_INPUT = 0;
-const CHAIN_OUTPUT = 1;
-const CHAIN_FORWARD = 2;
-
-// Protocol 상수
-const PROTOCOL_TCP = 0;
-const PROTOCOL_UDP = 1;
-const PROTOCOL_ICMP = 2;
-const PROTOCOL_ANY = 3;
-
-// Action 상수
-const ACTION_DROP = 0;
-const ACTION_ACCEPT = 1;
+import {
+    CHAIN_INPUT, CHAIN_OUTPUT, CHAIN_FORWARD,
+    PROTOCOL_TCP, PROTOCOL_UDP, PROTOCOL_ICMP, PROTOCOL_ANY,
+    ACTION_DROP, ACTION_ACCEPT,
+    CHAIN_NAMES, PROTOCOL_NAMES, ACTION_NAMES,
+} from '../constants/ruleConstants';
 
 // Chain 값을 문자열로 변환
-const chainToString = (chain: number): string => {
-    switch (chain) {
-        case CHAIN_INPUT: return 'INPUT';
-        case CHAIN_OUTPUT: return 'OUTPUT';
-        case CHAIN_FORWARD: return 'FORWARD';
-        default: return 'INPUT';
-    }
-};
+const chainToString = (chain: number): string => CHAIN_NAMES[chain] || 'INPUT';
 
 // Protocol 값을 문자열로 변환
-const protocolToString = (protocol: number): string => {
-    switch (protocol) {
-        case PROTOCOL_TCP: return 'tcp';
-        case PROTOCOL_UDP: return 'udp';
-        case PROTOCOL_ICMP: return 'icmp';
-        case PROTOCOL_ANY: return 'any';
-        default: return 'tcp';
-    }
-};
+const protocolToString = (protocol: number): string => (PROTOCOL_NAMES[protocol] || 'TCP').toLowerCase();
 
 // Action 값을 문자열로 변환
-const actionToString = (action: number): string => {
-    switch (action) {
-        case ACTION_DROP: return 'DROP';
-        case ACTION_ACCEPT: return 'ACCEPT';
-        default: return 'DROP';
-    }
-};
+const actionToString = (action: number): string => ACTION_NAMES[action] || 'DROP';
 
 // 프로토콜 옵션 문자열 생성
 const formatOptions = (rule: model.FirewallRule): string => {
