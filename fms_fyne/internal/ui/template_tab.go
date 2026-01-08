@@ -170,15 +170,14 @@ func (t *TemplateTab) onSubTabChanged(tab *container.TabItem) {
 
 // syncBuildersToText 빌더 내용을 텍스트로 동기화
 func (t *TemplateTab) syncBuildersToText() {
-	// 필터 규칙
+	// 필터 규칙 (주석 포함)
 	filterRules := t.ruleBuilder.GetRules()
 	filterComments := t.ruleBuilder.GetComments()
 	filterText := parser.RulesToText(filterRules, filterComments)
 
-	// NAT 규칙
+	// NAT 규칙 (주석 제외 - 필터 규칙에서 이미 포함됨)
 	natRules := t.natBuilder.GetRules()
-	natComments := t.natBuilder.GetComments()
-	natText := parser.NATRulesToText(natRules, natComments)
+	natText := parser.NATRulesToText(natRules, nil) // nil - 주석 중복 방지
 
 	// 통합
 	var finalText string
@@ -399,6 +398,7 @@ func (t *TemplateTab) onSaveTemplate() {
 
 		t.loadTemplates()
 		t.templateList.SetSelected(version)
+		dialog.ShowInformation("알림", "템플릿이 저장되었습니다.", t.window)
 	}, t.window)
 }
 
@@ -426,5 +426,6 @@ func (t *TemplateTab) onDeleteTemplate() {
 		t.ruleBuilder.Clear()
 		t.natBuilder.Clear()
 		t.loadTemplates()
+		dialog.ShowInformation("알림", "템플릿이 삭제되었습니다.", t.window)
 	}, t.window)
 }

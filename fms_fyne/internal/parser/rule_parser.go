@@ -213,6 +213,11 @@ func ParseTextToRules(text string) ([]*model.FirewallRule, []string, []error) {
 			continue
 		}
 
+		// NAT 규칙은 건너뛰기 (ParseTextToNATRules에서 처리)
+		if strings.Contains(line, "-t=nat") {
+			continue
+		}
+
 		rule, err := ParseLine(line)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("라인 %d: %w", i+1, err))
