@@ -10,6 +10,7 @@ import (
 
 	"fms_wails/internal/deploy"
 	"fms_wails/internal/model"
+	"fms_wails/internal/parser"
 	"fms_wails/internal/storage"
 	"fms_wails/internal/version"
 
@@ -430,4 +431,155 @@ func (a *App) GetAppName() string {
 // GetAppFullName은 앱 전체 이름을 반환합니다.
 func (a *App) GetAppFullName() string {
 	return version.AppFullName
+}
+
+// ===== 규칙 파서 API =====
+
+// ParseRules는 텍스트를 규칙 배열로 파싱합니다.
+func (a *App) ParseRules(text string) *ParseRulesResult {
+	rules, comments, errors := parser.ParseTextToRules(text)
+
+	// 에러 메시지 배열로 변환
+	var errorMessages []string
+	for _, err := range errors {
+		if err != nil {
+			errorMessages = append(errorMessages, err.Error())
+		}
+	}
+
+	return &ParseRulesResult{
+		Rules:    rules,
+		Comments: comments,
+		Errors:   errorMessages,
+	}
+}
+
+// ParseRulesResult는 규칙 파싱 결과입니다.
+type ParseRulesResult struct {
+	Rules    []*model.FirewallRule `json:"rules"`
+	Comments []string              `json:"comments"`
+	Errors   []string              `json:"errors"`
+}
+
+// RulesToText는 규칙 배열을 텍스트로 변환합니다.
+func (a *App) RulesToText(rulesJSON string, commentsJSON string) string {
+	var rules []*model.FirewallRule
+	if err := json.Unmarshal([]byte(rulesJSON), &rules); err != nil {
+		return ""
+	}
+
+	var comments []string
+	if commentsJSON != "" {
+		json.Unmarshal([]byte(commentsJSON), &comments)
+	}
+
+	return parser.RulesToText(rules, comments)
+}
+
+// GetChainOptions는 Chain 옵션 목록을 반환합니다.
+func (a *App) GetChainOptions() []string {
+	return model.GetChainOptions()
+}
+
+// GetProtocolOptions는 Protocol 옵션 목록을 반환합니다.
+func (a *App) GetProtocolOptions() []string {
+	return model.GetProtocolOptions()
+}
+
+// GetActionOptions는 Action 옵션 목록을 반환합니다.
+func (a *App) GetActionOptions() []string {
+	return model.GetActionOptions()
+}
+
+// GetTCPFlagsPresets는 TCP Flags 프리셋 목록을 반환합니다.
+func (a *App) GetTCPFlagsPresets() []model.TCPFlagsPreset {
+	return model.GetTCPFlagsPresets()
+}
+
+// GetTCPFlagsList는 개별 TCP Flags 목록을 반환합니다.
+func (a *App) GetTCPFlagsList() []string {
+	return model.GetTCPFlagsList()
+}
+
+// GetICMPTypeOptions는 ICMP Type 옵션 목록을 반환합니다.
+func (a *App) GetICMPTypeOptions() []string {
+	return model.GetICMPTypeOptions()
+}
+
+// GetICMPCodeOptions는 ICMP Code 옵션 목록을 반환합니다.
+func (a *App) GetICMPCodeOptions() []string {
+	return model.GetICMPCodeOptions()
+}
+
+// NewFirewallRule은 기본값이 설정된 새 규칙을 생성합니다.
+func (a *App) NewFirewallRule() *model.FirewallRule {
+	return model.NewFirewallRule()
+}
+
+// ===== NAT 규칙 파서 API =====
+
+// ParseNATRules는 텍스트를 NAT 규칙 배열로 파싱합니다.
+func (a *App) ParseNATRules(text string) *ParseNATRulesResult {
+	rules, comments, errors := parser.ParseTextToNATRules(text)
+
+	// 에러 메시지 배열로 변환
+	var errorMessages []string
+	for _, err := range errors {
+		if err != nil {
+			errorMessages = append(errorMessages, err.Error())
+		}
+	}
+
+	return &ParseNATRulesResult{
+		Rules:    rules,
+		Comments: comments,
+		Errors:   errorMessages,
+	}
+}
+
+// ParseNATRulesResult는 NAT 규칙 파싱 결과입니다.
+type ParseNATRulesResult struct {
+	Rules    []*model.NATRule `json:"rules"`
+	Comments []string         `json:"comments"`
+	Errors   []string         `json:"errors"`
+}
+
+// NATRulesToText는 NAT 규칙 배열을 텍스트로 변환합니다.
+func (a *App) NATRulesToText(rulesJSON string, commentsJSON string) string {
+	var rules []*model.NATRule
+	if err := json.Unmarshal([]byte(rulesJSON), &rules); err != nil {
+		return ""
+	}
+
+	var comments []string
+	if commentsJSON != "" {
+		json.Unmarshal([]byte(commentsJSON), &comments)
+	}
+
+	return parser.NATRulesToText(rules, comments)
+}
+
+// GetNATTypeOptions는 NAT 타입 옵션 목록을 반환합니다.
+func (a *App) GetNATTypeOptions() []string {
+	return model.GetNATTypeOptions()
+}
+
+// GetSNATTypeOptions는 SNAT 폼용 타입 옵션을 반환합니다.
+func (a *App) GetSNATTypeOptions() []string {
+	return model.GetSNATTypeOptions()
+}
+
+// NewNATRule은 기본값이 설정된 새 NAT 규칙을 생성합니다.
+func (a *App) NewNATRule() *model.NATRule {
+	return model.NewNATRule()
+}
+
+// NewDNATRule은 DNAT 규칙을 생성합니다.
+func (a *App) NewDNATRule() *model.NATRule {
+	return model.NewDNATRule()
+}
+
+// NewSNATRule은 SNAT 규칙을 생성합니다.
+func (a *App) NewSNATRule() *model.NATRule {
+	return model.NewSNATRule()
 }
