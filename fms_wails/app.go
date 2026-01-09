@@ -3,26 +3,32 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
 	"fms_wails/internal/deploy"
 	"fms_wails/internal/model"
-	"fms_wails/internal/parser"
+	"fms_wails/internal/service"
 	"fms_wails/internal/storage"
 	"fms_wails/internal/version"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// App struct
+// App struct - Wails 프레임워크와 서비스 계층을 연결하는 파사드
 type App struct {
-	ctx      context.Context
-	store    *storage.JSONStore
-	deployer *deploy.Deployer
-	config   *model.Config
+	ctx context.Context
+
+	// 서비스 계층
+	templateSvc *service.TemplateService
+	firewallSvc *service.FirewallService
+	deploySvc   *service.DeployService
+	parserSvc   *service.ParserService
+
+	// 설정
+	store  *storage.JSONStore
+	config *model.Config
 }
 
 // NewApp creates a new App application struct
@@ -66,7 +72,13 @@ func (a *App) startup(ctx context.Context) {
 	a.config = config
 
 	// Deployer 초기화
-	a.deployer = deploy.NewDeployer(a.config)
+	deployer := deploy.NewDeployer(a.config)
+
+	// 서비스 계층 초기화
+	a.templateSvc = service.NewTemplateService(store)
+	a.firewallSvc = service.NewFirewallService(store, deployer, config)
+	a.deploySvc = service.NewDeployService(store, store, store, store, deployer)
+	a.parserSvc = service.NewParserService()
 
 	log.Printf("저장소 초기화 완료: %s", configDir)
 }
@@ -91,7 +103,7 @@ func (a *App) SaveConfig(configJSON string) error {
 		return err
 	}
 	a.config = &config
-	a.deployer.UpdateConfig(&config)
+	a.firewallSvc.UpdateConfig(&config)
 	return a.store.SaveConfig(&config)
 }
 
@@ -99,287 +111,122 @@ func (a *App) SaveConfig(configJSON string) error {
 
 // GetAllTemplates는 모든 템플릿을 반환합니다.
 func (a *App) GetAllTemplates() []*model.Template {
-	if a.store == nil {
-		return []*model.Template{}
-	}
-	templates, _ := a.store.GetAllTemplates()
-	return templates
+	return a.templateSvc.GetAll()
 }
 
 // GetTemplate는 특정 버전의 템플릿을 반환합니다.
 func (a *App) GetTemplate(version string) *model.Template {
-	if a.store == nil {
-		return nil
-	}
-	template, err := a.store.GetTemplate(version)
-	if err != nil {
-		return nil
-	}
-	return template
+	return a.templateSvc.Get(version)
 }
 
 // SaveTemplate는 템플릿을 저장합니다.
 func (a *App) SaveTemplate(version, contents string) error {
-	if a.store == nil {
-		return nil
-	}
-	template := model.NewTemplate(version, contents)
-	if !template.IsValid() {
-		return fmt.Errorf("유효하지 않은 템플릿입니다. 버전과 내용을 확인해주세요.")
-	}
-	return a.store.SaveTemplate(template)
+	return a.templateSvc.Save(version, contents)
 }
 
 // DeleteTemplate는 템플릿을 삭제합니다.
 func (a *App) DeleteTemplate(version string) error {
-	if a.store == nil {
-		return nil
-	}
-	return a.store.DeleteTemplate(version)
+	return a.templateSvc.Delete(version)
 }
 
 // DeleteAllTemplates는 모든 템플릿을 삭제합니다.
 func (a *App) DeleteAllTemplates() error {
-	if a.store == nil {
-		return nil
-	}
-	return a.store.DeleteAllTemplates()
+	return a.templateSvc.DeleteAll()
 }
 
 // ===== 장비 API =====
 
 // GetAllFirewalls는 모든 장비를 반환합니다.
 func (a *App) GetAllFirewalls() []*model.Firewall {
-	if a.store == nil {
-		return []*model.Firewall{}
-	}
-	firewalls, _ := a.store.GetAllFirewalls()
-	return firewalls
+	return a.firewallSvc.GetAll()
 }
 
 // GetFirewall는 특정 장비를 반환합니다.
 func (a *App) GetFirewall(index int) *model.Firewall {
-	if a.store == nil {
-		return nil
-	}
-	firewall, err := a.store.GetFirewall(index)
-	if err != nil {
-		return nil
-	}
-	return firewall
+	return a.firewallSvc.Get(index)
 }
 
 // SaveFirewall는 장비를 저장합니다.
 func (a *App) SaveFirewall(firewallJSON string) error {
-	if a.store == nil {
-		return nil
-	}
-	var firewall model.Firewall
-	if err := json.Unmarshal([]byte(firewallJSON), &firewall); err != nil {
-		return err
-	}
-	return a.store.SaveFirewall(&firewall)
+	return a.firewallSvc.Save(firewallJSON)
 }
 
 // DeleteFirewall는 장비를 삭제합니다.
 func (a *App) DeleteFirewall(index int) error {
-	if a.store == nil {
-		return nil
-	}
-	return a.store.DeleteFirewall(index)
+	return a.firewallSvc.Delete(index)
 }
 
 // DeleteAllFirewalls는 모든 장비를 삭제합니다.
 func (a *App) DeleteAllFirewalls() error {
-	if a.store == nil {
-		return nil
-	}
-	return a.store.DeleteAllFirewalls()
+	return a.firewallSvc.DeleteAll()
 }
 
 // CheckServerStatus는 서버 상태를 확인합니다.
 func (a *App) CheckServerStatus(index int) string {
-	if a.store == nil || a.deployer == nil {
-		return model.ServerStatusStop
-	}
-
-	firewall, err := a.store.GetFirewall(index)
-	if err != nil {
-		return model.ServerStatusStop
-	}
-
-	a.deployer.HealthCheck(firewall)
-
-	// 상태 업데이트
-	a.store.SaveFirewall(firewall)
-
-	return firewall.ServerStatus
+	return a.firewallSvc.CheckServerStatus(index)
 }
 
 // CheckAllServerStatus는 모든 장비의 상태를 확인합니다.
 func (a *App) CheckAllServerStatus() {
-	if a.store == nil || a.deployer == nil {
-		return
-	}
-
-	firewalls, _ := a.store.GetAllFirewalls()
-	if len(firewalls) == 0 {
-		return
-	}
-
-	// Agent 모드면 배치 호출, 아니면 개별 호출
-	if a.config.IsAgentMode() {
-		a.deployer.HealthCheckBatch(firewalls)
-	} else {
-		a.deployer.HealthCheckMultiple(firewalls, nil)
-	}
-
-	// 상태 저장
-	for _, fw := range firewalls {
-		a.store.SaveFirewall(fw)
-	}
+	a.firewallSvc.CheckAllServerStatus()
 }
 
 // CheckSelectedServerStatus는 선택된 장비들의 상태를 병렬로 확인합니다.
 func (a *App) CheckSelectedServerStatus(indexes []int) {
-	if a.store == nil || a.deployer == nil {
-		return
-	}
-
-	// 선택된 장비들을 가져옴
-	var selectedFirewalls []*model.Firewall
-	for _, idx := range indexes {
-		fw, err := a.store.GetFirewall(idx)
-		if err == nil && fw != nil {
-			selectedFirewalls = append(selectedFirewalls, fw)
-		}
-	}
-
-	if len(selectedFirewalls) == 0 {
-		return
-	}
-
-	// Agent 모드면 배치 호출, 아니면 병렬 개별 호출
-	if a.config.IsAgentMode() {
-		a.deployer.HealthCheckBatch(selectedFirewalls)
-	} else {
-		a.deployer.HealthCheckMultiple(selectedFirewalls, nil)
-	}
-
-	// 상태 저장
-	for _, fw := range selectedFirewalls {
-		a.store.SaveFirewall(fw)
-	}
+	a.firewallSvc.CheckSelectedServerStatus(indexes)
 }
 
 // ===== 배포 API =====
 
 // Deploy는 템플릿을 장비에 배포합니다.
 func (a *App) Deploy(firewallIndex int, templateVersion string) (*model.DeployHistory, error) {
-	if a.store == nil || a.deployer == nil {
-		return nil, nil
-	}
-
-	firewall, err := a.store.GetFirewall(firewallIndex)
-	if err != nil {
-		return nil, err
-	}
-
-	template, err := a.store.GetTemplate(templateVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	result := a.deployer.Deploy(firewall, template)
-
-	// 이력 저장
-	a.store.SaveHistory(result.History)
-
-	// 장비 상태 업데이트
-	a.store.SaveFirewall(firewall)
-
-	return result.History, nil
+	return a.deploySvc.Deploy(firewallIndex, templateVersion)
 }
 
 // ===== 이력 API =====
 
 // GetAllHistory는 모든 배포 이력을 반환합니다.
 func (a *App) GetAllHistory() []*model.DeployHistory {
-	if a.store == nil {
-		return []*model.DeployHistory{}
-	}
-	history, _ := a.store.GetAllHistory()
-	return history
+	return a.deploySvc.GetAllHistory()
 }
 
 // DeleteHistory는 배포 이력을 삭제합니다.
 func (a *App) DeleteHistory(id int) error {
-	if a.store == nil {
-		return nil
-	}
-	return a.store.DeleteHistory(id)
+	return a.deploySvc.DeleteHistory(id)
 }
 
 // DeleteAllHistory는 모든 배포 이력을 삭제합니다.
 func (a *App) DeleteAllHistory() error {
-	if a.store == nil {
-		return nil
-	}
-	return a.store.DeleteAllHistory()
+	return a.deploySvc.DeleteAllHistory()
 }
 
 // SaveHistory는 배포 이력을 저장합니다. (Import용)
 func (a *App) SaveHistory(historyJSON string) error {
-	if a.store == nil {
-		return nil
-	}
-	var history model.DeployHistory
-	if err := json.Unmarshal([]byte(historyJSON), &history); err != nil {
-		return err
-	}
-	return a.store.SaveHistory(&history)
+	return a.deploySvc.SaveHistory(historyJSON)
 }
 
 // ===== Export/Import API =====
 
 // ExportData는 모든 데이터를 JSON으로 내보냅니다.
 func (a *App) ExportData() string {
-	if a.store == nil {
-		return "{}"
-	}
-	data, _ := a.store.ExportAll()
-	jsonBytes, _ := json.MarshalIndent(data, "", "  ")
-	return string(jsonBytes)
+	return a.deploySvc.ExportData()
 }
 
 // ImportData는 JSON 데이터를 가져옵니다.
 func (a *App) ImportData(jsonData string) error {
-	if a.store == nil {
-		return nil
-	}
-	var data storage.ExportData
-	if err := json.Unmarshal([]byte(jsonData), &data); err != nil {
-		return err
-	}
-	return a.store.ImportAll(&data)
+	return a.deploySvc.ImportData(jsonData)
 }
 
 // ===== Reset API =====
 
 // ResetAll은 모든 데이터를 초기화합니다.
 func (a *App) ResetAll() error {
-	if a.store == nil {
-		return nil
-	}
-	return a.store.ClearAll()
+	return a.deploySvc.ResetAll()
 }
 
 // GetConfigDir은 설정 디렉토리 경로를 반환합니다.
 func (a *App) GetConfigDir() string {
-	if a.store == nil {
-		return ""
-	}
-	return a.store.GetConfigDir()
+	return a.deploySvc.GetConfigDir()
 }
 
 // ===== 네이티브 파일 다이얼로그 API =====
@@ -460,154 +307,88 @@ func (a *App) GetAppFullName() string {
 // ===== 규칙 파서 API =====
 
 // ParseRules는 텍스트를 규칙 배열로 파싱합니다.
-func (a *App) ParseRules(text string) *ParseRulesResult {
-	rules, comments, errors := parser.ParseTextToRules(text)
-
-	// 에러 메시지 배열로 변환
-	var errorMessages []string
-	for _, err := range errors {
-		if err != nil {
-			errorMessages = append(errorMessages, err.Error())
-		}
-	}
-
-	return &ParseRulesResult{
-		Rules:    rules,
-		Comments: comments,
-		Errors:   errorMessages,
-	}
-}
-
-// ParseRulesResult는 규칙 파싱 결과입니다.
-type ParseRulesResult struct {
-	Rules    []*model.FirewallRule `json:"rules"`
-	Comments []string              `json:"comments"`
-	Errors   []string              `json:"errors"`
+func (a *App) ParseRules(text string) *service.ParseRulesResult {
+	return a.parserSvc.ParseRules(text)
 }
 
 // RulesToText는 규칙 배열을 텍스트로 변환합니다.
 func (a *App) RulesToText(rulesJSON string, commentsJSON string) string {
-	var rules []*model.FirewallRule
-	if err := json.Unmarshal([]byte(rulesJSON), &rules); err != nil {
-		return ""
-	}
-
-	var comments []string
-	if commentsJSON != "" {
-		if err := json.Unmarshal([]byte(commentsJSON), &comments); err != nil {
-			comments = nil // 파싱 실패 시 빈 배열로 처리
-		}
-	}
-
-	return parser.RulesToText(rules, comments)
+	return a.parserSvc.RulesToText(rulesJSON, commentsJSON)
 }
 
 // GetChainOptions는 Chain 옵션 목록을 반환합니다.
 func (a *App) GetChainOptions() []string {
-	return model.GetChainOptions()
+	return a.parserSvc.GetChainOptions()
 }
 
 // GetProtocolOptions는 Protocol 옵션 목록을 반환합니다.
 func (a *App) GetProtocolOptions() []string {
-	return model.GetProtocolOptions()
+	return a.parserSvc.GetProtocolOptions()
 }
 
 // GetActionOptions는 Action 옵션 목록을 반환합니다.
 func (a *App) GetActionOptions() []string {
-	return model.GetActionOptions()
+	return a.parserSvc.GetActionOptions()
 }
 
 // GetTCPFlagsPresets는 TCP Flags 프리셋 목록을 반환합니다.
 func (a *App) GetTCPFlagsPresets() []model.TCPFlagsPreset {
-	return model.GetTCPFlagsPresets()
+	return a.parserSvc.GetTCPFlagsPresets()
 }
 
 // GetTCPFlagsList는 개별 TCP Flags 목록을 반환합니다.
 func (a *App) GetTCPFlagsList() []string {
-	return model.GetTCPFlagsList()
+	return a.parserSvc.GetTCPFlagsList()
 }
 
 // GetICMPTypeOptions는 ICMP Type 옵션 목록을 반환합니다.
 func (a *App) GetICMPTypeOptions() []string {
-	return model.GetICMPTypeOptions()
+	return a.parserSvc.GetICMPTypeOptions()
 }
 
 // GetICMPCodeOptions는 ICMP Code 옵션 목록을 반환합니다.
 func (a *App) GetICMPCodeOptions() []string {
-	return model.GetICMPCodeOptions()
+	return a.parserSvc.GetICMPCodeOptions()
 }
 
 // NewFirewallRule은 기본값이 설정된 새 규칙을 생성합니다.
 func (a *App) NewFirewallRule() *model.FirewallRule {
-	return model.NewFirewallRule()
+	return a.parserSvc.NewFirewallRule()
 }
 
 // ===== NAT 규칙 파서 API =====
 
 // ParseNATRules는 텍스트를 NAT 규칙 배열로 파싱합니다.
-func (a *App) ParseNATRules(text string) *ParseNATRulesResult {
-	rules, comments, errors := parser.ParseTextToNATRules(text)
-
-	// 에러 메시지 배열로 변환
-	var errorMessages []string
-	for _, err := range errors {
-		if err != nil {
-			errorMessages = append(errorMessages, err.Error())
-		}
-	}
-
-	return &ParseNATRulesResult{
-		Rules:    rules,
-		Comments: comments,
-		Errors:   errorMessages,
-	}
-}
-
-// ParseNATRulesResult는 NAT 규칙 파싱 결과입니다.
-type ParseNATRulesResult struct {
-	Rules    []*model.NATRule `json:"rules"`
-	Comments []string         `json:"comments"`
-	Errors   []string         `json:"errors"`
+func (a *App) ParseNATRules(text string) *service.ParseNATRulesResult {
+	return a.parserSvc.ParseNATRules(text)
 }
 
 // NATRulesToText는 NAT 규칙 배열을 텍스트로 변환합니다.
 func (a *App) NATRulesToText(rulesJSON string, commentsJSON string) string {
-	var rules []*model.NATRule
-	if err := json.Unmarshal([]byte(rulesJSON), &rules); err != nil {
-		return ""
-	}
-
-	var comments []string
-	if commentsJSON != "" {
-		if err := json.Unmarshal([]byte(commentsJSON), &comments); err != nil {
-			comments = nil // 파싱 실패 시 빈 배열로 처리
-		}
-	}
-
-	return parser.NATRulesToText(rules, comments)
+	return a.parserSvc.NATRulesToText(rulesJSON, commentsJSON)
 }
 
 // GetNATTypeOptions는 NAT 타입 옵션 목록을 반환합니다.
 func (a *App) GetNATTypeOptions() []string {
-	return model.GetNATTypeOptions()
+	return a.parserSvc.GetNATTypeOptions()
 }
 
 // GetSNATTypeOptions는 SNAT 폼용 타입 옵션을 반환합니다.
 func (a *App) GetSNATTypeOptions() []string {
-	return model.GetSNATTypeOptions()
+	return a.parserSvc.GetSNATTypeOptions()
 }
 
 // NewNATRule은 기본값이 설정된 새 NAT 규칙을 생성합니다.
 func (a *App) NewNATRule() *model.NATRule {
-	return model.NewNATRule()
+	return a.parserSvc.NewNATRule()
 }
 
 // NewDNATRule은 DNAT 규칙을 생성합니다.
 func (a *App) NewDNATRule() *model.NATRule {
-	return model.NewDNATRule()
+	return a.parserSvc.NewDNATRule()
 }
 
 // NewSNATRule은 SNAT 규칙을 생성합니다.
 func (a *App) NewSNATRule() *model.NATRule {
-	return model.NewSNATRule()
+	return a.parserSvc.NewSNATRule()
 }
