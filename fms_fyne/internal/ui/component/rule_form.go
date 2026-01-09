@@ -201,8 +201,15 @@ func (f *RuleForm) createTCPFlagsUI() {
 		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Set:")),
 	)
 	for _, flag := range flags {
+		flagCopy := flag // 클로저에서 사용할 변수 복사
 		check := widget.NewCheck(strings.ToUpper(flag), func(b bool) {
 			if !f.updatingFromPreset {
+				// SET에 선택된 플래그는 자동으로 MASK에도 선택
+				if b {
+					if maskCheck, ok := f.tcpMaskChecks[flagCopy]; ok {
+						maskCheck.SetChecked(true)
+					}
+				}
 				f.tcpFlagsPresetSel.SetSelected("Custom")
 			}
 		})
