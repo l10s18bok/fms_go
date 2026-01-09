@@ -429,6 +429,12 @@
     height: 100%;
     margin-bottom: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.split-layout > .card:last-child {
+    overflow: visible;
 }
 
 .empty-state {
@@ -659,8 +665,10 @@
 .rule-builder-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
     gap: 16px;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .rule-form-title {
