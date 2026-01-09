@@ -216,6 +216,10 @@ const RuleForm = ({ onAdd, editRule, editIndex, onUpdate, onCancel }: RuleFormPr
     // Set 체크박스 변경
     const handleSetChange = (flag: string, checked: boolean) => {
         setSetFlags(prev => ({ ...prev, [flag]: checked }));
+        // SET에 선택된 플래그는 자동으로 MASK에도 선택
+        if (checked) {
+            setMaskFlags(prev => ({ ...prev, [flag]: true }));
+        }
         setTcpFlagsPreset('Custom');
     };
 
