@@ -26,6 +26,9 @@ smartfw_hs/
 # Claude Code 로컬 설정
 .claude/
 
+# Bugs file
+nul
+
 # OS
 .DS_Store
 Thumbs.db
