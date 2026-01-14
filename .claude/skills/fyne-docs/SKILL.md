@@ -144,3 +144,72 @@ container.NewBorder(top, bottom, left, right, center)
 // Grid - 그리드 레이아웃
 container.NewGridWithColumns(3, widgets...)
 ```
+
+## 다이얼로그 및 팝업 중첩
+
+### 중첩 제약사항
+
+Fyne의 다이얼로그와 모달 팝업은 canvas 전체를 덮는 오버레이를 사용하므로 **동시에 여러 개를 띄우면 문제가 발생**합니다.
+
+| 컴포넌트 | 동시 중첩 | 비고 |
+|----------|-----------|------|
+| dialog.* | ❌ | Modal 오버레이 충돌 |
+| widget.PopUp (비모달) | ⚠️ | 가능하나 권장 안함 |
+| widget.ModalPopUp | ❌ | 오버레이 충돌 |
+| widget.PopUpMenu | ⚠️ | 메뉴 전용 |
+
+### Dialog 인터페이스 메서드
+
+```go
+type Dialog interface {
+    Show()              // 다이얼로그 표시
+    Hide()              // 다이얼로그 숨김 (상태 유지)
+    Dismiss()           // 다이얼로그 닫기 (v2.6+)
+    SetOnClosed(func()) // 닫힘 콜백 설정
+    Refresh()
+    Resize(fyne.Size)
+    MinSize() fyne.Size
+    SetDismissText(string)
+}
+```
+
+### 해결 패턴: Hide/Show 방식
+
+다이얼로그 안에서 다른 다이얼로그(예: FileOpen)를 띄워야 할 때는 **부모 다이얼로그를 숨긴 후 자식 다이얼로그를 표시**하고, 자식이 닫히면 부모를 다시 표시합니다.
+
+```go
+// 부모 다이얼로그 (예: 장비 추가/수정)
+parentDialog := dialog.NewCustom("장비 추가/수정", "취소", content, window)
+
+// [찾아보기...] 버튼 클릭 시
+browseBtn.OnTapped = func() {
+    parentDialog.Hide()  // 1. 부모 다이얼로그 숨김
+
+    fileDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+        if reader != nil {
+            filePath = reader.URI().Path()
+            fileLabel.SetText(filePath)
+            reader.Close()
+        }
+        parentDialog.Show()  // 3. 파일 선택 후 부모 다이얼로그 다시 표시
+    }, window)
+    fileDialog.SetFilter(storage.NewExtensionFileFilter([]string{".pem", ".key"}))
+    fileDialog.Show()  // 2. 파일 다이얼로그 표시
+}
+
+parentDialog.Show()
+```
+
+**핵심 포인트:**
+- `Hide()`는 다이얼로그를 닫지 않고 숨기기만 하므로 **입력값이 유지**됨
+- FileOpen 콜백에서 부모 다이얼로그를 `Show()`로 다시 표시
+- 같은 다이얼로그 인스턴스를 재사용하므로 상태 보존
+
+### 대안: 인라인 편집 방식
+
+다이얼로그 중첩을 완전히 피하려면 다이얼로그 대신 **테이블 인라인 편집** 방식을 사용:
+
+```
+[추가] 클릭 → 테이블에 빈 행 추가 → 행 내에서 직접 편집
+                                    → [찾아보기...] 버튼은 메인 윈도우에서 FileOpen 호출
+```
