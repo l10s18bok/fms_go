@@ -24,10 +24,16 @@ import (
 type MainUI struct {
 	window      fyne.Window
 	store       *storage.JSONStore
-	tabs        *container.AppTabs
+	tabs        *container.DocTabs  // 닫기 버튼이 있는 탭
+	leftMenu    *fyne.Container     // 왼쪽 메뉴
 	templateTab *TemplateTab
 	deviceTab   *DeviceTab
 	historyTab  *HistoryTab
+
+	// 탭 아이템 참조 (동적 추가/제거용)
+	templateTabItem *container.TabItem
+	deviceTabItem   *container.TabItem
+	historyTabItem  *container.TabItem
 }
 
 // 새로운 메인 UI 인스턴스를 생성합니다.
@@ -46,31 +52,130 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 	ui.deviceTab.SetHistoryTab(ui.historyTab)
 	ui.historyTab.SetDeviceTab(ui.deviceTab)
 
-	// 탭 컨테이너 생성
-	ui.tabs = container.NewAppTabs(
-		container.NewTabItemWithIcon("템플릿 관리", theme.DocumentIcon(), ui.templateTab.Content()),
-		container.NewTabItemWithIcon("장비 관리", theme.ComputerIcon(), ui.deviceTab.Content()),
-		container.NewTabItemWithIcon("배포 이력", theme.HistoryIcon(), ui.historyTab.Content()),
-	)
+	// 탭 아이템 생성 (동적 추가/제거용)
+	ui.templateTabItem = container.NewTabItemWithIcon("방화벽 룰 관리", theme.DocumentIcon(), ui.templateTab.Content())
+	ui.deviceTabItem = container.NewTabItemWithIcon("장비 관리", theme.ComputerIcon(), ui.deviceTab.Content())
+	ui.historyTabItem = container.NewTabItemWithIcon("배포 이력", theme.HistoryIcon(), ui.historyTab.Content())
+
+	// DocTabs 컨테이너 생성 (닫기 버튼 지원)
+	ui.tabs = container.NewDocTabs()
 	ui.tabs.SetTabLocation(container.TabLocationTop)
+
+	// 탭 닫기 시 처리
+	ui.tabs.OnClosed = func(tab *container.TabItem) {
+		// 탭이 닫혀도 데이터는 유지됨 (다시 열 수 있음)
+	}
 
 	// 탭 변경 시 이벤트 처리
 	ui.tabs.OnSelected = func(tab *container.TabItem) {
-		if ui.tabs.SelectedIndex() == 1 { // 장비 관리 탭
+		if tab == ui.deviceTabItem {
 			ui.deviceTab.RefreshTemplates()
 		}
 	}
 
+	// 왼쪽 메뉴 생성
+	ui.createLeftMenu()
+
 	// 네이티브 메뉴바 설정
 	ui.setupMainMenu()
+
+	// 초기 탭 열기: 방화벽 룰 관리
+	ui.openTab(ui.templateTabItem)
 
 	return ui
 }
 
+// 왼쪽 메뉴를 생성합니다.
+func (m *MainUI) createLeftMenu() {
+	// 방화벽 룰 관리 버튼
+	ruleBtn := widget.NewButton("방화벽 룰 관리", func() {
+		m.openTab(m.templateTabItem)
+	})
+
+	// 장비 관리 버튼
+	deviceBtn := widget.NewButton("장비 관리", func() {
+		m.openTab(m.deviceTabItem)
+	})
+
+	// 배포 이력 버튼
+	historyBtn := widget.NewButton("배포 이력", func() {
+		m.openTab(m.historyTabItem)
+	})
+
+	// 왼쪽 메뉴 레이아웃
+	m.leftMenu = container.NewVBox(
+		ruleBtn,
+		deviceBtn,
+		historyBtn,
+	)
+}
+
+// 탭을 열거나 이미 열려있으면 선택합니다.
+func (m *MainUI) openTab(tabItem *container.TabItem) {
+	// 이미 열려있는지 확인
+	for _, item := range m.tabs.Items {
+		if item == tabItem {
+			m.tabs.Select(tabItem)
+			return
+		}
+	}
+	// 새로 추가하고 선택
+	m.tabs.Append(tabItem)
+	m.tabs.Select(tabItem)
+}
+
 // 메인 UI 컨텐츠를 반환합니다.
 func (m *MainUI) Content() fyne.CanvasObject {
-	// 탭만 반환 (메뉴바는 네이티브 메뉴로 이동)
-	return m.tabs
+	// 왼쪽 메뉴 + 오른쪽 탭 영역
+	leftPanel := container.NewVBox(
+		widget.NewLabel(""), // 상단 여백
+		m.leftMenu,
+	)
+
+	// 왼쪽 패널에 최소 너비 적용 (150px)
+	leftPanelWithSize := container.New(&minWidthLayout{minWidth: 150}, leftPanel)
+
+	// 구분선 추가
+	separator := widget.NewSeparator()
+
+	// 왼쪽 메뉴 + 구분선 + 오른쪽 탭 영역
+	leftWithSeparator := container.NewBorder(
+		nil, nil, nil, separator,
+		leftPanelWithSize,
+	)
+
+	// 왼쪽 메뉴 너비 고정 (Border 레이아웃 사용)
+	return container.NewBorder(
+		nil,               // 상단
+		nil,               // 하단
+		leftWithSeparator, // 왼쪽 (고정)
+		nil,               // 오른쪽
+		m.tabs,            // 중앙 (확장)
+	)
+}
+
+// minWidthLayout 최소 너비를 보장하는 커스텀 레이아웃
+type minWidthLayout struct {
+	minWidth float32
+}
+
+func (l *minWidthLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	if len(objects) == 0 {
+		return fyne.NewSize(l.minWidth, 0)
+	}
+	childMin := objects[0].MinSize()
+	width := childMin.Width
+	if width < l.minWidth {
+		width = l.minWidth
+	}
+	return fyne.NewSize(width, childMin.Height)
+}
+
+func (l *minWidthLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	for _, obj := range objects {
+		obj.Resize(size)
+		obj.Move(fyne.NewPos(0, 0))
+	}
 }
 
 // 네이티브 메뉴바를 설정합니다.
@@ -207,14 +312,36 @@ func (m *MainUI) showHelpDialog() {
 	component.ShowHelpPopup("도움말", component.AppHelpText, m.window.Canvas().Content())
 }
 
+// 현재 선택된 탭 유형을 반환합니다. (0: 룰, 1: 장비, 2: 이력, -1: 없음)
+func (m *MainUI) getSelectedTabType() int {
+	selected := m.tabs.Selected()
+	if selected == nil {
+		return -1
+	}
+	switch selected {
+	case m.templateTabItem:
+		return 0
+	case m.deviceTabItem:
+		return 1
+	case m.historyTabItem:
+		return 2
+	default:
+		return -1
+	}
+}
+
 // Import 다이얼로그를 표시합니다.
 func (m *MainUI) showImportDialog() {
 	// 현재 탭에 따라 데이터 종류 결정
-	tabIndex := m.tabs.SelectedIndex()
+	tabType := m.getSelectedTabType()
+	if tabType < 0 {
+		dialog.ShowInformation("알림", "먼저 탭을 선택해주세요.", m.window)
+		return
+	}
 
 	// 탭별 데이터 타입명
-	tabNames := []string{"템플릿", "장비", "배포 이력"}
-	tabName := tabNames[tabIndex]
+	tabNames := []string{"룰", "장비", "배포 이력"}
+	tabName := tabNames[tabType]
 
 	// 파일 선택 다이얼로그
 	openDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
@@ -243,8 +370,8 @@ func (m *MainUI) showImportDialog() {
 				}
 
 				// 현재 탭에 따라 처리
-				switch tabIndex {
-				case 0: // 템플릿 탭
+				switch tabType {
+				case 0: // 룰 탭
 					var templates []*model.Template
 					if err := json.Unmarshal(data, &templates); err != nil {
 						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
@@ -257,11 +384,11 @@ func (m *MainUI) showImportDialog() {
 						return
 					}
 
-					// 템플릿 형식 검증: version과 contents가 유효한지 확인
+					// 룰 형식 검증: version과 contents가 유효한지 확인
 					validCount := 0
 					for _, tmpl := range templates {
 						if tmpl.Version == "" || tmpl.Version == "-" || tmpl.Contents == "" || tmpl.Contents == "-" {
-							continue // 유효하지 않은 템플릿은 건너뜀
+							continue // 유효하지 않은 룰은 건너뜀
 						}
 						if err := m.store.SaveTemplate(tmpl); err != nil {
 							dialog.ShowError(err, m.window)
@@ -270,10 +397,10 @@ func (m *MainUI) showImportDialog() {
 						validCount++
 					}
 					if validCount == 0 {
-						dialog.ShowError(fmt.Errorf("유효한 템플릿 데이터가 없습니다. 템플릿 형식의 JSON 파일을 선택해주세요."), m.window)
+						dialog.ShowError(fmt.Errorf("유효한 룰 데이터가 없습니다. 룰 형식의 JSON 파일을 선택해주세요."), m.window)
 						return
 					}
-					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 템플릿이 가져오기 되었습니다.", validCount), m.window)
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 룰이 가져오기 되었습니다.", validCount), m.window)
 					m.templateTab.RefreshTemplates()
 				case 1: // 장비 관리 탭
 					var firewalls []*model.Firewall
@@ -363,18 +490,22 @@ func (m *MainUI) showImportDialog() {
 // Export 다이얼로그를 표시합니다.
 func (m *MainUI) showExportDialog() {
 	// 현재 탭에 따라 데이터 종류 결정
-	tabIndex := m.tabs.SelectedIndex()
+	tabType := m.getSelectedTabType()
+	if tabType < 0 {
+		dialog.ShowInformation("알림", "먼저 탭을 선택해주세요.", m.window)
+		return
+	}
 
 	// 데이터 확인
-	switch tabIndex {
-	case 0: // 템플릿 탭
+	switch tabType {
+	case 0: // 룰 탭
 		templates, err := m.store.GetAllTemplates()
 		if err != nil {
 			dialog.ShowError(err, m.window)
 			return
 		}
 		if len(templates) == 0 {
-			dialog.ShowInformation("알림", "내보낼 템플릿이 없습니다.", m.window)
+			dialog.ShowInformation("알림", "내보낼 룰이 없습니다.", m.window)
 			return
 		}
 	case 1: // 장비 관리 탭
@@ -414,8 +545,8 @@ func (m *MainUI) showExportDialog() {
 		var jsonErr error
 
 		// 현재 탭에 따라 처리
-		switch tabIndex {
-		case 0: // 템플릿 탭
+		switch tabType {
+		case 0: // 룰 탭
 			templates, err := m.store.GetAllTemplates()
 			if err != nil {
 				dialog.ShowError(err, m.window)
@@ -452,9 +583,9 @@ func (m *MainUI) showExportDialog() {
 	}, m.window)
 
 	// 기본 파일명 설정
-	switch tabIndex {
+	switch tabType {
 	case 0:
-		saveDialog.SetFileName("templateList.json")
+		saveDialog.SetFileName("ruleList.json")
 	case 1:
 		saveDialog.SetFileName("firewallList.json")
 	case 2:
