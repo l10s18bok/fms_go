@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"fms/internal/model"
@@ -12,10 +14,11 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
-// 배포 이력 탭을 구현합니다.
+// 배포 이력 탭을 구현합니다. (PRD 3.3.4 기준)
 type HistoryTab struct {
 	window    fyne.Window
 	store     *storage.JSONStore
@@ -23,196 +26,184 @@ type HistoryTab struct {
 	content   fyne.CanvasObject
 
 	// UI 컴포넌트
-	historyTable *widget.Table // 이력 테이블
-	detailTable  *widget.Table // 상세 결과 테이블
+	historyTable *component.PagedTable // 이력 테이블 (공통 컴포넌트)
+	typeFilter   *widget.Select        // 유형 필터
+	searchBox    *component.SearchBox  // 검색 컴포넌트 (공통)
 
 	// 데이터
-	histories            []*model.DeployHistory
-	selectedHistoryIndex int
-	selectedHistory      *model.DeployHistory
+	histories         []*model.DeployHistory
+	filteredHistories []*model.DeployHistory // 필터링된 이력
+	searchKeyword     string                 // 검색 키워드
 }
 
 // 새로운 배포 이력 탭을 생성합니다.
 func NewHistoryTab(window fyne.Window, store *storage.JSONStore) *HistoryTab {
 	tab := &HistoryTab{
-		window:               window,
-		store:                store,
-		histories:            []*model.DeployHistory{},
-		selectedHistoryIndex: -1,
+		window:    window,
+		store:     store,
+		histories: []*model.DeployHistory{},
 	}
 	tab.createUI()
 	tab.loadHistory()
 	return tab
 }
 
-// 이력 탭의 UI를 생성합니다.
+// 이력 탭의 UI를 생성합니다. (PRD 3.3.4 기준 - 상세 패널 없음)
 func (h *HistoryTab) createUI() {
-	// 상단: 이력 테이블
-	historyPanel := h.createHistoryTablePanel()
-
-	// 하단: 상세 결과
-	detailPanel := h.createDetailPanel()
-
-	// 상하 분할 (60% : 40%)
-	split := container.NewVSplit(historyPanel, detailPanel)
-	split.Offset = 0.6
-
-	h.content = split
+	// 이력 테이블 패널만 사용 (상세 패널 제거)
+	h.content = h.createHistoryTablePanel()
 }
 
-// 이력 테이블 패널을 생성합니다.
+// 이력 테이블 패널을 생성합니다. (PRD 3.3.4 기준)
+// 컬럼: 선택, 시간, 장비명, 장비 IP, 유형, 버전, 결과
 func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
-	// 테이블 헤더
-	headers := []string{"시간", "장비", "템플릿", "결과"}
+	h.historyTable = component.NewPagedTable(component.PagedTableConfig{
+		Columns: []component.ColumnDef{
+			{Header: "선택", Width: 50},
+			{Header: "시간", Width: 150},
+			{Header: "장비명", Width: 150},
+			{Header: "장비 IP", Width: 225},
+			{Header: "유형", Width: 100},
+			{Header: "버전", Width: 80},
+			{Header: "결과", Width: 60},
+		},
+		PageSize: 15,
+		OnCellUpdate: func(row int, col int, cell fyne.CanvasObject) {
+			h.updateHistoryCell(row, col, cell)
+		},
+		OnRowSelected:    func(row int) {},
+		OnRowDoubleClick: func(row int) {},
+	})
 
-	// 테이블 생성
-	h.historyTable = widget.NewTable(
-		// 크기 함수
-		func() (int, int) {
-			return len(h.histories) + 1, len(headers)
-		},
-		// 셀 생성 함수
-		func() fyne.CanvasObject {
-			return widget.NewLabel("                    ")
-		},
-		// 셀 업데이트 함수
-		func(id widget.TableCellID, cell fyne.CanvasObject) {
-			label := cell.(*widget.Label)
+	// 유형 필터 드롭다운 (전체, 프로그램, 방화벽 룰)
+	h.typeFilter = widget.NewSelect([]string{"전체", "프로그램", "방화벽 룰"}, func(selected string) {
+		h.applyFilter()
+	})
+	h.typeFilter.SetSelected("전체") // 기본값: 전체
 
-			if id.Row == 0 {
-				label.SetText(headers[id.Col])
-				label.TextStyle = fyne.TextStyle{Bold: true}
-			} else {
-				idx := id.Row - 1
-				if idx < len(h.histories) {
-					history := h.histories[idx]
-					switch id.Col {
-					case 0:
-						label.SetText(history.GetTimestampString())
-					case 1:
-						label.SetText(history.DeviceIP)
-					case 2:
-						label.SetText(history.TemplateVer)
-					case 3:
-						label.SetText(model.GetDeployStatusText(history.Status))
-					}
-				}
-			}
+	// 검색 컴포넌트 (공통)
+	h.searchBox = component.NewSearchBox(component.SearchBoxConfig{
+		Placeholder: "시간, 장비명, IP, 버전 검색",
+		Width:       200,
+		OnSearch: func(text string) {
+			h.onSearch()
 		},
+	})
+
+	// 선택 삭제 버튼
+	deleteBtn := component.NewCustomButton("선택삭제", nil, themes.Colors["red"], nil, func() {
+		h.onDeleteHistory()
+	})
+
+	// 상단 헤더 (PRD 3.3.4: [유형선택 ▼] 검색: [____] [찾기] [선택삭제])
+	headerLine := container.NewBorder(
+		nil, nil,
+		container.NewHBox(
+			h.typeFilter,
+			h.searchBox.Content(),
+		),
+		container.NewHBox(deleteBtn),
+		nil,
 	)
 
-	// 열 너비 설정
-	h.historyTable.SetColumnWidth(0, 180) // 시간
-	h.historyTable.SetColumnWidth(1, 150) // 장비
-	h.historyTable.SetColumnWidth(2, 100) // 템플릿
-	h.historyTable.SetColumnWidth(3, 100) // 결과
+	// 헤더에 상하좌우 10px 패딩 적용
+	paddedHeader := container.New(layout.NewCustomPaddedLayout(10, 10, 10, 10), headerLine)
 
-	// 이력 선택 시 상세 표시
-	h.historyTable.OnSelected = func(id widget.TableCellID) {
-		if id.Row > 0 { // 헤더 제외
-			h.selectedHistoryIndex = id.Row - 1
-			if h.selectedHistoryIndex < len(h.histories) {
-				h.selectedHistory = h.histories[h.selectedHistoryIndex]
-				h.detailTable.Refresh()
+	return container.NewBorder(
+		paddedHeader,
+		nil,
+		nil, nil,
+		h.historyTable.Content(),
+	)
+}
+
+// 이력 테이블 셀을 업데이트합니다. (PRD 3.3.4 컬럼 기준)
+func (h *HistoryTab) updateHistoryCell(row int, col int, cell fyne.CanvasObject) {
+	label := cell.(*widget.Label)
+
+	if row >= len(h.filteredHistories) {
+		label.SetText("")
+		return
+	}
+
+	history := h.filteredHistories[row]
+
+	switch col {
+	case 1: // 시간
+		label.SetText(history.GetTimestampString())
+	case 2: // 장비명
+		label.SetText(history.DeviceName)
+	case 3: // 장비 IP
+		label.SetText(history.DeviceIP)
+	case 4: // 유형
+		label.SetText(model.GetHistoryTypeText(history.Type))
+	case 5: // 버전
+		if history.Type == model.HistoryTypeProgram {
+			label.SetText(history.ProgramVer)
+		} else {
+			label.SetText(history.TemplateVer)
+		}
+	case 6: // 결과
+		label.SetText(model.GetDeployStatusText(history.Status))
+	}
+}
+
+// 검색을 실행합니다. (PRD 3.3.4 검색 기능)
+func (h *HistoryTab) onSearch() {
+	h.searchKeyword = strings.TrimSpace(h.searchBox.GetText())
+	h.applyFilter()
+
+	// 검색 결과가 없으면 다이얼로그 표시
+	if len(h.filteredHistories) == 0 && h.searchKeyword != "" {
+		dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", h.window)
+	}
+}
+
+// 필터와 검색을 적용합니다.
+func (h *HistoryTab) applyFilter() {
+	selected := h.typeFilter.Selected
+
+	// 1단계: 유형 필터 적용
+	var typeFiltered []*model.DeployHistory
+	if selected == "전체" || selected == "" {
+		// 전체: 모든 이력 표시
+		typeFiltered = h.histories
+	} else if selected == "방화벽 룰" {
+		for _, history := range h.histories {
+			// 방화벽 룰: "firewall", "template"(레거시), 빈 문자열(레거시)
+			if history.Type == model.HistoryTypeFirewall || history.Type == "template" || history.Type == "" {
+				typeFiltered = append(typeFiltered, history)
+			}
+		}
+	} else { // 프로그램
+		for _, history := range h.histories {
+			if history.Type == model.HistoryTypeProgram {
+				typeFiltered = append(typeFiltered, history)
 			}
 		}
 	}
 
-	// 삭제 버튼 (투명 배경 + 빨간 텍스트)
-	deleteBtn := component.NewCustomButton("이력 삭제", nil, themes.Colors["red"], nil, func() {
-		h.onDeleteHistory()
-	})
-
-	// 전체 삭제 버튼 (투명 배경 + 빨간 텍스트)
-	clearBtn := component.NewCustomButton("전체 삭제", nil, themes.Colors["red"], nil, func() {
-		h.onClearHistory()
-	})
-
-	// 스크롤 가능한 테이블
-	scrollableTable := container.NewScroll(h.historyTable)
-
-	// 상단 헤더 (배포 이력 라벨)
-	header := widget.NewLabel("배포 이력")
-
-	// 하단 버튼 영역 (이력삭제 좌측 + margin, 전체삭제 우측 + margin)
-	bottomButtons := container.NewPadded(container.NewBorder(nil, nil, deleteBtn, clearBtn, nil))
-
-	return container.NewBorder(
-		header,
-		bottomButtons,
-		nil, nil,
-		scrollableTable,
-	)
-}
-
-// 상세 결과 패널을 생성합니다.
-func (h *HistoryTab) createDetailPanel() fyne.CanvasObject {
-	// 상세 테이블 헤더
-	headers := []string{"규칙", "상태", "사유"}
-
-	// 테이블 생성
-	h.detailTable = widget.NewTable(
-		// 크기 함수
-		func() (int, int) {
-			if h.selectedHistory == nil {
-				return 1, len(headers) // 헤더만
+	// 2단계: 검색 키워드 적용
+	if h.searchKeyword == "" {
+		h.filteredHistories = typeFiltered
+	} else {
+		keyword := strings.ToLower(h.searchKeyword)
+		h.filteredHistories = []*model.DeployHistory{}
+		for _, history := range typeFiltered {
+			// 검색 대상: 시간, 장비명, 장비 IP, 버전 (부분 일치)
+			if strings.Contains(strings.ToLower(history.GetTimestampString()), keyword) ||
+				strings.Contains(strings.ToLower(history.DeviceName), keyword) ||
+				strings.Contains(strings.ToLower(history.DeviceIP), keyword) ||
+				strings.Contains(strings.ToLower(history.TemplateVer), keyword) ||
+				strings.Contains(strings.ToLower(history.ProgramVer), keyword) {
+				h.filteredHistories = append(h.filteredHistories, history)
 			}
-			return len(h.selectedHistory.Results) + 1, len(headers)
-		},
-		// 셀 생성 함수
-		func() fyne.CanvasObject {
-			return widget.NewLabel("                              ")
-		},
-		// 셀 업데이트 함수
-		func(id widget.TableCellID, cell fyne.CanvasObject) {
-			label := cell.(*widget.Label)
+		}
+	}
 
-			if id.Row == 0 {
-				label.SetText(headers[id.Col])
-				label.TextStyle = fyne.TextStyle{Bold: true}
-			} else if h.selectedHistory != nil {
-				idx := id.Row - 1
-				if idx < len(h.selectedHistory.Results) {
-					result := h.selectedHistory.Results[idx]
-					switch id.Col {
-					case 0:
-						// 규칙이 너무 길면 축약 (Text 필드 사용)
-						text := result.Text
-						if text == "" {
-							text = result.Rule // Text가 비어있으면 Rule 사용
-						}
-						if len(text) > 60 {
-							text = text[:60] + "..."
-						}
-						label.SetText(text)
-					case 1:
-						label.SetText(model.GetRuleStatusText(result.Status))
-					case 2:
-						label.SetText(model.GetReasonText(result.Reason))
-					}
-				}
-			}
-		},
-	)
-
-	// 열 너비 설정
-	h.detailTable.SetColumnWidth(0, 550) // 규칙
-	h.detailTable.SetColumnWidth(1, 60)  // 상태
-	h.detailTable.SetColumnWidth(2, 350) // 사유
-
-	// 스크롤 가능한 테이블
-	scrollableTable := container.NewScroll(h.detailTable)
-
-	return container.NewBorder(
-		widget.NewSeparator(),
-		nil,
-		nil, nil,
-		container.NewBorder(
-			widget.NewLabel("상세 결과 (이력을 선택하면 표시됩니다)"),
-			nil, nil, nil,
-			scrollableTable,
-		),
-	)
+	if h.historyTable != nil {
+		h.historyTable.SetData(len(h.filteredHistories))
+	}
 }
 
 // 탭의 컨텐츠를 반환합니다.
@@ -237,13 +228,10 @@ func (h *HistoryTab) loadHistory() {
 		return h.histories[i].ID > h.histories[j].ID
 	})
 
-	h.selectedHistoryIndex = -1
-	h.selectedHistory = nil
-
 	// UI 업데이트는 메인 스레드에서 실행
 	fyne.Do(func() {
-		h.historyTable.Refresh()
-		h.detailTable.Refresh()
+		// 필터 적용
+		h.applyFilter()
 	})
 }
 
@@ -267,65 +255,39 @@ func (h *HistoryTab) ReloadHistory() {
 	h.loadHistory()
 }
 
-// 선택된 이력을 삭제합니다.
+// 선택된 이력을 삭제합니다. (PagedTable 체크된 행 사용)
 func (h *HistoryTab) onDeleteHistory() {
-	if h.selectedHistoryIndex < 0 || h.selectedHistory == nil {
+	checkedRows := h.historyTable.GetCheckedRows()
+	if len(checkedRows) == 0 {
 		dialog.ShowInformation("알림", "삭제할 이력을 선택해주세요.", h.window)
 		return
 	}
 
-	dialog.ShowConfirm("확인", "선택한 배포 이력을 삭제하시겠습니까?", func(ok bool) {
+	dialog.ShowConfirm("확인", fmt.Sprintf("선택한 %d개 이력을 삭제하시겠습니까?", len(checkedRows)), func(ok bool) {
 		if !ok {
 			return
 		}
 
-		// 삭제할 이력의 장비 IP 저장
-		deviceIP := h.selectedHistory.DeviceIP
-
-		if err := h.store.DeleteHistory(h.selectedHistory.ID); err != nil {
-			dialog.ShowError(err, h.window)
-			return
-		}
-
-		// 해당 장비의 남은 이력이 있는지 확인
-		h.resetDeviceDeployStatusIfNoHistory(deviceIP)
-
-		dialog.ShowInformation("성공", "배포 이력이 삭제되었습니다.", h.window)
-		h.loadHistory()
-	}, h.window)
-}
-
-// 모든 이력을 삭제합니다.
-func (h *HistoryTab) onClearHistory() {
-	if len(h.histories) == 0 {
-		dialog.ShowInformation("알림", "삭제할 이력이 없습니다.", h.window)
-		return
-	}
-
-	dialog.ShowConfirm("경고", "모든 배포 이력을 삭제하시겠습니까?", func(ok bool) {
-		if !ok {
-			return
-		}
-
-		// 이력에 있는 모든 장비 IP 수집
+		// 삭제할 이력의 장비 IP 수집
 		deviceIPs := make(map[string]bool)
-		for _, history := range h.histories {
-			deviceIPs[history.DeviceIP] = true
-		}
-
-		if err := h.store.ClearHistory(); err != nil {
-			dialog.ShowError(err, h.window)
-			return
-		}
-
-		// 모든 장비의 배포 상태 초기화
-		if h.deviceTab != nil {
-			for deviceIP := range deviceIPs {
-				h.deviceTab.ResetDeviceDeployStatus(deviceIP)
+		for _, row := range checkedRows {
+			if row < len(h.filteredHistories) {
+				history := h.filteredHistories[row]
+				deviceIPs[history.DeviceIP] = true
+				if err := h.store.DeleteHistory(history.ID); err != nil {
+					dialog.ShowError(err, h.window)
+					return
+				}
 			}
 		}
 
-		dialog.ShowInformation("성공", "모든 배포 이력이 삭제되었습니다.", h.window)
+		// 해당 장비의 남은 이력이 있는지 확인
+		for deviceIP := range deviceIPs {
+			h.resetDeviceDeployStatusIfNoHistory(deviceIP)
+		}
+
+		h.historyTable.ClearChecked()
+		dialog.ShowInformation("성공", "선택한 배포 이력이 삭제되었습니다.", h.window)
 		h.loadHistory()
 	}, h.window)
 }

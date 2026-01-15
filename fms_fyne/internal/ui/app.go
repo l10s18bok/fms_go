@@ -29,11 +29,13 @@ type MainUI struct {
 	templateTab *TemplateTab
 	deviceTab   *DeviceTab
 	historyTab  *HistoryTab
+	programTab  *ProgramTab         // 프로그램 관리 탭
 
 	// 탭 아이템 참조 (동적 추가/제거용)
 	templateTabItem *container.TabItem
 	deviceTabItem   *container.TabItem
 	historyTabItem  *container.TabItem
+	programTabItem  *container.TabItem // 프로그램 관리 탭 아이템
 }
 
 // 새로운 메인 UI 인스턴스를 생성합니다.
@@ -47,6 +49,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 	ui.templateTab = NewTemplateTab(window, store)
 	ui.deviceTab = NewDeviceTab(window, store, ui.templateTab)
 	ui.historyTab = NewHistoryTab(window, store)
+	ui.programTab = NewProgramTab(window, store)
 
 	// 탭 간 참조 설정
 	ui.deviceTab.SetHistoryTab(ui.historyTab)
@@ -56,6 +59,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 	ui.templateTabItem = container.NewTabItemWithIcon("방화벽 룰 관리", theme.DocumentIcon(), ui.templateTab.Content())
 	ui.deviceTabItem = container.NewTabItemWithIcon("장비 관리", theme.ComputerIcon(), ui.deviceTab.Content())
 	ui.historyTabItem = container.NewTabItemWithIcon("배포 이력", theme.HistoryIcon(), ui.historyTab.Content())
+	ui.programTabItem = container.NewTabItemWithIcon("프로그램 관리", theme.FolderOpenIcon(), ui.programTab.Content())
 
 	// DocTabs 컨테이너 생성 (닫기 버튼 지원)
 	ui.tabs = container.NewDocTabs()
@@ -102,11 +106,18 @@ func (m *MainUI) createLeftMenu() {
 		m.openTab(m.historyTabItem)
 	})
 
+	// 프로그램 관리 버튼
+	programBtn := widget.NewButton("프로그램 관리", func() {
+		m.openTab(m.programTabItem)
+	})
+
 	// 왼쪽 메뉴 레이아웃
 	m.leftMenu = container.NewVBox(
 		ruleBtn,
 		deviceBtn,
 		historyBtn,
+		widget.NewSeparator(),
+		programBtn,
 	)
 }
 
@@ -312,7 +323,7 @@ func (m *MainUI) showHelpDialog() {
 	component.ShowHelpPopup("도움말", component.AppHelpText, m.window.Canvas().Content())
 }
 
-// 현재 선택된 탭 유형을 반환합니다. (0: 룰, 1: 장비, 2: 이력, -1: 없음)
+// 현재 선택된 탭 유형을 반환합니다. (0: 룰, 1: 장비, 2: 이력, 3: 프로그램, -1: 없음)
 func (m *MainUI) getSelectedTabType() int {
 	selected := m.tabs.Selected()
 	if selected == nil {
@@ -325,6 +336,8 @@ func (m *MainUI) getSelectedTabType() int {
 		return 1
 	case m.historyTabItem:
 		return 2
+	case m.programTabItem:
+		return 3
 	default:
 		return -1
 	}
@@ -340,7 +353,7 @@ func (m *MainUI) showImportDialog() {
 	}
 
 	// 탭별 데이터 타입명
-	tabNames := []string{"룰", "장비", "배포 이력"}
+	tabNames := []string{"룰", "장비", "배포 이력", "프로그램"}
 	tabName := tabNames[tabType]
 
 	// 파일 선택 다이얼로그
@@ -464,6 +477,37 @@ func (m *MainUI) showImportDialog() {
 					}
 					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 배포 이력이 가져오기 되었습니다.", validCount), m.window)
 					m.historyTab.RefreshHistory()
+				case 3: // 프로그램 탭
+					var programs []*model.ProcessInfo
+					if err := json.Unmarshal(data, &programs); err != nil {
+						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
+						return
+					}
+
+					// 기존 데이터 모두 삭제
+					if err := m.store.ClearPrograms(); err != nil {
+						dialog.ShowError(err, m.window)
+						return
+					}
+
+					// 프로그램 형식 검증: ProcessName이 유효한지 확인
+					validCount := 0
+					for _, p := range programs {
+						if p.ProcessName == "" || p.ProcessName == "-" {
+							continue // 유효하지 않은 프로그램은 건너뜀
+						}
+						if err := m.store.SaveProgram(p); err != nil {
+							dialog.ShowError(err, m.window)
+							return
+						}
+						validCount++
+					}
+					if validCount == 0 {
+						dialog.ShowError(fmt.Errorf("유효한 프로그램 데이터가 없습니다. 프로그램 형식의 JSON 파일을 선택해주세요."), m.window)
+						return
+					}
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 프로그램이 가져오기 되었습니다.", validCount), m.window)
+					m.programTab.RefreshPrograms()
 				}
 			}, m.window)
 	}, m.window)
@@ -528,6 +572,16 @@ func (m *MainUI) showExportDialog() {
 			dialog.ShowInformation("알림", "내보낼 배포 이력이 없습니다.", m.window)
 			return
 		}
+	case 3: // 프로그램 탭
+		programs, err := m.store.GetAllPrograms()
+		if err != nil {
+			dialog.ShowError(err, m.window)
+			return
+		}
+		if len(programs) == 0 {
+			dialog.ShowInformation("알림", "내보낼 프로그램이 없습니다.", m.window)
+			return
+		}
 	}
 
 	// 파일 저장 다이얼로그
@@ -567,6 +621,13 @@ func (m *MainUI) showExportDialog() {
 				return
 			}
 			data, jsonErr = json.MarshalIndent(histories, "", "  ")
+		case 3: // 프로그램 탭
+			programs, err := m.store.GetAllPrograms()
+			if err != nil {
+				dialog.ShowError(err, m.window)
+				return
+			}
+			data, jsonErr = json.MarshalIndent(programs, "", "  ")
 		}
 
 		if jsonErr != nil {
@@ -590,6 +651,8 @@ func (m *MainUI) showExportDialog() {
 		saveDialog.SetFileName("firewallList.json")
 	case 2:
 		saveDialog.SetFileName("historyList.json")
+	case 3:
+		saveDialog.SetFileName("programList.json")
 	}
 
 	// 실행 파일 위치의 config 폴더를 시작 경로로 설정, 없으면 실행 파일 디렉토리
@@ -613,7 +676,7 @@ func (m *MainUI) showExportDialog() {
 func (m *MainUI) showResetDialog() {
 	// 경고 다이얼로그 표시
 	dialog.ShowConfirm("⚠️ 경고",
-		"모든 데이터(템플릿, 장비, 배포이력)를 초기화하시겠습니까?",
+		"모든 데이터(템플릿, 장비, 배포이력, 프로그램)를 초기화하시겠습니까?",
 		func(ok bool) {
 			if !ok {
 				return
@@ -637,11 +700,18 @@ func (m *MainUI) showResetDialog() {
 				return
 			}
 
+			// 모든 프로그램 삭제
+			if err := m.store.ClearPrograms(); err != nil {
+				dialog.ShowError(err, m.window)
+				return
+			}
+
 			// UI 초기화 (서버 상태 체크 없이, 다이얼로그 없이)
 			m.templateTab.ClearSelection()
 			m.templateTab.RefreshTemplates()
 			m.deviceTab.ReloadDevices()
 			m.historyTab.ReloadHistory()
+			m.programTab.RefreshPrograms()
 
 			dialog.ShowInformation("완료", "모든 데이터가 초기화되었습니다.", m.window)
 		}, m.window)
