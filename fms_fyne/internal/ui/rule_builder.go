@@ -8,7 +8,7 @@ import (
 	"fyne.io/fyne/v2/container"
 )
 
-// RuleBuilder 규칙 빌더 패널
+// RuleBuilder 룰 빌더 패널
 type RuleBuilder struct {
 	ruleTable      *component.RuleTable
 	generalForm    *component.RuleForm       // 일반 규칙 폼
@@ -20,7 +20,7 @@ type RuleBuilder struct {
 	content *fyne.Container
 }
 
-// NewRuleBuilder 새 규칙 빌더 생성
+// NewRuleBuilder 새 룰 빌더 생성
 func NewRuleBuilder(onChange func()) *RuleBuilder {
 	builder := &RuleBuilder{
 		onChange: onChange,

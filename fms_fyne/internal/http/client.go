@@ -87,7 +87,7 @@ func (c *Client) CheckHealthViaAgent(ipAddrs []string) (map[string]bool, error) 
 
 // 직접 연결로 장비 상태를 확인합니다.
 func (c *Client) CheckHealthDirect(deviceIP string) (bool, error) {
-	url := fmt.Sprintf("http://%s/respCheck", deviceIP)
+	url := fmt.Sprintf("http://%s/agent/respCheck", deviceIP)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
@@ -148,12 +148,11 @@ func (c *Client) DeployViaAgent(deviceIP string, template string) (*model.Deploy
 
 // 직접 연결로 템플릿을 배포합니다.
 func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployResult, error) {
-	url := fmt.Sprintf("http://%s/agent/req-deploy", deviceIP)
+	url := fmt.Sprintf("http://%s/agent/firewall-deploy", deviceIP)
 
-	// 요청 데이터 생성 (템플릿을 변환 없이 그대로 전송)
+	// 요청 데이터 생성 (configInfo로 전송)
 	reqData := map[string]interface{}{
-		"template": template,
-		"ipAddrs":  []string{deviceIP},
+		"configInfo": template,
 	}
 	jsonData, err := json.Marshal(reqData)
 	if err != nil {
