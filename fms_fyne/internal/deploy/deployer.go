@@ -38,7 +38,7 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 
 	result := &DeployResult{
 		Firewall: fw,
-		History:  model.NewDeployHistory(fw.DeviceName, template.Version),
+		History:  model.NewDeployHistory(fw.DeviceName, fw.DeviceIP, template.Version),
 	}
 
 	// 템플릿 전체를 배포

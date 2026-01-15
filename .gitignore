@@ -29,6 +29,9 @@ smartfw_hs/
 # Bugs file
 nul
 
+# 개인키 생성안내 제외
+ssh키생성.txt
+
 # OS
 .DS_Store
 Thumbs.db

@@ -13,16 +13,18 @@ import (
 // JSON 파일 기반 저장소입니다.
 type JSONStore struct {
 	configDir string
-	mu      sync.RWMutex
+	mu        sync.RWMutex
 
 	// 캐시된 데이터
 	templates map[string]*model.Template
 	firewalls map[int]*model.Firewall
 	history   map[int]*model.DeployHistory
+	programs  map[int]*model.ProcessInfo // 신규: 프로그램 정보
 
 	// Auto increment 카운터
 	nextFirewallID int
 	nextHistoryID  int
+	nextProgramID  int // 신규
 }
 
 // 파일명 상수
@@ -31,6 +33,7 @@ const (
 	firewallsFile = "firewalls.json"
 	historyFile   = "history.json"
 	configFile    = "config.json"
+	programsFile  = "programs.json" // 신규
 )
 
 // 새로운 JSON 저장소를 생성.
@@ -40,6 +43,7 @@ func NewJSONStore(configDir string) (*JSONStore, error) {
 		templates: make(map[string]*model.Template),
 		firewalls: make(map[int]*model.Firewall),
 		history:   make(map[int]*model.DeployHistory),
+		programs:  make(map[int]*model.ProcessInfo), // 신규
 	}
 
 	// 설정 디렉토리 생성
@@ -64,6 +68,9 @@ func (s *JSONStore) loadAll() error {
 		return err
 	}
 	if err := s.loadHistory(); err != nil {
+		return err
+	}
+	if err := s.loadPrograms(); err != nil {
 		return err
 	}
 	return nil
@@ -148,6 +155,34 @@ func (s *JSONStore) loadHistory() error {
 	return nil
 }
 
+// 프로그램 데이터를 로드합니다.
+func (s *JSONStore) loadPrograms() error {
+	path := filepath.Join(s.configDir, programsFile)
+
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil // 파일이 없으면 빈 상태로 시작
+	}
+	if err != nil {
+		return err
+	}
+
+	var programs []*model.ProcessInfo
+	if err := json.Unmarshal(data, &programs); err != nil {
+		return err
+	}
+
+	maxID := 0
+	for _, p := range programs {
+		s.programs[p.ID] = p
+		if p.ID > maxID {
+			maxID = p.ID
+		}
+	}
+	s.nextProgramID = maxID + 1
+	return nil
+}
+
 // 템플릿 데이터를 저장합니다.
 func (s *JSONStore) saveTemplates() error {
 	templates := make([]*model.Template, 0, len(s.templates))
@@ -193,6 +228,22 @@ func (s *JSONStore) saveHistory() error {
 	}
 
 	path := filepath.Join(s.configDir, historyFile)
+	return os.WriteFile(path, data, 0644)
+}
+
+// 프로그램 데이터를 저장합니다.
+func (s *JSONStore) savePrograms() error {
+	programs := make([]*model.ProcessInfo, 0, len(s.programs))
+	for _, p := range s.programs {
+		programs = append(programs, p)
+	}
+
+	data, err := json.MarshalIndent(programs, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(s.configDir, programsFile)
 	return os.WriteFile(path, data, 0644)
 }
 
@@ -525,4 +576,96 @@ func (s *JSONStore) SaveConfig(config *model.Config) error {
 
 	path := filepath.Join(s.configDir, configFile)
 	return os.WriteFile(path, data, 0644)
+}
+
+// ===== ProcessInfo 메서드 =====
+
+// 모든 프로그램을 반환합니다.
+func (s *JSONStore) GetAllPrograms() ([]*model.ProcessInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	programs := make([]*model.ProcessInfo, 0, len(s.programs))
+	for _, p := range s.programs {
+		programs = append(programs, p.Clone())
+	}
+	return programs, nil
+}
+
+// 특정 ID의 프로그램을 반환합니다.
+func (s *JSONStore) GetProgram(id int) (*model.ProcessInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	p, ok := s.programs[id]
+	if !ok {
+		return nil, fmt.Errorf("프로그램을 찾을 수 없습니다: %d", id)
+	}
+	return p.Clone(), nil
+}
+
+// 이름으로 프로그램을 검색합니다.
+func (s *JSONStore) GetProgramByName(name string) (*model.ProcessInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, p := range s.programs {
+		if p.ProcessName == name {
+			return p.Clone(), nil
+		}
+	}
+	return nil, fmt.Errorf("프로그램을 찾을 수 없습니다: %s", name)
+}
+
+// 프로그램을 저장합니다.
+func (s *JSONStore) SaveProgram(program *model.ProcessInfo) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 기존 프로그램인지 확인 (ID로 판단)
+	_, exists := s.programs[program.ID]
+
+	// 새 프로그램인 경우에만 ID 할당 (ID가 -1 또는 0인 경우)
+	if program.ID <= 0 {
+		program.ID = s.nextProgramID
+		s.nextProgramID++
+	}
+
+	// 기존 프로그램이 아니고 ID > 0인 경우, nextProgramID 업데이트
+	if !exists && program.ID >= s.nextProgramID {
+		s.nextProgramID = program.ID + 1
+	}
+
+	s.programs[program.ID] = program.Clone()
+	return s.savePrograms()
+}
+
+// 프로그램을 삭제합니다.
+func (s *JSONStore) DeleteProgram(id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.programs[id]; !ok {
+		return fmt.Errorf("프로그램을 찾을 수 없습니다: %d", id)
+	}
+
+	delete(s.programs, id)
+	return s.savePrograms()
+}
+
+// 모든 프로그램을 삭제합니다.
+func (s *JSONStore) ClearPrograms() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.programs = make(map[int]*model.ProcessInfo)
+	s.nextProgramID = 1
+	return s.savePrograms()
+}
+
+// 프로그램 수를 반환합니다.
+func (s *JSONStore) CountPrograms() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.programs)
 }
