@@ -1,13 +1,25 @@
 package model
 
-// 방화벽 장비 정보를 나타냅니다.
+// 방화벽 장비 정보를 나타냅니다. (PRD 4.2 기준)
 type Firewall struct {
 	Index        int           `json:"index"`                  // 고유 ID (Auto Increment)
-	DeviceName   string        `json:"deviceName"`             // 장비 IP 주소
+	DeviceName   string        `json:"deviceName"`             // 장비명 (PRD: device_name)
+	DeviceIP     string        `json:"device_ip,omitempty"`    // 장비 IP (PRD: device_ip)
 	ServerStatus string        `json:"serverStatus"`           // 서버 상태 (running/stop/-)
 	DeployStatus string        `json:"deployStatus"`           // 배포 상태 (success/fail/error/-)
 	Version      string        `json:"version"`                // 배포된 템플릿 버전
 	DeployResult *DeployResult `json:"deployResult,omitempty"` // 마지막 배포 결과
+
+	// SSH 인증 정보 (프로그램 업데이트용)
+	DeviceID  string `json:"device_id,omitempty"`  // SSH 사용자 ID (PRD: device_id)
+	DevicePW  string `json:"device_pw,omitempty"`  // SSH 비밀번호 (PRD: device_pw)
+	DevicePPK string `json:"device_ppk,omitempty"` // PPK 키 파일 경로 (PRD: device_ppk)
+
+	// 프로그램 버전 정보
+	ProgramVersions map[string]string `json:"program_versions,omitempty"` // 프로그램명 -> 버전
+
+	// 상태 정보 (PRD: lastCheckedAt)
+	LastCheckedAt string `json:"lastCheckedAt,omitempty"` // 마지막 상태 확인 시간
 }
 
 // 배포 결과를 나타냅니다.
@@ -60,11 +72,16 @@ func (f *Firewall) IsValid() bool {
 // 장비의 복사본을 반환합니다.
 func (f *Firewall) Clone() *Firewall {
 	clone := &Firewall{
-		Index:        f.Index,
-		DeviceName:   f.DeviceName,
-		ServerStatus: f.ServerStatus,
-		DeployStatus: f.DeployStatus,
-		Version:      f.Version,
+		Index:         f.Index,
+		DeviceName:    f.DeviceName,
+		DeviceIP:      f.DeviceIP,
+		ServerStatus:  f.ServerStatus,
+		DeployStatus:  f.DeployStatus,
+		Version:       f.Version,
+		DeviceID:      f.DeviceID,
+		DevicePW:      f.DevicePW,
+		DevicePPK:     f.DevicePPK,
+		LastCheckedAt: f.LastCheckedAt,
 	}
 
 	// DeployResult 복사
@@ -76,6 +93,14 @@ func (f *Firewall) Clone() *Firewall {
 		if len(f.DeployResult.Info) > 0 {
 			clone.DeployResult.Info = make([]ResultInfo, len(f.DeployResult.Info))
 			copy(clone.DeployResult.Info, f.DeployResult.Info)
+		}
+	}
+
+	// ProgramVersions 복사
+	if f.ProgramVersions != nil {
+		clone.ProgramVersions = make(map[string]string)
+		for k, v := range f.ProgramVersions {
+			clone.ProgramVersions[k] = v
 		}
 	}
 
