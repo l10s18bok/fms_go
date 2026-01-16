@@ -174,7 +174,7 @@ req|INSERT|3813792919|INPUT|ACCEPT|TCP|192.168.1.0/24|ANY|80||
 
 ### fms_fyne 빌드 (Windows)
 
-**CMD / Git Bash:**
+**배포용 빌드 (콘솔 창 없음):**
 ```bash
 cd fms_fyne
 go mod download
@@ -182,13 +182,13 @@ go mod tidy
 go build -ldflags "-H windowsgui -s -w" -o fms_fyne.exe .
 ```
 
-**PowerShell:**
-```powershell
+**디버깅용 빌드 (콘솔 창 표시):**
+```bash
 cd fms_fyne
-go mod download
-go mod tidy
-go build -ldflags '-H windowsgui -s -w' -o fms_fyne.exe .
+go build -ldflags "-H windows -s -w" -o fms_fyne.exe .
 ```
+- 콘솔 창이 함께 열려 `log.Println()` 출력 확인 가능
+- 개발 중 디버깅에 유용
 
 ### fms_wails 빌드 (Windows)
 

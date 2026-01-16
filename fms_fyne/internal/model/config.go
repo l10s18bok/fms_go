@@ -10,11 +10,18 @@ const (
 // 기본 타임아웃 (초)
 const DefaultTimeoutSeconds = 5
 
+// 테마 상수
+const (
+	ThemeLight = "light"
+	ThemeDark  = "dark"
+)
+
 // 애플리케이션 설정을 나타냅니다.
 type Config struct {
 	ConnectionMode string `json:"connectionMode"` // 연결 모드: "agent" 또는 "direct"
 	AgentServerURL string `json:"agentServerURL"` // 에이전트 서버 URL (예: http://172.24.10.6:8080)
 	TimeoutSeconds int    `json:"timeoutSeconds"` // HTTP 타임아웃 (초)
+	Theme          string `json:"theme"`          // 테마: "light" 또는 "dark"
 }
 
 // 기본 설정을 반환합니다.
@@ -23,6 +30,7 @@ func DefaultConfig() *Config {
 		ConnectionMode: ConnectionModeDirect,
 		AgentServerURL: "http://172.24.10.6:8080",
 		TimeoutSeconds: DefaultTimeoutSeconds,
+		Theme:          ThemeLight,
 	}
 }
 

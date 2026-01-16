@@ -218,9 +218,11 @@ func (m *MainUI) setupMainMenu() {
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("라이트 테마", func() {
 			fyne.CurrentApp().Settings().SetTheme(theme.LightTheme())
+			m.saveThemeSetting(model.ThemeLight)
 		}),
 		fyne.NewMenuItem("다크 테마", func() {
 			fyne.CurrentApp().Settings().SetTheme(theme.DarkTheme())
+			m.saveThemeSetting(model.ThemeDark)
 		}),
 	)
 
@@ -727,4 +729,14 @@ func (m *MainUI) showResetDialog() {
 
 			dialog.ShowInformation("완료", "모든 데이터가 초기화되었습니다.", m.window)
 		}, m.window)
+}
+
+// 테마 설정을 저장합니다.
+func (m *MainUI) saveThemeSetting(themeName string) {
+	config, err := m.store.GetConfig()
+	if err != nil {
+		config = model.DefaultConfig()
+	}
+	config.Theme = themeName
+	m.store.SaveConfig(config)
 }

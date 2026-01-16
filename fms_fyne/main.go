@@ -5,11 +5,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"fms/internal/model"
 	"fms/internal/storage"
 	"fms/internal/ui"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/theme"
 )
 
 func main() {
@@ -35,6 +37,14 @@ func main() {
 
 	// Fyne 애플리케이션 생성
 	a := app.New()
+
+	// 저장된 테마 설정 로드 및 적용
+	config, err := store.GetConfig()
+	if err == nil && config.Theme == model.ThemeDark {
+		a.Settings().SetTheme(theme.DarkTheme())
+	} else {
+		a.Settings().SetTheme(theme.LightTheme())
+	}
 
 	// 메인 윈도우 생성
 	w := a.NewWindow("FMS - Firewall Management System")
