@@ -10,7 +10,6 @@ import (
 
 	"fms/internal/model"
 	"fms/internal/storage"
-	"fms/internal/themes"
 	"fms/internal/ui/component"
 	"fms/internal/version"
 
@@ -94,23 +93,23 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 
 // 왼쪽 메뉴를 생성합니다.
 func (m *MainUI) createLeftMenu() {
-	// 방화벽 룰 관리 버튼 (텍스트만, 위아래 간격 4)
-	ruleBtn := component.NewCustomButton("방화벽 룰 관리", nil, themes.Colors["black"], nil, func() {
+	// 방화벽 룰 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
+	ruleBtn := component.NewCustomButton("방화벽 룰 관리", nil, nil, nil, func() {
 		m.openTab(m.templateTabItem)
 	}, 4, 4, 0, 0)
 
-	// 장비 관리 버튼 (텍스트만, 위아래 간격 4)
-	deviceBtn := component.NewCustomButton("장비 관리", nil, themes.Colors["black"], nil, func() {
+	// 장비 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
+	deviceBtn := component.NewCustomButton("장비 관리", nil, nil, nil, func() {
 		m.openTab(m.deviceTabItem)
 	}, 4, 4, 0, 0)
 
-	// 배포 이력 버튼 (텍스트만, 위아래 간격 4)
-	historyBtn := component.NewCustomButton("배포 이력", nil, themes.Colors["black"], nil, func() {
+	// 배포 이력 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
+	historyBtn := component.NewCustomButton("배포 이력", nil, nil, nil, func() {
 		m.openTab(m.historyTabItem)
 	}, 4, 4, 0, 0)
 
-	// 프로그램 관리 버튼 (텍스트만, 위아래 간격 4)
-	programBtn := component.NewCustomButton("프로그램 관리", nil, themes.Colors["black"], nil, func() {
+	// 프로그램 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
+	programBtn := component.NewCustomButton("프로그램 관리", nil, nil, nil, func() {
 		m.openTab(m.programTabItem)
 	}, 4, 4, 0, 0)
 
@@ -215,6 +214,13 @@ func (m *MainUI) setupMainMenu() {
 	toolsMenu := fyne.NewMenu("도구",
 		fyne.NewMenuItem("설정", func() {
 			m.showSettingsDialog()
+		}),
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem("라이트 테마", func() {
+			fyne.CurrentApp().Settings().SetTheme(theme.LightTheme())
+		}),
+		fyne.NewMenuItem("다크 테마", func() {
+			fyne.CurrentApp().Settings().SetTheme(theme.DarkTheme())
 		}),
 	)
 

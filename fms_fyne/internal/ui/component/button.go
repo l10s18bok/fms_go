@@ -135,7 +135,7 @@ func NewRedTextButton(text string, onTap func()) fyne.CanvasObject {
 
 // 전천후 커스텀 버튼을 생성합니다.
 // - icon: nil이면 텍스트만 표시
-// - iconColor: 아이콘/텍스트 색상 (nil이면 자동 결정: 밝은 배경→검정, 어두운 배경→흰색)
+// - iconColor: 아이콘/텍스트 색상 (nil이면 테마 foreground 색상 사용)
 // - bgColor: nil이면 투명 배경 (텍스트 버튼)
 // - margin: 외부 여백 (상, 하, 좌, 우 순서, 생략 시 0)
 func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.Color, onTap func(), margin ...float32) fyne.CanvasObject {
@@ -145,7 +145,10 @@ func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.
 		mTop, mBottom, mLeft, mRight = margin[0], margin[1], margin[2], margin[3]
 	}
 
-	// 텍스트/아이콘 색상 결정 (기본값: 흰색)
+	// 텍스트/아이콘 색상 결정
+	// iconColor가 nil이고 bgColor도 nil이면 테마 반응형 Label 사용
+	useThemeColor := iconColor == nil && bgColor == nil
+
 	var textColor color.Color = color.White
 	if iconColor != nil {
 		textColor = iconColor
@@ -159,7 +162,12 @@ func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.
 		iconImg := canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
 		iconImg.SetMinSize(fyne.NewSize(16, 16))
 		iconImg.FillMode = canvas.ImageFillContain
-		content = container.NewHBox(iconImg, newBoldText(label, textColor))
+		if useThemeColor {
+			lbl := widget.NewLabelWithStyle(label, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+			content = container.NewHBox(iconImg, lbl)
+		} else {
+			content = container.NewHBox(iconImg, newBoldText(label, textColor))
+		}
 	} else if icon != nil {
 		// 아이콘만
 		iconImg := canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
@@ -180,8 +188,12 @@ func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.
 			return container.New(layout.NewCustomPaddedLayout(mTop, mBottom, mLeft, mRight), btn)
 		}
 		return btn
+	} else if useThemeColor {
+		// 텍스트만 (테마 반응형)
+		lbl := widget.NewLabelWithStyle(label, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+		content = lbl
 	} else {
-		// 텍스트만
+		// 텍스트만 (고정 색상)
 		content = newBoldText(label, textColor)
 	}
 
