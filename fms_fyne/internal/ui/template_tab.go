@@ -264,9 +264,6 @@ func (t *TemplateTab) onTemplateSelected(version string) {
 		return
 	}
 
-	// 모든 탭 위치 초기화
-	t.resetAllTabs()
-
 	// 선택된 룰 찾기
 	for _, tmpl := range t.templates {
 		if tmpl.Version == version {
