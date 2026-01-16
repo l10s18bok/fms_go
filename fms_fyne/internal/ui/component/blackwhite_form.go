@@ -2,7 +2,6 @@ package component
 
 import (
 	"fms/internal/model"
-	"fms/internal/themes"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -40,11 +39,6 @@ func (f *BlackWhiteForm) createUI() {
 	f.sipEntry = widget.NewEntry()
 	f.sipEntry.SetPlaceHolder("차단/허용할 IP (예: 192.168.1.100)")
 
-	// 추가 버튼
-	f.addBtn = NewCustomButton("+ 추가", nil, nil, themes.Colors["darkgray"], func() {
-		f.submitRule()
-	})
-
 	// 레이블 너비 통일
 	labelWidth := float32(50)
 	rowHeight := float32(36)
@@ -57,26 +51,18 @@ func (f *BlackWhiteForm) createUI() {
 		container.NewGridWrap(fyne.NewSize(300, rowHeight), f.sipEntry),
 	)
 
-	// 헤더: "Black/White 규칙 추가" 레이블 + 오른쪽에 추가 버튼
-	header := container.NewBorder(
-		nil, nil, // top, bottom
-		widget.NewLabel("Black/White 규칙 추가"),                  // left
-		container.NewGridWrap(fyne.NewSize(80, 36), f.addBtn), // right
-	)
-
 	// 전체 레이아웃
 	f.content = container.NewVBox(
-		widget.NewSeparator(),
-		header,
 		row,
 	)
 }
 
-// submitRule 규칙 생성 및 콜백 호출
-func (f *BlackWhiteForm) submitRule() {
+// SubmitRule 규칙 생성 및 콜백 호출 (다이얼로그에서 호출 가능)
+// 성공 시 true, 실패 시 false 반환
+func (f *BlackWhiteForm) SubmitRule() bool {
 	// IP가 비어있으면 무시
 	if f.sipEntry.Text == "" {
-		return
+		return false
 	}
 
 	isBlack := f.typeSel.Selected == "Black"
@@ -102,6 +88,7 @@ func (f *BlackWhiteForm) submitRule() {
 	}
 
 	f.Reset()
+	return true
 }
 
 // Reset 폼 초기화

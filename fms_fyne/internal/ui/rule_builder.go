@@ -10,19 +10,19 @@ import (
 
 // RuleBuilder 룰 빌더 패널
 type RuleBuilder struct {
-	ruleTable      *component.RuleTable
-	generalForm    *component.RuleForm       // 일반 규칙 폼
-	blackWhiteForm *component.BlackWhiteForm // Black/White 폼
-	formTabs       *container.AppTabs        // 폼 전환 탭
-	onChange       func()
-	comments       []string // 주석 라인 보존
+	window    fyne.Window
+	ruleTable *component.RuleTable
+	addDialog *component.RuleAddDialog // 규칙 추가 다이얼로그
+	onChange  func()
+	comments  []string // 주석 라인 보존
 
 	content *fyne.Container
 }
 
 // NewRuleBuilder 새 룰 빌더 생성
-func NewRuleBuilder(onChange func()) *RuleBuilder {
+func NewRuleBuilder(window fyne.Window, onChange func()) *RuleBuilder {
 	builder := &RuleBuilder{
+		window:   window,
 		onChange: onChange,
 		comments: []string{},
 	}
@@ -35,36 +35,16 @@ func (b *RuleBuilder) createUI() {
 	// 규칙 테이블
 	b.ruleTable = component.NewRuleTable(b.onChange)
 
-	// 일반 규칙 추가 폼
-	b.generalForm = component.NewRuleForm(func(rule *model.FirewallRule) {
+	// 규칙 추가 다이얼로그
+	b.addDialog = component.NewRuleAddDialog(b.window, func(rule *model.FirewallRule) {
 		b.ruleTable.AddRule(rule)
 		if b.onChange != nil {
 			b.onChange()
 		}
 	})
 
-	// Black/White 규칙 추가 폼
-	b.blackWhiteForm = component.NewBlackWhiteForm(func(rule *model.FirewallRule) {
-		b.ruleTable.AddRule(rule)
-		if b.onChange != nil {
-			b.onChange()
-		}
-	})
-
-	// 폼 전환 탭
-	b.formTabs = container.NewAppTabs(
-		container.NewTabItem("일반 규칙", b.generalForm.Content()),
-		container.NewTabItem("Black/White", b.blackWhiteForm.Content()),
-	)
-
-	// 전체 레이아웃: 테이블 위, 폼 탭 아래
-	b.content = container.NewBorder(
-		nil,
-		b.formTabs,
-		nil,
-		nil,
-		b.ruleTable.Content(),
-	)
+	// 전체 레이아웃: 테이블만 표시 (추가 버튼은 TemplateTab 헤더로 이동)
+	b.content = container.NewMax(b.ruleTable.Content())
 }
 
 // Content UI 컨테이너 반환
@@ -103,9 +83,12 @@ func (b *RuleBuilder) Refresh() {
 	b.ruleTable.Refresh()
 }
 
-// ResetTabs 폼 탭 위치 초기화 (첫 번째 탭으로)
+// ResetTabs 다이얼로그 탭 위치 초기화 (첫 번째 탭으로)
 func (b *RuleBuilder) ResetTabs() {
-	if len(b.formTabs.Items) > 0 {
-		b.formTabs.SelectIndex(0)
-	}
+	b.addDialog.ResetTabs()
+}
+
+// ShowAddDialog 규칙 추가 다이얼로그 표시
+func (b *RuleBuilder) ShowAddDialog() {
+	b.addDialog.Show()
 }

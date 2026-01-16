@@ -28,6 +28,7 @@ type TemplateTab struct {
 	ruleBuilder     *RuleBuilder       // 룰 빌더
 	natBuilder      *NATBuilder        // NAT 규칙 빌더
 	subTabs         *container.AppTabs // 서브 탭 (텍스트 편집 / 룰 빌더 / NAT 규칙)
+	addBtn          fyne.CanvasObject  // 추가 버튼 (탭에 따라 표시/숨김)
 
 	// 데이터
 	templates       []*model.Template
@@ -54,9 +55,9 @@ func (t *TemplateTab) createUI() {
 	// 우측: 룰 목록 패널
 	rightPanel := t.createTemplateListPanel()
 
-	// 좌우 분할 (75% : 25%)
+	// 좌우 분할 (85% : 15%)
 	split := container.NewHSplit(leftPanel, rightPanel)
-	split.Offset = 0.75
+	split.Offset = 0.85
 
 	// 전체 레이아웃
 	t.content = container.NewBorder(
@@ -79,14 +80,14 @@ func (t *TemplateTab) createTemplateListPanel() fyne.CanvasObject {
 	// 목록 영역 (스크롤 가능)
 	listContainer := container.NewVScroll(t.templateList)
 
-	// 새 룰 추가 버튼
-	newBtn := component.NewCustomButton("+새 룰 추가", nil, themes.Colors["black"], themes.Colors["lightgray"], func() {
+	// 새 템플릿 추가 버튼
+	newBtn := component.NewCustomButton("+ 템플릿 추가", nil, themes.Colors["black"], themes.Colors["lightgray"], func() {
 		t.onNewTemplate()
 	}, 5, 0, 0, 5)
 
 	// 헤더: "룰 목록" + 오른쪽에 새 룰 추가 버튼
 	header := container.NewBorder(nil, nil,
-		widget.NewLabel("룰 목록"),
+		widget.NewLabel("목록"),
 		newBtn,
 	)
 
@@ -107,10 +108,10 @@ func (t *TemplateTab) createTemplateContentPanel() fyne.CanvasObject {
 	t.templateContent.Wrapping = fyne.TextWrapOff
 
 	// 룰 빌더
-	t.ruleBuilder = NewRuleBuilder(nil)
+	t.ruleBuilder = NewRuleBuilder(t.window, nil)
 
 	// NAT 규칙 빌더
-	t.natBuilder = NewNATBuilder(nil)
+	t.natBuilder = NewNATBuilder(t.window, nil)
 
 	// 텍스트 편집 탭
 	textEditTab := container.NewTabItem("텍스트 편집", t.templateContent)
@@ -125,6 +126,12 @@ func (t *TemplateTab) createTemplateContentPanel() fyne.CanvasObject {
 	t.subTabs = container.NewAppTabs(textEditTab, ruleBuilderTab, natBuilderTab)
 	t.subTabs.OnSelected = t.onSubTabChanged
 
+	// 추가 버튼 (탭에 따라 표시/숨김)
+	t.addBtn = component.NewCustomButton("+ 추가", nil, nil, themes.Colors["darkgray"], func() {
+		t.onAddRule()
+	}, 5, 5, 5, 5)
+	t.addBtn.Hide() // 초기에는 텍스트 편집 탭이므로 숨김
+
 	// 저장, 삭제 버튼
 	saveBtn := component.NewCustomButton("저장", theme.ConfirmIcon(), nil, themes.Colors["blue"], func() {
 		t.onSaveTemplate()
@@ -132,10 +139,10 @@ func (t *TemplateTab) createTemplateContentPanel() fyne.CanvasObject {
 	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
 		t.onDeleteTemplate()
 	}, 5, 5, 5, 5)
-	buttons := container.NewHBox(saveBtn, deleteBtn)
+	buttons := container.NewHBox(t.addBtn, saveBtn, deleteBtn)
 
-	// 헤더: "규칙 내용" + 저장/삭제 버튼
-	header := container.NewBorder(nil, nil, widget.NewLabel("규칙 내용"), buttons, nil)
+	// 헤더: 저장/삭제 버튼 (오른쪽 정렬)
+	header := container.NewBorder(nil, nil, nil, buttons, nil)
 
 	// 제목과 함께 반환
 	return container.NewBorder(
@@ -153,14 +160,17 @@ func (t *TemplateTab) onSubTabChanged(tab *container.TabItem) {
 		rules, comments, _ := parser.ParseTextToRules(t.templateContent.Text)
 		t.ruleBuilder.SetRules(rules)
 		t.ruleBuilder.SetComments(comments)
+		t.addBtn.Show() // 추가 버튼 표시
 	case "NAT 규칙":
 		// 텍스트 -> NAT 빌더로 변환 (NAT 규칙만)
 		natRules, comments, _ := parser.ParseTextToNATRules(t.templateContent.Text)
 		t.natBuilder.SetRules(natRules)
 		t.natBuilder.SetComments(comments)
+		t.addBtn.Show() // 추가 버튼 표시
 	case "텍스트 편집":
 		// 모든 빌더의 내용을 텍스트로 통합
 		t.syncBuildersToText()
+		t.addBtn.Hide() // 추가 버튼 숨김
 	}
 }
 
@@ -380,14 +390,27 @@ func (t *TemplateTab) onSaveTemplate() {
 	}, t.window)
 }
 
-// 룰 삭제 시 호출됩니다.
+// onAddRule 규칙 추가 (현재 탭에 따라 다이얼로그 표시)
+func (t *TemplateTab) onAddRule() {
+	selectedTab := t.subTabs.Selected().Text
+	switch selectedTab {
+	case "룰 빌더":
+		t.ruleBuilder.ShowAddDialog()
+	case "NAT 규칙":
+		t.natBuilder.ShowAddDialog()
+	default:
+		// 텍스트 편집 탭에서는 아무 동작 안함
+	}
+}
+
+// 템플릿 삭제 시 호출됩니다.
 func (t *TemplateTab) onDeleteTemplate() {
 	if t.selectedVersion == "" {
-		dialog.ShowInformation("알림", "삭제할 룰을 선택해주세요.", t.window)
+		dialog.ShowInformation("알림", "삭제할 템플릿을 선택해주세요.", t.window)
 		return
 	}
 
-	dialog.ShowConfirm("확인", "선택한 룰을 삭제하시겠습니까?", func(ok bool) {
+	dialog.ShowConfirm("확인", "선택한 템플릿을 삭제하시겠습니까?", func(ok bool) {
 		if !ok {
 			return
 		}
@@ -404,6 +427,6 @@ func (t *TemplateTab) onDeleteTemplate() {
 		t.ruleBuilder.Clear()
 		t.natBuilder.Clear()
 		t.loadTemplates()
-		dialog.ShowInformation("알림", "룰이 삭제되었습니다.", t.window)
+		dialog.ShowInformation("알림", "삭제되었습니다.", t.window)
 	}, t.window)
 }

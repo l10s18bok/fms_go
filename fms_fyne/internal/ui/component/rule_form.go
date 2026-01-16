@@ -110,7 +110,7 @@ func (f *RuleForm) createUI() {
 
 	// 추가 버튼 (진한 회색 배경)
 	f.addBtn = NewCustomButton("+ 추가", nil, nil, themes.Colors["darkgray"], func() {
-		f.submitRule()
+		f.SubmitRule()
 	})
 
 	// TCP Flags 옵션 UI 생성
@@ -149,17 +149,8 @@ func (f *RuleForm) createUI() {
 	// 전체 폼 레이아웃 (Black/White 체크박스 제거됨 - BlackWhiteForm에서 별도 처리)
 	formContent := container.NewVBox(row1, row2, f.optionsContainer)
 
-	// 헤더: "규칙 추가" 레이블 + 오른쪽에 추가 버튼
-	header := container.NewBorder(
-		nil, nil, // top, bottom
-		widget.NewLabel("규칙 추가"),                              // left
-		container.NewGridWrap(fyne.NewSize(80, 36), f.addBtn), // right
-	)
-
 	// 테두리가 있는 카드 형태
 	f.content = container.NewVBox(
-		widget.NewSeparator(),
-		header,
 		formContent,
 	)
 }
@@ -502,8 +493,9 @@ func (f *RuleForm) getICMPCode() string {
 	return ""
 }
 
-// submitRule 규칙 생성 및 콜백 호출
-func (f *RuleForm) submitRule() {
+// SubmitRule 규칙 생성 및 콜백 호출 (다이얼로그에서 호출 가능)
+// 성공 시 true, 실패 시 false 반환
+func (f *RuleForm) SubmitRule() bool {
 	rule := &model.FirewallRule{
 		Chain:    model.StringToChain(f.chainSel.Selected),
 		Protocol: model.StringToProtocol(f.protoSel.Selected),
@@ -540,6 +532,7 @@ func (f *RuleForm) submitRule() {
 	}
 
 	f.Reset()
+	return true
 }
 
 // Reset 폼 초기화

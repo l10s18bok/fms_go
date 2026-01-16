@@ -6,24 +6,23 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
 )
 
 // NATBuilder NAT 규칙 빌더 패널
 type NATBuilder struct {
-	natTable *component.NATTable
-	dnatForm *component.DNATForm
-	snatForm *component.SNATForm
-	formTabs *container.AppTabs
-	onChange func()
-	comments []string // 주석 라인 보존
+	window    fyne.Window
+	natTable  *component.NATTable
+	addDialog *component.NATAddDialog // NAT 규칙 추가 다이얼로그
+	onChange  func()
+	comments  []string // 주석 라인 보존
 
 	content *fyne.Container
 }
 
 // NewNATBuilder 새 NAT 빌더 생성
-func NewNATBuilder(onChange func()) *NATBuilder {
+func NewNATBuilder(window fyne.Window, onChange func()) *NATBuilder {
 	builder := &NATBuilder{
+		window:   window,
 		onChange: onChange,
 		comments: []string{},
 	}
@@ -36,40 +35,16 @@ func (b *NATBuilder) createUI() {
 	// NAT 규칙 테이블
 	b.natTable = component.NewNATTable(b.onChange)
 
-	// DNAT (포트 포워딩) 폼
-	b.dnatForm = component.NewDNATForm(func(rule *model.NATRule) {
+	// NAT 규칙 추가 다이얼로그
+	b.addDialog = component.NewNATAddDialog(b.window, func(rule *model.NATRule) {
 		b.natTable.AddRule(rule)
 		if b.onChange != nil {
 			b.onChange()
 		}
 	})
 
-	// SNAT/MASQUERADE 폼
-	b.snatForm = component.NewSNATForm(func(rule *model.NATRule) {
-		b.natTable.AddRule(rule)
-		if b.onChange != nil {
-			b.onChange()
-		}
-	})
-
-	// 폼 전환 탭
-	b.formTabs = container.NewAppTabs(
-		container.NewTabItem("DNAT (포트 포워딩)", b.dnatForm.Content()),
-		container.NewTabItem("SNAT/MASQUERADE", b.snatForm.Content()),
-	)
-
-	// 전체 레이아웃: 테이블 위, 폼 탭 아래 (Separator로 테이블과 폼 구분)
-	formWithSeparator := container.NewVBox(
-		widget.NewSeparator(),
-		b.formTabs,
-	)
-	b.content = container.NewBorder(
-		nil,
-		formWithSeparator,
-		nil,
-		nil,
-		b.natTable.Content(),
-	)
+	// 전체 레이아웃: 테이블만 표시 (추가 버튼은 TemplateTab 헤더로 이동)
+	b.content = container.NewMax(b.natTable.Content())
 }
 
 // Content UI 컨테이너 반환
@@ -108,9 +83,12 @@ func (b *NATBuilder) Refresh() {
 	b.natTable.Refresh()
 }
 
-// ResetTabs 폼 탭 위치 초기화 (첫 번째 탭으로)
+// ResetTabs 다이얼로그 탭 위치 초기화 (첫 번째 탭으로)
 func (b *NATBuilder) ResetTabs() {
-	if len(b.formTabs.Items) > 0 {
-		b.formTabs.SelectIndex(0)
-	}
+	b.addDialog.ResetTabs()
+}
+
+// ShowAddDialog NAT 규칙 추가 다이얼로그 표시
+func (b *NATBuilder) ShowAddDialog() {
+	b.addDialog.Show()
 }

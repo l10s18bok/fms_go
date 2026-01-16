@@ -189,6 +189,83 @@ const ICMPOptionsHelpText = `ICMP Type 옵션 설명:
 • addressmask-reply
   - 서브넷 마스크 응답입니다.`
 
+// GeneralRuleHelpText 일반 규칙 도움말
+const GeneralRuleHelpText = `일반 규칙 도움말:
+
+방화벽 규칙을 세부적으로 설정합니다.
+
+[입력 필드 설명]
+
+• Chain (체인)
+  - INPUT: 서버로 들어오는 트래픽
+  - OUTPUT: 서버에서 나가는 트래픽
+  - FORWARD: 서버를 경유하는 트래픽
+
+• Action (동작)
+  - ACCEPT: 트래픽 허용
+  - DROP: 트래픽 차단 (응답 없음)
+  - REJECT: 트래픽 차단 (거부 응답 전송)
+  - RETURN: 현재 체인 종료
+  - FLUSH: 체인의 모든 규칙 삭제
+  - LOG: 로그 기록
+
+• Protocol (프로토콜)
+  - TCP: 웹, SSH, FTP 등 연결 지향
+  - UDP: DNS, NTP 등 비연결 지향
+  - ICMP: ping, traceroute 등
+  - ANY: 모든 프로토콜
+
+• SIP / DIP (소스/목적지 IP)
+  - 특정 IP 또는 네트워크 지정
+  - 예: 192.168.1.100, 10.0.0.0/8
+  - 비워두면 ANY (모든 IP)
+
+• 포트 옵션 (TCP/UDP)
+  - SPort: 소스 포트
+  - DPort: 목적지 포트
+  - 예: 80, 443, 22, 1024:65535
+
+• TCP Flags (TCP 전용)
+  - 특정 TCP 플래그 조합을 필터링
+  - SYN, ACK, FIN, RST, PSH, URG
+
+• ICMP Type (ICMP 전용)
+  - echo-request (ping), echo-reply 등`
+
+// BlackWhiteHelpText Black/White 규칙 도움말
+const BlackWhiteHelpText = `Black/White 리스트 도움말:
+
+간단하게 IP를 차단하거나 허용합니다.
+
+[타입 선택]
+
+• Black (차단)
+  - 지정한 IP에서 오는 모든 트래픽을 차단합니다.
+  - Action: DROP
+  - Chain: INPUT
+
+• White (허용)
+  - 지정한 IP에서 오는 모든 트래픽을 허용합니다.
+  - Action: ACCEPT
+  - Chain: INPUT
+
+[입력 필드]
+
+• IP
+  - 차단/허용할 IP 주소입니다.
+  - 필수 입력 항목입니다.
+  - 예: 192.168.1.100, 10.0.0.0/8
+
+[사용 예시]
+
+악성 IP 차단:
+  Type=Black, IP=203.0.113.50
+  → 해당 IP에서 오는 모든 접속 차단
+
+신뢰 IP 허용:
+  Type=White, IP=192.168.1.0/24
+  → 내부 네트워크에서 오는 접속 허용`
+
 // DNATHelpText DNAT (포트 포워딩) 도움말
 const DNATHelpText = `포트 포워딩 (DNAT) 도움말:
 
