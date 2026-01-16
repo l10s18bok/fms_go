@@ -8,7 +8,6 @@ import (
 	"fms/internal/storage"
 	"fms/internal/themes"
 	"fms/internal/ui/component"
-	"fms/internal/version"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -59,16 +58,13 @@ func (t *TemplateTab) createUI() {
 	split := container.NewHSplit(leftPanel, rightPanel)
 	split.Offset = 0.25
 
-	// 하단 버튼 및 입력 영역
-	bottomPanel := t.createBottomPanel()
-
 	// 전체 레이아웃
 	t.content = container.NewBorder(
-		nil,         // 상단
-		bottomPanel, // 하단 고정
-		nil,         // 좌측
-		nil,         // 우측
-		split,       // 중앙 (자동 확장)
+		nil,   // 상단
+		nil,   // 하단
+		nil,   // 좌측
+		nil,   // 우측
+		split, // 중앙 (자동 확장)
 	)
 }
 
@@ -190,21 +186,6 @@ func (t *TemplateTab) syncBuildersToText() {
 	}
 
 	t.templateContent.SetText(finalText)
-}
-
-// 하단 버튼/입력 영역을 생성합니다.
-func (t *TemplateTab) createBottomPanel() fyne.CanvasObject {
-	// 앱 버전 표시
-	appVersionLabel := widget.NewLabel(version.GetVersionString())
-
-	// 버튼 그룹 없음 (저장/삭제는 규칙 빌더로 이동)
-	buttons := container.NewHBox()
-
-	// 하단 레이아웃
-	return container.NewVBox(
-		widget.NewSeparator(),
-		container.NewBorder(nil, nil, appVersionLabel, buttons, nil),
-	)
 }
 
 // 탭의 컨텐츠를 반환합니다.

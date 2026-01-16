@@ -11,6 +11,7 @@ import (
 	"fms/internal/model"
 	"fms/internal/storage"
 	"fms/internal/ui/component"
+	"fms/internal/version"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -155,10 +156,14 @@ func (m *MainUI) Content() fyne.CanvasObject {
 		leftPanelWithSize,
 	)
 
+	// 하단 버전 표시 (상단 구분선 포함)
+	versionLabel := widget.NewLabel(version.GetVersionString())
+	bottomBar := container.NewBorder(widget.NewSeparator(), nil, versionLabel, nil, nil)
+
 	// 왼쪽 메뉴 너비 고정 (Border 레이아웃 사용)
 	return container.NewBorder(
 		nil,               // 상단
-		nil,               // 하단
+		bottomBar,         // 하단 (버전 표시)
 		leftWithSeparator, // 왼쪽 (고정)
 		nil,               // 오른쪽
 		m.tabs,            // 중앙 (확장)
