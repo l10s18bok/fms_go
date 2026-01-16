@@ -31,12 +31,13 @@ type PagedTableConfig struct {
 type PagedTable struct {
 	widget.BaseWidget
 
-	config      PagedTableConfig
-	table       *widget.Table
-	totalItems  int          // 전체 데이터 수
-	currentPage int          // 현재 페이지 (0부터 시작)
-	checkedRows map[int]bool // 체크된 행 (실제 데이터 인덱스 기준)
-	selectedRow int          // 현재 선택된 행 (페이지 내 인덱스, -1이면 선택 없음)
+	config       PagedTableConfig
+	table        *widget.Table
+	totalItems   int          // 전체 데이터 수
+	currentPage  int          // 현재 페이지 (0부터 시작)
+	checkedRows  map[int]bool // 체크된 행 (실제 데이터 인덱스 기준)
+	selectedRow  int          // 현재 선택된 행 (페이지 내 인덱스, -1이면 선택 없음)
+	allSelected  bool         // 전체 선택 상태
 
 
 	// 페이지네이션 UI
@@ -61,6 +62,7 @@ func NewPagedTable(config PagedTableConfig) *PagedTable {
 		totalItems:  0,
 		checkedRows: make(map[int]bool),
 		selectedRow: -1,
+		allSelected: false,
 	}
 	t.ExtendBaseWidget(t)
 	t.createUI()
@@ -218,9 +220,29 @@ func (t *PagedTable) updateCell(id widget.TableCellID, cell fyne.CanvasObject) {
 
 	if id.Row == 0 {
 		// 헤더
-		label.SetText(t.config.Columns[id.Col].Header)
-		label.TextStyle = fyne.TextStyle{Bold: true}
-		label.Show()
+		if id.Col == 0 {
+			// 첫 번째 컬럼 헤더: 전체 선택 체크박스
+			checkBtn.Show()
+			checkBtn.OnTapped = func() {
+				t.toggleSelectAll()
+			}
+
+			checkText.Hidden = false
+			if t.allSelected {
+				checkText.Text = "✔"
+				checkText.Color = color.RGBA{R: 220, G: 20, B: 20, A: 255}
+				checkText.TextStyle = fyne.TextStyle{Bold: true}
+			} else {
+				checkText.Text = "☐"
+				checkText.Color = color.RGBA{R: 100, G: 100, B: 100, A: 255}
+				checkText.TextStyle = fyne.TextStyle{Bold: false}
+			}
+			checkText.Refresh()
+		} else {
+			label.SetText(t.config.Columns[id.Col].Header)
+			label.TextStyle = fyne.TextStyle{Bold: true}
+			label.Show()
+		}
 		background.Refresh()
 		return
 	}
@@ -273,6 +295,30 @@ func (t *PagedTable) updateCell(id widget.TableCellID, cell fyne.CanvasObject) {
 	}
 }
 
+// toggleSelectAll 전체 선택/해제 토글
+func (t *PagedTable) toggleSelectAll() {
+	t.allSelected = !t.allSelected
+
+	if t.allSelected {
+		// 전체 선택
+		for i := 0; i < t.totalItems; i++ {
+			t.checkedRows[i] = true
+		}
+	} else {
+		// 전체 해제
+		t.checkedRows = make(map[int]bool)
+	}
+
+	// 체크 변경 콜백 호출 (각 항목에 대해)
+	if t.config.OnCheckChange != nil {
+		for i := 0; i < t.totalItems; i++ {
+			t.config.OnCheckChange(i, t.allSelected)
+		}
+	}
+
+	t.table.Refresh()
+}
+
 // toggleCheck 체크박스 토글 (버튼 클릭용)
 func (t *PagedTable) toggleCheck(dataIndex int, pageRow int) {
 	t.checkedRows[dataIndex] = !t.checkedRows[dataIndex]
@@ -284,6 +330,9 @@ func (t *PagedTable) toggleCheck(dataIndex int, pageRow int) {
 		t.selectedRow = -1
 	}
 
+	// 전체 선택 상태 업데이트
+	t.updateAllSelectedState()
+
 	if t.config.OnCheckChange != nil {
 		t.config.OnCheckChange(dataIndex, t.checkedRows[dataIndex])
 	}
@@ -292,6 +341,24 @@ func (t *PagedTable) toggleCheck(dataIndex int, pageRow int) {
 	}
 
 	t.table.Refresh()
+}
+
+// updateAllSelectedState 전체 선택 상태 업데이트
+func (t *PagedTable) updateAllSelectedState() {
+	if t.totalItems == 0 {
+		t.allSelected = false
+		return
+	}
+
+	// 모든 항목이 체크되었는지 확인
+	allChecked := true
+	for i := 0; i < t.totalItems; i++ {
+		if !t.checkedRows[i] {
+			allChecked = false
+			break
+		}
+	}
+	t.allSelected = allChecked
 }
 
 // getPageRowCount 현재 페이지의 행 수 반환
@@ -349,6 +416,7 @@ func (t *PagedTable) SetData(totalItems int) {
 	t.totalItems = totalItems
 	t.currentPage = 0
 	t.selectedRow = -1
+	t.allSelected = false
 	t.table.Refresh()
 	t.updatePaginationUI()
 }
@@ -418,6 +486,7 @@ func (t *PagedTable) SetChecked(dataIndex int, checked bool) {
 // ClearChecked 모든 체크 해제
 func (t *PagedTable) ClearChecked() {
 	t.checkedRows = make(map[int]bool)
+	t.allSelected = false
 	t.table.Refresh()
 }
 
@@ -437,12 +506,14 @@ func (t *PagedTable) SelectAllData() {
 	for i := 0; i < t.totalItems; i++ {
 		t.checkedRows[i] = true
 	}
+	t.allSelected = true
 	t.table.Refresh()
 }
 
 // DeselectAll 전체 선택 해제
 func (t *PagedTable) DeselectAll() {
 	t.checkedRows = make(map[int]bool)
+	t.allSelected = false
 	t.table.Refresh()
 }
 
