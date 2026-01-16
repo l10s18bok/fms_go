@@ -540,15 +540,18 @@ func (d *DeviceTab) showAddEditDialog() {
 
 // 상세보기 다이얼로그를 표시합니다. (PRD 3.3.3 기준)
 func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
+	// 레이아웃 설정 (추가/수정 스타일, 크기 축소)
+	rowHeight := float32(30)
+	rowSpacing := float32(12)
+	labelWidth := float32(80)
+	valueWidth := float32(200)
+
 	// 접속정보 텍스트
 	authInfo := "-"
-	authDetail := ""
 	if fw.DevicePPK != "" {
-		authInfo = "PPK"
-		authDetail = fmt.Sprintf("PPK 경로: %s", fw.DevicePPK)
+		authInfo = fmt.Sprintf("PPK: %s", fw.DevicePPK)
 	} else if fw.DevicePW != "" {
-		authInfo = "PW"
-		authDetail = fmt.Sprintf("ID: %s", fw.DeviceID)
+		authInfo = fmt.Sprintf("PW (ID: %s)", fw.DeviceID)
 	}
 
 	// 서버상태 텍스트
@@ -561,48 +564,107 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 	}
 
 	// 배포정보
-	deployInfo := fmt.Sprintf("방화벽 룰셋 버전: %s", fw.Version)
+	deployInfo := fw.Version
 	if fw.Version == "" || fw.Version == "-" {
-		deployInfo = "방화벽 룰셋 버전: -"
+		deployInfo = "-"
 	}
 
 	// 프로그램 버전 정보
+	programInfo := "-"
 	if fw.ProgramVersions != nil && len(fw.ProgramVersions) > 0 {
+		programInfo = ""
 		for name, ver := range fw.ProgramVersions {
-			deployInfo += fmt.Sprintf("\n%s 버전: %s", name, ver)
+			if programInfo != "" {
+				programInfo += "\n"
+			}
+			programInfo += fmt.Sprintf("%s: %s", name, ver)
 		}
 	}
 
-	content := container.NewVBox(
-		container.NewGridWithColumns(2,
-			widget.NewLabelWithStyle("장비명:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			widget.NewLabel(fw.DeviceName),
+	// IP 값
+	ipValue := fw.DeviceIP
+	if ipValue == "" {
+		ipValue = fw.DeviceName
+	}
+
+	// 커스텀 팝업 생성
+	var popup *widget.PopUp
+
+	// 헤더 (큰 폰트 - RichText 사용)
+	headerText := widget.NewRichTextFromMarkdown("## 상세보기")
+
+	// 폼 컨텐츠
+	formContent := container.NewVBox(
+		// 장비명
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabelWithStyle("장비명:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fw.DeviceName)),
 		),
-		container.NewGridWithColumns(2,
-			widget.NewLabelWithStyle("IP:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			widget.NewLabel(func() string {
-				if fw.DeviceIP != "" {
-					return fw.DeviceIP
-				}
-				return fw.DeviceName
-			}()),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		// IP
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabelWithStyle("IP:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(ipValue)),
 		),
-		container.NewGridWithColumns(2,
-			widget.NewLabelWithStyle("연결상태:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			widget.NewLabel(statusText),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		// 연결상태
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabelWithStyle("연결상태:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(statusText)),
 		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
 		widget.NewSeparator(),
-		container.NewGridWithColumns(2,
-			widget.NewLabelWithStyle("접속정보:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			widget.NewLabel(authInfo),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		// 접속정보
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabelWithStyle("접속정보:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(authInfo)),
 		),
-		widget.NewLabel(authDetail),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
 		widget.NewSeparator(),
-		widget.NewLabelWithStyle("배포정보:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabel(deployInfo),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		// 룰셋 버전
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabelWithStyle("룰셋 버전:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(deployInfo)),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		// 프로그램 버전
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabelWithStyle("프로그램:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(programInfo)),
+		),
+		container.NewGridWrap(fyne.NewSize(1, 30), layout.NewSpacer()),
 	)
 
-	dialog.ShowCustom("상세보기", "확인", content, d.window)
+	// 확인 버튼
+	confirmBtn := component.NewCustomButton("확인", nil, nil, themes.Colors["blue"], func() {
+		popup.Hide()
+	}, 5, 5, 5, 5)
+
+	// 버튼 컨테이너 (중앙 정렬)
+	btnContainer := container.NewHBox(
+		layout.NewSpacer(),
+		confirmBtn,
+		layout.NewSpacer(),
+	)
+
+	// 전체 컨텐츠
+	content := container.NewVBox(
+		headerText,
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		formContent,
+		btnContainer,
+		container.NewGridWrap(fyne.NewSize(1, 15), layout.NewSpacer()),
+	)
+
+	// 고정 크기 컨테이너 (작은 크기: 380x490)
+	paddedContent := container.New(layout.NewCustomPaddedLayout(15, 15, 15, 15), content)
+	sizedContent := container.NewGridWrap(fyne.NewSize(380, 490), paddedContent)
+
+	// 팝업 생성
+	popup = widget.NewModalPopUp(sizedContent, d.window.Canvas())
+	popup.Show()
 }
 
 // 배포 다이얼로그를 표시합니다. (PRD 3.3.3 기준 - 통합 다이얼로그)
