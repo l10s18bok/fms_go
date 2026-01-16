@@ -43,9 +43,8 @@ type DeviceTab struct {
 	statusRedLabel    *widget.Label
 
 	// 데이터
-	firewalls           []*model.Firewall
-	filteredFirewalls   []*model.Firewall // 검색 필터링된 목록
-	selectedDeviceIndex int
+	firewalls         []*model.Firewall
+	filteredFirewalls []*model.Firewall // 검색 필터링된 목록
 
 	// 새로고침 상태
 	isRefreshing bool
@@ -55,12 +54,11 @@ type DeviceTab struct {
 // 새로운 장비 관리 탭을 생성합니다.
 func NewDeviceTab(window fyne.Window, store *storage.JSONStore, templateTab *TemplateTab) *DeviceTab {
 	tab := &DeviceTab{
-		window:              window,
-		store:               store,
-		templateTab:         templateTab,
-		firewalls:           []*model.Firewall{},
-		filteredFirewalls:   []*model.Firewall{},
-		selectedDeviceIndex: -1,
+		window:            window,
+		store:             store,
+		templateTab:       templateTab,
+		firewalls:         []*model.Firewall{},
+		filteredFirewalls: []*model.Firewall{},
 	}
 	tab.createUI()
 	tab.loadFirewalls()
@@ -194,10 +192,7 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 			d.updateDeviceCell(row, col, cell)
 		},
 		OnRowSelected: func(row int) {
-			// 단일 클릭 - 선택
-			if row >= 0 && row < len(d.filteredFirewalls) {
-				d.selectedDeviceIndex = d.getOriginalIndex(d.filteredFirewalls[row])
-			}
+			// 단일 클릭 - 선택 (현재 미사용)
 		},
 		OnRowDoubleClick: func(row int) {
 			// 더블 클릭 - 상세보기
@@ -258,16 +253,6 @@ func (d *DeviceTab) updateDeviceCell(row int, col int, cell fyne.CanvasObject) {
 			label.SetText("-")
 		}
 	}
-}
-
-// 필터링된 목록에서 원본 인덱스를 찾습니다.
-func (d *DeviceTab) getOriginalIndex(fw *model.Firewall) int {
-	for i, f := range d.firewalls {
-		if f.Index == fw.Index {
-			return i
-		}
-	}
-	return -1
 }
 
 // 검색 필터를 적용합니다.
@@ -965,7 +950,6 @@ func (d *DeviceTab) onDeleteDevices() {
 
 		// 삭제 후 새로고침
 		d.deviceTable.ClearChecked()
-		d.selectedDeviceIndex = -1
 		d.loadFirewalls()
 
 		dialog.ShowInformation("성공", "선택한 장비가 삭제되었습니다.", d.window)
