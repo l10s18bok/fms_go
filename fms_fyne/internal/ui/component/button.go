@@ -166,7 +166,7 @@ func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.
 		iconImg.SetMinSize(fyne.NewSize(16, 16))
 		iconImg.FillMode = canvas.ImageFillContain
 		content = iconImg
-	} else if bgColor != nil && func() bool { _, _, _, a := bgColor.RGBA(); return a == 0 }() {
+	} else if bgColor != nil && isTransparent(bgColor) {
 		// 테두리 + 텍스트 (bgColor가 투명색인 경우)
 		paddedText := container.New(layout.NewCustomPaddedLayout(8, 8, 16, 16), container.NewCenter(newBoldText(label, textColor)))
 		// 테두리는 Black 색상 고정
@@ -219,4 +219,14 @@ func isLightColor(c color.Color) bool {
 	// 밝기 계산 (0-65535 범위)
 	brightness := (r*299 + g*587 + b*114) / 1000
 	return brightness > 32767
+}
+
+// 투명 색상인지 판별합니다.
+func isTransparent(c color.Color) bool {
+	if c == nil {
+		return false
+	}
+	// RGBA 값으로 알파가 0인지 확인
+	_, _, _, a := c.RGBA()
+	return a == 0
 }

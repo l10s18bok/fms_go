@@ -10,6 +10,7 @@ import (
 
 	"fms/internal/model"
 	"fms/internal/storage"
+	"fms/internal/themes"
 	"fms/internal/ui/component"
 	"fms/internal/version"
 
@@ -37,6 +38,7 @@ type MainUI struct {
 	deviceTabItem   *container.TabItem
 	historyTabItem  *container.TabItem
 	programTabItem  *container.TabItem // 프로그램 관리 탭 아이템
+
 }
 
 // 새로운 메인 UI 인스턴스를 생성합니다.
@@ -92,32 +94,31 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 
 // 왼쪽 메뉴를 생성합니다.
 func (m *MainUI) createLeftMenu() {
-	// 방화벽 룰 관리 버튼
-	ruleBtn := widget.NewButton("방화벽 룰 관리", func() {
+	// 방화벽 룰 관리 버튼 (텍스트만, 위아래 간격 4)
+	ruleBtn := component.NewCustomButton("방화벽 룰 관리", nil, themes.Colors["black"], nil, func() {
 		m.openTab(m.templateTabItem)
-	})
+	}, 4, 4, 0, 0)
 
-	// 장비 관리 버튼
-	deviceBtn := widget.NewButton("장비 관리", func() {
+	// 장비 관리 버튼 (텍스트만, 위아래 간격 4)
+	deviceBtn := component.NewCustomButton("장비 관리", nil, themes.Colors["black"], nil, func() {
 		m.openTab(m.deviceTabItem)
-	})
+	}, 4, 4, 0, 0)
 
-	// 배포 이력 버튼
-	historyBtn := widget.NewButton("배포 이력", func() {
+	// 배포 이력 버튼 (텍스트만, 위아래 간격 4)
+	historyBtn := component.NewCustomButton("배포 이력", nil, themes.Colors["black"], nil, func() {
 		m.openTab(m.historyTabItem)
-	})
+	}, 4, 4, 0, 0)
 
-	// 프로그램 관리 버튼
-	programBtn := widget.NewButton("프로그램 관리", func() {
+	// 프로그램 관리 버튼 (텍스트만, 위아래 간격 4)
+	programBtn := component.NewCustomButton("프로그램 관리", nil, themes.Colors["black"], nil, func() {
 		m.openTab(m.programTabItem)
-	})
+	}, 4, 4, 0, 0)
 
 	// 왼쪽 메뉴 레이아웃
 	m.leftMenu = container.NewVBox(
 		ruleBtn,
 		deviceBtn,
 		historyBtn,
-		widget.NewSeparator(),
 		programBtn,
 	)
 }
