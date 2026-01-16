@@ -48,15 +48,15 @@ func NewTemplateTab(window fyne.Window, store *storage.JSONStore) *TemplateTab {
 
 // 방화벽 룰 탭의 UI를 생성합니다.
 func (t *TemplateTab) createUI() {
-	// 좌측: 룰 목록 패널
-	leftPanel := t.createTemplateListPanel()
+	// 좌측: 규칙 내용 패널 (서브 탭 포함)
+	leftPanel := t.createTemplateContentPanel()
 
-	// 우측: 규칙 내용 패널 (서브 탭 포함)
-	rightPanel := t.createTemplateContentPanel()
+	// 우측: 룰 목록 패널
+	rightPanel := t.createTemplateListPanel()
 
-	// 좌우 분할 (25% : 75%)
+	// 좌우 분할 (75% : 25%)
 	split := container.NewHSplit(leftPanel, rightPanel)
-	split.Offset = 0.25
+	split.Offset = 0.75
 
 	// 전체 레이아웃
 	t.content = container.NewBorder(
