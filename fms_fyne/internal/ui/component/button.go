@@ -159,20 +159,30 @@ func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.
 		iconImg := canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
 		iconImg.SetMinSize(fyne.NewSize(16, 16))
 		iconImg.FillMode = canvas.ImageFillContain
-		text := canvas.NewText(label, textColor)
-		text.TextStyle = fyne.TextStyle{Bold: true}
-		content = container.NewHBox(iconImg, text)
+		content = container.NewHBox(iconImg, newBoldText(label, textColor))
 	} else if icon != nil {
 		// 아이콘만
 		iconImg := canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
 		iconImg.SetMinSize(fyne.NewSize(16, 16))
 		iconImg.FillMode = canvas.ImageFillContain
 		content = iconImg
+	} else if bgColor != nil && func() bool { _, _, _, a := bgColor.RGBA(); return a == 0 }() {
+		// 테두리 + 텍스트 (bgColor가 투명색인 경우)
+		paddedText := container.New(layout.NewCustomPaddedLayout(8, 8, 16, 16), container.NewCenter(newBoldText(label, textColor)))
+		// 테두리는 Black 색상 고정
+		border := canvas.NewRectangle(color.Transparent)
+		border.StrokeColor = color.RGBA{R: 40, G: 40, B: 40, A: 255} // Black
+		border.StrokeWidth = 1
+		border.CornerRadius = 4
+		// 테두리 + 텍스트 버튼은 여기서 직접 반환 (이중 패딩 방지)
+		btn := NewTappableContainer(container.NewStack(border, paddedText), onTap)
+		if mTop > 0 || mBottom > 0 || mLeft > 0 || mRight > 0 {
+			return container.New(layout.NewCustomPaddedLayout(mTop, mBottom, mLeft, mRight), btn)
+		}
+		return btn
 	} else {
 		// 텍스트만
-		text := canvas.NewText(label, textColor)
-		text.TextStyle = fyne.TextStyle{Bold: true}
-		content = text
+		content = newBoldText(label, textColor)
 	}
 
 	// 내부 패딩 적용 (기본값 고정: 8, 8, 16, 16)
@@ -196,6 +206,13 @@ func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.
 	return btn
 }
 
+// Bold 스타일 텍스트를 생성합니다.
+func newBoldText(text string, c color.Color) *canvas.Text {
+	t := canvas.NewText(text, c)
+	t.TextStyle = fyne.TextStyle{Bold: true}
+	return t
+}
+
 // 밝은 색상인지 판별합니다.
 func isLightColor(c color.Color) bool {
 	r, g, b, _ := c.RGBA()
@@ -203,4 +220,3 @@ func isLightColor(c color.Color) bool {
 	brightness := (r*299 + g*587 + b*114) / 1000
 	return brightness > 32767
 }
-

@@ -55,7 +55,7 @@ func NewSearchBox(config SearchBoxConfig) *SearchBox {
 	}
 
 	// 찾기 버튼 (돋보기 아이콘, NewCustomButton 사용)
-	s.Button = NewCustomButton("", theme.SearchIcon(), nil, themes.Colors["blue"], func() {
+	s.Button = NewCustomButton("", theme.SearchIcon(), nil, themes.Colors["darkgray"], func() {
 		doSearch()
 	})
 

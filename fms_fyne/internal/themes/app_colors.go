@@ -19,8 +19,9 @@ var Colors = map[string]color.Color{
 	"gray":      color.RGBA{R: 100, G: 100, B: 100, A: 255}, // ButtonSecondary
 	"darkgray":  color.RGBA{R: 80, G: 80, B: 80, A: 255},    // ButtonDark
 	"lightgray": color.RGBA{R: 200, G: 200, B: 200, A: 255},
-	"black":     color.RGBA{R: 40, G: 40, B: 40, A: 255}, // ButtonBlack
-	"white":     color.White,
+	"black":       color.RGBA{R: 40, G: 40, B: 40, A: 255}, // ButtonBlack
+	"white":       color.White,
+	"transparent": color.Transparent, // 테두리만 있는 버튼용
 }
 
 // 색상 이름으로 색상을 반환합니다. 없으면 흰색을 반환합니다.

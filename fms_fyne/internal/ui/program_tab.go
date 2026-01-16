@@ -16,7 +16,6 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	fynestorage "fyne.io/fyne/v2/storage"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -27,7 +26,7 @@ type ProgramTab struct {
 	content fyne.CanvasObject
 
 	// UI 컴포넌트
-	searchBox    *component.SearchBox  // 검색 컴포넌트 (공통)
+	searchBox    *component.SearchBox // 검색 컴포넌트 (공통)
 	programTable *component.PagedTable
 
 	// 데이터
@@ -69,7 +68,7 @@ func (t *ProgramTab) createUI() {
 	})
 
 	// 추가/수정 버튼
-	addEditBtn := component.NewCustomButton("추가/수정", theme.ContentAddIcon(), nil, themes.Colors["blue"], func() {
+	addEditBtn := component.NewCustomButton("추가/수정", nil, nil, themes.Colors["blue"], func() {
 		t.onAddOrEdit()
 	})
 
