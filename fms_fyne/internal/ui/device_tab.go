@@ -571,7 +571,7 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 
 	// 프로그램 버전 정보
 	programInfo := "-"
-	if fw.ProgramVersions != nil && len(fw.ProgramVersions) > 0 {
+	if len(fw.ProgramVersions) > 0 {
 		programInfo = ""
 		for name, ver := range fw.ProgramVersions {
 			if programInfo != "" {

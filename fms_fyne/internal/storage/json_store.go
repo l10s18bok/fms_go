@@ -669,3 +669,37 @@ func (s *JSONStore) CountPrograms() int {
 	defer s.mu.RUnlock()
 	return len(s.programs)
 }
+
+// IP로 장비를 조회합니다.
+func (s *JSONStore) GetFirewallByIP(ip string) (*model.Firewall, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, fw := range s.firewalls {
+		if fw.DeviceIP == ip {
+			return fw, nil
+		}
+	}
+	return nil, fmt.Errorf("장비를 찾을 수 없습니다: %s", ip)
+}
+
+// 장비 수를 반환합니다.
+func (s *JSONStore) CountFirewalls() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.firewalls)
+}
+
+// 이력 수를 반환합니다.
+func (s *JSONStore) CountHistory() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.history)
+}
+
+// 템플릿 수를 반환합니다.
+func (s *JSONStore) CountTemplates() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.templates)
+}
