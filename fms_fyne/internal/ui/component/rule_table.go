@@ -1,6 +1,8 @@
 package component
 
 import (
+	"image/color"
+
 	"fms/internal/model"
 	"fms/internal/parser"
 
@@ -53,9 +55,10 @@ var headerTexts = []string{
 // RuleTable widget.Table 기반 규칙 테이블
 type RuleTable struct {
 	widget.BaseWidget
-	rules    []*model.FirewallRule
-	table    *widget.Table
-	onChange func()
+	rules         []*model.FirewallRule
+	table         *widget.Table
+	borderedTable *fyne.Container // 외곽선 포함 테이블
+	onChange      func()
 
 	lastWidth float32 // 마지막 너비 (중복 업데이트 방지)
 }
@@ -116,6 +119,26 @@ func (t *RuleTable) createTable() {
 
 	// 초기 컬럼 너비 설정 (기본값)
 	t.updateColumnWidths(900)
+
+	// 테이블 외곽선 (상, 하, 좌, 우)
+	borderColor := color.RGBA{R: 200, G: 200, B: 200, A: 255}
+	borderTop := canvas.NewRectangle(borderColor)
+	borderTop.SetMinSize(fyne.NewSize(0, 1))
+	borderBottom := canvas.NewRectangle(borderColor)
+	borderBottom.SetMinSize(fyne.NewSize(0, 1))
+	borderLeft := canvas.NewRectangle(borderColor)
+	borderLeft.SetMinSize(fyne.NewSize(1, 0))
+	borderRight := canvas.NewRectangle(borderColor)
+	borderRight.SetMinSize(fyne.NewSize(1, 0))
+
+	// 테이블을 외곽선으로 감싸기
+	t.borderedTable = container.NewBorder(
+		borderTop,
+		borderBottom,
+		borderLeft,
+		borderRight,
+		t.table,
+	)
 }
 
 // updateCell 셀 업데이트
@@ -294,7 +317,7 @@ func (t *RuleTable) Resize(size fyne.Size) {
 
 // CreateRenderer 렌더러 생성
 func (t *RuleTable) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(t.table)
+	return widget.NewSimpleRenderer(t.borderedTable)
 }
 
 // triggerChange 변경 콜백 호출
