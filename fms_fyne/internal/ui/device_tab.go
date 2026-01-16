@@ -324,11 +324,23 @@ func (d *DeviceTab) showAddEditDialog() {
 
 	// 체크된 장비가 있으면 수정 모드 (PagedTable 사용)
 	checkedRows := d.deviceTable.GetCheckedRows()
-	if len(checkedRows) > 0 && checkedRows[0] < len(d.filteredFirewalls) {
+
+	// 여러 개 선택 시 안내 다이얼로그 표시
+	if len(checkedRows) > 1 {
+		dialog.ShowInformation("안내", "수정하려면 하나만 선택해주세요.", d.window)
+		return
+	}
+
+	if len(checkedRows) == 1 && checkedRows[0] < len(d.filteredFirewalls) {
 		editingFw = d.filteredFirewalls[checkedRows[0]]
 	}
 
-	// 입력 필드
+	// 입력 필드 너비
+	entryWidth := float32(250)
+	rowHeight := float32(36)
+	labelWidth := float32(80)
+	rowSpacing := float32(20) // 라인 간격 2배
+
 	deviceNameEntry := widget.NewEntry()
 	deviceNameEntry.SetPlaceHolder("장비 이름")
 
@@ -349,16 +361,25 @@ func (d *DeviceTab) showAddEditDialog() {
 	authSelect := widget.NewSelect([]string{"PW", "PPK"}, nil)
 	authSelect.SetSelected("PW")
 
-	// PW 입력 영역
-	pwContainer := container.NewGridWithColumns(2,
-		widget.NewLabel("SSH ID:"), sshIDEntry,
-		widget.NewLabel("비밀번호:"), sshPWEntry,
+	// PW 입력 영역 (라인 간격 2배)
+	pwContainer := container.NewVBox(
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("SSH ID:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), sshIDEntry),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("비밀번호:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), sshPWEntry),
+		),
 	)
 
 	// PPK 입력 영역 (초기에 숨김)
 	ppkBrowseBtn := widget.NewButton("찾아보기...", nil)
-	ppkContainer := container.NewGridWithColumns(2,
-		widget.NewLabel("PPK:"), container.NewBorder(nil, nil, nil, ppkBrowseBtn, ppkPathLabel),
+	ppkContainer := container.NewHBox(
+		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("PPK:")),
+		container.NewGridWrap(fyne.NewSize(entryWidth-80, rowHeight), ppkPathLabel),
+		ppkBrowseBtn,
 	)
 	ppkContainer.Hide()
 
@@ -390,27 +411,48 @@ func (d *DeviceTab) showAddEditDialog() {
 		}
 	}
 
-	// 다이얼로그 컨텐츠
-	content := container.NewVBox(
-		container.NewGridWithColumns(2,
-			widget.NewLabel("장비명:"), deviceNameEntry,
-			widget.NewLabel("서버 IP:"), serverIPEntry,
+	// 다이얼로그 컨텐츠 (라인 간격 2배, 버튼-비밀번호 간격 3배)
+	buttonSpacing := float32(60) // 버튼과 비밀번호 간격 3배
+
+	// 헤더 (큰 폰트 - RichText 사용, 수정 모드에 따라 동적 변경)
+	title := "장비 추가"
+	if editingFw != nil {
+		title = "장비 수정"
+	}
+	headerText := widget.NewRichTextFromMarkdown("## " + title)
+
+	// 폼 컨텐츠
+	formContent := container.NewVBox(
+		// 장비명
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("장비명:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), deviceNameEntry),
 		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
+		// 서버 IP
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("서버 IP:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), serverIPEntry),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
 		widget.NewSeparator(),
-		container.NewGridWithColumns(2,
-			widget.NewLabel("접속선택:"), authSelect,
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
+		// 접속선택
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("접속선택:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), authSelect),
 		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
 		pwContainer,
 		ppkContainer,
+		container.NewGridWrap(fyne.NewSize(1, buttonSpacing), layout.NewSpacer()), // 버튼 간격 3배
 	)
 
-	// 다이얼로그 생성
-	var parentDialog dialog.Dialog
-	parentDialog = dialog.NewCustomConfirm("장비 추가/수정", "저장", "취소", content, func(ok bool) {
-		if !ok {
-			return
-		}
+	// 커스텀 팝업 생성
+	var popup *widget.PopUp
 
+	// 저장 처리 함수
+	onSave := func() {
 		// 유효성 검사
 		if serverIPEntry.Text == "" {
 			dialog.ShowError(fmt.Errorf("서버 IP를 입력해주세요"), d.window)
@@ -453,15 +495,48 @@ func (d *DeviceTab) showAddEditDialog() {
 			return
 		}
 
+		popup.Hide()
+
 		// 체크 해제 및 새로고침
 		d.deviceTable.ClearChecked()
 		d.loadFirewalls()
 		dialog.ShowInformation("성공", "장비 정보가 저장되었습니다.", d.window)
-	}, d.window)
+	}
+
+	// 버튼 (간격 3배 = 60)
+	cancelBtn := component.NewCustomButton("취소", nil, themes.Colors["black"], themes.Colors["lightgray"], func() {
+		popup.Hide()
+	}, 5, 5, 5, 5)
+	saveBtn := component.NewCustomButton("저장", nil, nil, themes.Colors["blue"], onSave, 5, 5, 5, 5)
+
+	// 버튼 컨테이너 (중앙 정렬, 버튼 간격 3배 = 60)
+	btnContainer := container.NewHBox(
+		layout.NewSpacer(),
+		cancelBtn,
+		container.NewGridWrap(fyne.NewSize(60, 1), layout.NewSpacer()), // 버튼 간격 3배
+		saveBtn,
+		layout.NewSpacer(),
+	)
+
+	// 전체 컨텐츠
+	content := container.NewVBox(
+		headerText,
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 헤더 아래 간격
+		formContent,
+		btnContainer,
+		container.NewGridWrap(fyne.NewSize(1, 20), layout.NewSpacer()), // 하단 여백
+	)
+
+	// 고정 크기 컨테이너 (크기 1.5배: 450x600)
+	paddedContent := container.New(layout.NewCustomPaddedLayout(20, 20, 20, 20), content)
+	sizedContent := container.NewGridWrap(fyne.NewSize(450, 600), paddedContent)
+
+	// 팝업 생성
+	popup = widget.NewModalPopUp(sizedContent, d.window.Canvas())
 
 	// PPK 찾아보기 버튼 - 다이얼로그 중첩 처리 (fyne-docs 스킬 참고)
 	ppkBrowseBtn.OnTapped = func() {
-		parentDialog.Hide() // 부모 다이얼로그 숨김
+		popup.Hide() // 부모 다이얼로그 숨김
 
 		fileDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if reader != nil {
@@ -469,13 +544,13 @@ func (d *DeviceTab) showAddEditDialog() {
 				ppkPathLabel.SetText(ppkPath)
 				reader.Close()
 			}
-			parentDialog.Show() // 부모 다이얼로그 다시 표시
+			popup.Show() // 부모 다이얼로그 다시 표시
 		}, d.window)
 		fileDialog.SetFilter(fynestorage.NewExtensionFileFilter([]string{".ppk", ".pem", ".key"}))
 		fileDialog.Show()
 	}
 
-	parentDialog.Show()
+	popup.Show()
 }
 
 // 상세보기 다이얼로그를 표시합니다. (PRD 3.3.3 기준)
@@ -568,16 +643,36 @@ func (d *DeviceTab) onDeploy() {
 		return
 	}
 
-	// 선택한 IP 리스트
-	ipListLabel := widget.NewLabel(strings.Join(checkedIPs, ", "))
-	ipListLabel.Wrapping = fyne.TextWrapWord
+	// 레이아웃 설정 (다른 다이얼로그와 동일한 스타일)
+	rowHeight := float32(36)
+	rowSpacing := float32(20)
+	labelWidth := float32(100)
+	entryWidth := float32(300)
+	buttonSpacing := float32(60)
+
+	// 커스텀 팝업 생성
+	var popup *widget.PopUp
+
+	// 헤더 (큰 폰트 - RichText 사용)
+	headerText := widget.NewRichTextFromMarkdown("## 배포")
+
+	// 선택한 IP 리스트 (한 줄씩 표시, 3줄 높이 스크롤, 간격 축소)
+	// canvas.Text 사용으로 패딩 없이 컴팩트하게 표시
+	ipLabels := make([]fyne.CanvasObject, len(checkedIPs))
+	for i, ip := range checkedIPs {
+		text := canvas.NewText(ip, nil)
+		text.TextSize = 14
+		ipLabels[i] = text
+	}
+	ipListContent := container.NewVBox(ipLabels...)
+	ipListScroll := container.NewScroll(ipListContent)
+	ipListScroll.SetMinSize(fyne.NewSize(entryWidth, 54)) // 약 3줄 높이 (18px * 3)
 
 	// 배포선택 드롭다운
 	deployTypeSelect := widget.NewSelect([]string{"방화벽 룰 배포", "프로그램 배포"}, nil)
 	deployTypeSelect.SetSelected("방화벽 룰 배포")
 
 	// 배포 리스트 (라디오 버튼 그룹)
-	var deployListContainer *fyne.Container
 	var selectedItem string
 
 	// 방화벽 룰 목록
@@ -597,11 +692,10 @@ func (d *DeviceTab) onDeploy() {
 		return radio
 	}
 
-	// 초기 방화벽 룰 리스트
+	// 초기 방화벽 룰 리스트 (스크롤 가능)
 	radioGroup := createRadioList(templates)
 	deployListScroll := container.NewScroll(radioGroup)
-	deployListScroll.SetMinSize(fyne.NewSize(300, 150))
-	deployListContainer = container.NewBorder(nil, nil, nil, nil, deployListScroll)
+	deployListScroll.SetMinSize(fyne.NewSize(entryWidth, 150))
 
 	// 배포선택 변경 시 리스트 갱신
 	deployTypeSelect.OnChanged = func(selected string) {
@@ -616,28 +710,36 @@ func (d *DeviceTab) onDeploy() {
 		deployListScroll.Refresh()
 	}
 
-	// 다이얼로그 컨텐츠
-	content := container.NewVBox(
-		widget.NewLabelWithStyle("선택한 IP 리스트:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		ipListLabel,
-		widget.NewSeparator(),
-		container.NewGridWithColumns(2,
-			widget.NewLabel("배포선택:"), deployTypeSelect,
+	// 폼 컨텐츠 (라인 간격 2배)
+	formContent := container.NewVBox(
+		// 선택한 IP 목록
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("IP 목록:")),
+			ipListScroll,
 		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		// 배포선택
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("배포선택:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), deployTypeSelect),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
 		widget.NewSeparator(),
-		widget.NewLabelWithStyle("배포 리스트:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		deployListContainer,
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		// 배포 목록
+		widget.NewLabelWithStyle("배포 목록:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		deployListScroll,
+		container.NewGridWrap(fyne.NewSize(1, buttonSpacing), layout.NewSpacer()),
 	)
 
-	dialog.ShowCustomConfirm("배포", "배포", "취소", content, func(ok bool) {
-		if !ok {
-			return
-		}
-
+	// 배포 처리 함수
+	onDeploy := func() {
 		if selectedItem == "" {
 			dialog.ShowError(fmt.Errorf("배포할 항목을 선택해주세요"), d.window)
 			return
 		}
+
+		popup.Hide()
 
 		if deployTypeSelect.Selected == "방화벽 룰 배포" {
 			d.executeFirewallDeploy(checkedFirewalls, selectedItem)
@@ -651,7 +753,38 @@ func (d *DeviceTab) onDeploy() {
 				}
 			}
 		}
-	}, d.window)
+	}
+
+	// 버튼 (간격 3배 = 60)
+	cancelBtn := component.NewCustomButton("취소", nil, themes.Colors["black"], themes.Colors["lightgray"], func() {
+		popup.Hide()
+	}, 5, 5, 5, 5)
+	deployBtn := component.NewCustomButton("배포", nil, nil, themes.Colors["blue"], onDeploy, 5, 5, 5, 5)
+
+	// 버튼 컨테이너 (중앙 정렬, 버튼 간격 3배 = 60)
+	btnContainer := container.NewHBox(
+		layout.NewSpacer(),
+		cancelBtn,
+		container.NewGridWrap(fyne.NewSize(60, 1), layout.NewSpacer()),
+		deployBtn,
+		layout.NewSpacer(),
+	)
+
+	// 전체 컨텐츠
+	content := container.NewVBox(
+		headerText,
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		formContent,
+		btnContainer,
+	)
+
+	// 고정 크기 컨테이너 (상하 여백 동일하게)
+	paddedContent := container.New(layout.NewCustomPaddedLayout(20, 20, 20, 20), content)
+	sizedContent := container.NewGridWrap(fyne.NewSize(500, 600), paddedContent)
+
+	// 팝업 생성
+	popup = widget.NewModalPopUp(sizedContent, d.window.Canvas())
+	popup.Show()
 }
 
 // 방화벽 룰 배포를 실행합니다.

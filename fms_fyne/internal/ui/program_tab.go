@@ -234,16 +234,18 @@ func (t *ProgramTab) onDeleteSelected() {
 // onAddOrEdit 추가/수정 버튼 클릭 처리
 func (t *ProgramTab) onAddOrEdit() {
 	checkedRows := t.programTable.GetCheckedRows()
+
+	// 여러 개 선택 시 안내 다이얼로그 표시
+	if len(checkedRows) > 1 {
+		dialog.ShowInformation("안내", "수정하려면 하나만 선택해주세요.", t.window)
+		return
+	}
+
 	if len(checkedRows) == 0 {
 		// 추가 모드
 		t.showEditDialog(nil)
-	} else if len(checkedRows) == 1 {
-		// 수정 모드
-		if checkedRows[0] < len(t.filteredPrograms) {
-			t.showEditDialog(t.filteredPrograms[checkedRows[0]])
-		}
 	} else {
-		// 다중 선택 시 첫 번째만 수정
+		// 수정 모드
 		if checkedRows[0] < len(t.filteredPrograms) {
 			t.showEditDialog(t.filteredPrograms[checkedRows[0]])
 		}
@@ -253,6 +255,13 @@ func (t *ProgramTab) onAddOrEdit() {
 // showEditDialog 프로그램 추가/수정 다이얼로그를 표시합니다.
 func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	isEdit := program != nil
+
+	// 입력 필드 너비 (장비 관리와 동일)
+	entryWidth := float32(250)
+	rowHeight := float32(36)
+	labelWidth := float32(100)
+	rowSpacing := float32(20)  // 라인 간격 2배
+	buttonSpacing := float32(60) // 버튼 간격 3배
 
 	// 입력 필드 생성
 	nameEntry := widget.NewEntry()
@@ -266,6 +275,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	uploadPathEntry.SetText("/download/")
 
 	filePathLabel := widget.NewLabel("파일을 선택해주세요")
+	filePathLabel.Truncation = fyne.TextTruncateEllipsis
 	filePath := ""
 
 	// 수정 모드일 경우 기존 값 설정
@@ -277,29 +287,52 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 		filePathLabel.SetText(filePath)
 	}
 
-	// 다이얼로그 참조 (Hide/Show 패턴용)
-	var parentDialog dialog.Dialog
+	// 커스텀 팝업 생성
+	var popup *widget.PopUp
 
 	// 찾아보기 버튼
 	browseBtn := widget.NewButton("찾아보기...", nil)
 
-	// 파일 선택 행
-	fileRow := container.NewBorder(nil, nil, nil, browseBtn, filePathLabel)
+	// 헤더 (큰 폰트 - RichText 사용)
+	title := "프로그램 추가"
+	if isEdit {
+		title = "프로그램 수정"
+	}
+	headerText := widget.NewRichTextFromMarkdown("## " + title)
 
-	// 폼 컨텐츠
+	// 폼 컨텐츠 (라인 간격 2배)
 	formContent := container.NewVBox(
-		widget.NewLabel("이름:"),
-		nameEntry,
-		widget.NewLabel("버전:"),
-		versionEntry,
-		widget.NewLabel("업로드 경로:"),
-		uploadPathEntry,
-		widget.NewLabel("로컬 파일:"),
-		fileRow,
+		// 이름
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("이름:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), nameEntry),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
+		// 버전
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("버전:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), versionEntry),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
+		// 업로드 경로
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("업로드 경로:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), uploadPathEntry),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
+		widget.NewSeparator(),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
+		// 로컬 파일
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("로컬 파일:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth-80, rowHeight), filePathLabel),
+			browseBtn,
+		),
+		container.NewGridWrap(fyne.NewSize(1, buttonSpacing), layout.NewSpacer()), // 버튼 간격 3배
 	)
 
-	// 저장 버튼
-	saveBtn := widget.NewButton("저장", func() {
+	// 저장 처리 함수
+	onSave := func() {
 		// 유효성 검사
 		if nameEntry.Text == "" {
 			dialog.ShowError(fmt.Errorf("프로그램 이름을 입력해주세요"), t.window)
@@ -332,47 +365,50 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 			return
 		}
 
-		parentDialog.Hide()
+		popup.Hide()
+		t.programTable.ClearChecked()
 		t.loadPrograms()
 		if isEdit {
 			dialog.ShowInformation("수정 완료", "프로그램이 수정되었습니다.", t.window)
 		} else {
 			dialog.ShowInformation("추가 완료", "프로그램이 추가되었습니다.", t.window)
 		}
-	})
-
-	// 취소 버튼
-	cancelBtn := widget.NewButton("취소", func() {
-		parentDialog.Hide()
-	})
-
-	// 버튼 영역
-	buttons := container.NewHBox(
-		cancelBtn,
-		saveBtn,
-	)
-
-	// 다이얼로그 컨텐츠
-	dialogContent := container.NewBorder(
-		nil,
-		container.NewCenter(buttons),
-		nil, nil,
-		formContent,
-	)
-
-	// 다이얼로그 제목
-	title := "프로그램 추가"
-	if isEdit {
-		title = "프로그램 수정"
 	}
 
-	// 다이얼로그 생성
-	parentDialog = dialog.NewCustomWithoutButtons(title, dialogContent, t.window)
-	parentDialog.Resize(fyne.NewSize(500, 350))
+	// 버튼 (간격 3배 = 60)
+	cancelBtn := component.NewCustomButton("취소", nil, themes.Colors["black"], themes.Colors["lightgray"], func() {
+		popup.Hide()
+	}, 5, 5, 5, 5)
+	saveBtn := component.NewCustomButton("저장", nil, nil, themes.Colors["blue"], onSave, 5, 5, 5, 5)
+
+	// 버튼 컨테이너 (중앙 정렬, 버튼 간격 3배 = 60)
+	btnContainer := container.NewHBox(
+		layout.NewSpacer(),
+		cancelBtn,
+		container.NewGridWrap(fyne.NewSize(60, 1), layout.NewSpacer()), // 버튼 간격 3배
+		saveBtn,
+		layout.NewSpacer(),
+	)
+
+	// 전체 컨텐츠
+	content := container.NewVBox(
+		headerText,
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 헤더 아래 간격
+		formContent,
+		btnContainer,
+		container.NewGridWrap(fyne.NewSize(1, 20), layout.NewSpacer()), // 하단 여백
+	)
+
+	// 고정 크기 컨테이너 (크기 1.5배: 450x600)
+	paddedContent := container.New(layout.NewCustomPaddedLayout(20, 20, 20, 20), content)
+	sizedContent := container.NewGridWrap(fyne.NewSize(450, 550), paddedContent)
+
+	// 팝업 생성
+	popup = widget.NewModalPopUp(sizedContent, t.window.Canvas())
 
 	// 찾아보기 버튼 동작 설정 (Hide/Show 패턴)
 	browseBtn.OnTapped = func() {
-		parentDialog.Hide() // 부모 다이얼로그 숨김
+		popup.Hide() // 부모 다이얼로그 숨김
 
 		fileDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if reader != nil {
@@ -380,13 +416,13 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 				filePathLabel.SetText(filePath)
 				reader.Close()
 			}
-			parentDialog.Show() // 부모 다이얼로그 다시 표시
+			popup.Show() // 부모 다이얼로그 다시 표시
 		}, t.window)
 		fileDialog.SetFilter(fynestorage.NewExtensionFileFilter([]string{".tar", ".tar.gz", ".tgz", ".zip"}))
 		fileDialog.Show()
 	}
 
-	parentDialog.Show()
+	popup.Show()
 }
 
 // GetAllPrograms 모든 프로그램 목록을 반환합니다.
