@@ -80,16 +80,8 @@ func (t *TemplateTab) createTemplateListPanel() fyne.CanvasObject {
 	// 목록 영역 (스크롤 가능)
 	listContainer := container.NewVScroll(t.templateList)
 
-	// 새 템플릿 추가 버튼
-	newBtn := component.NewCustomButton("+ 템플릿 추가", nil, themes.Colors["black"], themes.Colors["lightgray"], func() {
-		t.onNewTemplate()
-	}, 5, 0, 0, 5)
-
-	// 헤더: "룰 목록" + 오른쪽에 새 룰 추가 버튼
-	header := container.NewBorder(nil, nil,
-		widget.NewLabel("목록"),
-		newBtn,
-	)
+	// 헤더: "목록"
+	header := widget.NewLabel("목록")
 
 	// 패널 레이아웃
 	return container.NewBorder(
@@ -291,21 +283,6 @@ func (t *TemplateTab) onTemplateSelected(version string) {
 			return
 		}
 	}
-}
-
-// onNewTemplate 새 룰 생성
-func (t *TemplateTab) onNewTemplate() {
-	// 선택 해제
-	t.templateList.SetSelected("")
-	t.selectedVersion = ""
-
-	// 내용 초기화
-	t.templateContent.SetText("")
-	t.ruleBuilder.Clear()
-	t.natBuilder.Clear()
-
-	// 탭 위치 초기화
-	t.resetAllTabs()
 }
 
 // resetAllTabs 모든 탭 위치를 첫 번째 탭으로 초기화
