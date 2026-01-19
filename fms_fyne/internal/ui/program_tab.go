@@ -350,7 +350,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 		// 저장
 		var p *model.ProcessInfo
 		if isEdit {
-			p = program
+			p = program.Clone() // 기존 객체의 복사본 사용 (ID 유지)
 		} else {
 			p = model.NewProcessInfo(nameEntry.Text, versionEntry.Text)
 		}

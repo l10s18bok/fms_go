@@ -625,13 +625,13 @@ func (s *JSONStore) SaveProgram(program *model.ProcessInfo) error {
 	// 기존 프로그램인지 확인 (ID로 판단)
 	_, exists := s.programs[program.ID]
 
-	// 새 프로그램인 경우에만 ID 할당 (ID가 -1 또는 0인 경우)
-	if program.ID <= 0 {
+	// 새 프로그램인 경우에만 ID 할당 (ID가 -1인 경우)
+	if program.ID < 0 {
 		program.ID = s.nextProgramID
 		s.nextProgramID++
 	}
 
-	// 기존 프로그램이 아니고 ID > 0인 경우, nextProgramID 업데이트
+	// 기존 프로그램이 아니고 ID >= nextProgramID인 경우, nextProgramID 업데이트
 	if !exists && program.ID >= s.nextProgramID {
 		s.nextProgramID = program.ID + 1
 	}
