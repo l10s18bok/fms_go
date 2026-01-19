@@ -11,6 +11,9 @@ import (
 	"fms/internal/utils"
 )
 
+// DefaultRemotePath 프로그램 업로드 기본 경로
+const DefaultRemotePath = "/download/"
+
 // UpdateUseCase 프로그램 업데이트 유스케이스
 type UpdateUseCase struct {
 	sshClientFactory  func() ssh.SSHClient
@@ -98,7 +101,7 @@ func (u *UpdateUseCase) UpdateProgram(
 	// 원격 경로 결정
 	remotePath := program.ProcessUploadPath
 	if remotePath == "" {
-		remotePath = "/download/"
+		remotePath = DefaultRemotePath
 	}
 	// 파일명 추가
 	remoteFilePath := filepath.Join(remotePath, filepath.Base(program.ProcessFilePath))
