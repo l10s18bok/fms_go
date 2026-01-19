@@ -54,3 +54,6 @@ const DefaultSSHPort = 22
 
 // 기본 HTTP 포트
 const DefaultHTTPPort = 8080
+
+// 기본 원격 업로드 경로
+const DefaultRemotePath = "/download/"

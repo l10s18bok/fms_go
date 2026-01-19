@@ -3,16 +3,15 @@ package usecase
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"time"
 
+	"fms/internal/domain"
 	"fms/internal/infrastructure/ssh"
 	"fms/internal/model"
 	"fms/internal/utils"
 )
-
-// DefaultRemotePath 프로그램 업로드 기본 경로
-const DefaultRemotePath = "/download/"
 
 // UpdateUseCase 프로그램 업데이트 유스케이스
 type UpdateUseCase struct {
@@ -40,6 +39,12 @@ func (u *UpdateUseCase) UpdateProgram(
 	device *model.Firewall,
 	program *model.ProcessInfo,
 ) *UpdateResult {
+	deviceIP := device.DeviceIP
+	if deviceIP == "" {
+		deviceIP = device.DeviceName
+	}
+	log.Printf("[UpdateProgram] 시작 - 장비: %s, 프로그램: %s %s", deviceIP, program.ProcessName, program.ProcessVersion)
+
 	result := &UpdateResult{
 		Success: false,
 		History: model.NewProgramUpdateHistory(device.DeviceName, device.DeviceIP, program.ProcessName, program.ProcessVersion),
@@ -50,6 +55,7 @@ func (u *UpdateUseCase) UpdateProgram(
 		result.Message = "SSH 사용자 ID가 설정되지 않았습니다"
 		result.History.Status = model.DeployStatusFail
 		result.History.Message = result.Message
+		log.Printf("[UpdateProgram] 실패 - %s: %s", deviceIP, result.Message)
 		return result
 	}
 
@@ -58,25 +64,33 @@ func (u *UpdateUseCase) UpdateProgram(
 		result.Message = "프로그램 파일 경로가 설정되지 않았습니다"
 		result.History.Status = model.DeployStatusFail
 		result.History.Message = result.Message
+		log.Printf("[UpdateProgram] 실패 - %s: %s", deviceIP, result.Message)
 		return result
 	}
+	log.Printf("[UpdateProgram] 로컬 파일: %s", program.ProcessFilePath)
 
 	// SSH 클라이언트 생성
 	sshClient := u.sshClientFactory()
 	defer sshClient.Close()
 
-	// SSH 연결
+	// SSH 연결 (DeviceIP 사용, 없으면 DeviceName 사용)
+	sshHost := device.DeviceIP
+	if sshHost == "" {
+		sshHost = device.DeviceName
+	}
+
 	var err error
 	if device.DevicePPK != "" {
-		// 키 인증
-		err = sshClient.ConnectWithKey(device.DeviceName, 22, device.DeviceID, device.DevicePPK)
+		log.Printf("[UpdateProgram] SSH 키 인증 시도 - %s@%s:22", device.DeviceID, sshHost)
+		err = sshClient.ConnectWithKey(sshHost, 22, device.DeviceID, device.DevicePPK)
 	} else if device.DevicePW != "" {
-		// 비밀번호 인증
-		err = sshClient.Connect(device.DeviceName, 22, device.DeviceID, device.DevicePW)
+		log.Printf("[UpdateProgram] SSH 비밀번호 인증 시도 - %s@%s:22", device.DeviceID, sshHost)
+		err = sshClient.Connect(sshHost, 22, device.DeviceID, device.DevicePW)
 	} else {
 		result.Message = "SSH 인증 정보(비밀번호 또는 키)가 설정되지 않았습니다"
 		result.History.Status = model.DeployStatusFail
 		result.History.Message = result.Message
+		log.Printf("[UpdateProgram] 실패 - %s: %s", deviceIP, result.Message)
 		return result
 	}
 
@@ -84,24 +98,29 @@ func (u *UpdateUseCase) UpdateProgram(
 		result.Message = fmt.Sprintf("SSH 연결 실패: %v", err)
 		result.History.Status = model.DeployStatusFail
 		result.History.Message = result.Message
+		log.Printf("[UpdateProgram] 실패 - %s: %s", deviceIP, result.Message)
 		return result
 	}
+	log.Printf("[UpdateProgram] SSH 연결 성공 - %s", deviceIP)
 
 	// SFTP 클라이언트 생성 및 연결
 	sftpClient := u.sftpClientFactory()
 	defer sftpClient.Close()
 
+	log.Printf("[UpdateProgram] SFTP 연결 시도 - %s", deviceIP)
 	if err := sftpClient.Connect(sshClient); err != nil {
 		result.Message = fmt.Sprintf("SFTP 연결 실패: %v", err)
 		result.History.Status = model.DeployStatusFail
 		result.History.Message = result.Message
+		log.Printf("[UpdateProgram] 실패 - %s: %s", deviceIP, result.Message)
 		return result
 	}
+	log.Printf("[UpdateProgram] SFTP 연결 성공 - %s", deviceIP)
 
 	// 원격 경로 결정
 	remotePath := program.ProcessUploadPath
 	if remotePath == "" {
-		remotePath = DefaultRemotePath
+		remotePath = domain.DefaultRemotePath
 	}
 	// 파일명 추가
 	remoteFilePath := filepath.Join(remotePath, filepath.Base(program.ProcessFilePath))
@@ -109,12 +128,15 @@ func (u *UpdateUseCase) UpdateProgram(
 	remoteFilePath = filepath.ToSlash(remoteFilePath)
 
 	// 파일 업로드
+	log.Printf("[UpdateProgram] 파일 업로드 시도 - %s -> %s:%s", program.ProcessFilePath, deviceIP, remoteFilePath)
 	if err := sftpClient.Upload(program.ProcessFilePath, remoteFilePath); err != nil {
 		result.Message = fmt.Sprintf("파일 업로드 실패: %v", err)
 		result.History.Status = model.DeployStatusFail
 		result.History.Message = result.Message
+		log.Printf("[UpdateProgram] 실패 - %s: %s", deviceIP, result.Message)
 		return result
 	}
+	log.Printf("[UpdateProgram] 파일 업로드 성공 - %s:%s", deviceIP, remoteFilePath)
 
 	// 장비의 프로그램 버전 업데이트
 	if device.ProgramVersions == nil {
@@ -129,6 +151,7 @@ func (u *UpdateUseCase) UpdateProgram(
 	result.History.Message = result.Message
 	result.History.Timestamp = utils.Now()
 
+	log.Printf("[UpdateProgram] 완료 - %s: %s", deviceIP, result.Message)
 	return result
 }
 

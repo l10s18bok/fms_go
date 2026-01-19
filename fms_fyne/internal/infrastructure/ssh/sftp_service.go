@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/pkg/sftp"
@@ -68,8 +69,8 @@ func (c *DefaultSFTPClient) Upload(localPath, remotePath string) error {
 		return fmt.Errorf("로컬 파일 정보 가져오기 실패: %w", err)
 	}
 
-	// 원격 디렉토리 생성
-	remoteDir := filepath.Dir(remotePath)
+	// 원격 디렉토리 생성 (Linux 경로이므로 path.Dir 사용)
+	remoteDir := path.Dir(remotePath)
 	if err := c.MkdirAll(remoteDir); err != nil {
 		return fmt.Errorf("원격 디렉토리 생성 실패: %w", err)
 	}
@@ -100,8 +101,8 @@ func (c *DefaultSFTPClient) UploadFromReader(reader io.Reader, remotePath string
 		return fmt.Errorf("SFTP 연결이 없습니다")
 	}
 
-	// 원격 디렉토리 생성
-	remoteDir := filepath.Dir(remotePath)
+	// 원격 디렉토리 생성 (Linux 경로이므로 path.Dir 사용)
+	remoteDir := path.Dir(remotePath)
 	if err := c.MkdirAll(remoteDir); err != nil {
 		return fmt.Errorf("원격 디렉토리 생성 실패: %w", err)
 	}

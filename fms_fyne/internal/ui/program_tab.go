@@ -260,7 +260,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	entryWidth := float32(250)
 	rowHeight := float32(36)
 	labelWidth := float32(100)
-	rowSpacing := float32(20)  // 라인 간격 2배
+	rowSpacing := float32(20)    // 라인 간격 2배
 	buttonSpacing := float32(60) // 버튼 간격 3배
 
 	// 입력 필드 생성
@@ -271,8 +271,8 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	versionEntry.SetPlaceHolder("버전 (예: v1.0.0)")
 
 	uploadPathEntry := widget.NewEntry()
-	uploadPathEntry.SetPlaceHolder("/download/")
-	uploadPathEntry.SetText("/download/")
+	uploadPathEntry.SetPlaceHolder("download")
+	uploadPathEntry.SetText("")
 
 	filePathLabel := widget.NewLabel("파일을 선택해주세요")
 	filePathLabel.Truncation = fyne.TextTruncateEllipsis
