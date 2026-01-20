@@ -6,17 +6,17 @@ import (
 	"fms/internal/storage"
 )
 
-// JSONProgramRepository JSON 기반 프로그램 저장소 어댑터
+// JSONProgramRepository JSON 기반 패키지 저장소 어댑터
 type JSONProgramRepository struct {
 	store *storage.JSONStore
 }
 
-// NewJSONProgramRepository 새로운 JSON 프로그램 저장소를 생성합니다.
+// NewJSONProgramRepository 새로운 JSON 패키지 저장소를 생성합니다.
 func NewJSONProgramRepository(store *storage.JSONStore) ProgramRepository {
 	return &JSONProgramRepository{store: store}
 }
 
-// GetAll 모든 프로그램을 조회합니다.
+// GetAll 모든 패키지을 조회합니다.
 func (r *JSONProgramRepository) GetAll() ([]*domain.ProcessInfo, error) {
 	programs, err := r.store.GetAllPrograms()
 	if err != nil {
@@ -25,7 +25,7 @@ func (r *JSONProgramRepository) GetAll() ([]*domain.ProcessInfo, error) {
 	return r.toDomainList(programs), nil
 }
 
-// GetByID ID로 프로그램을 조회합니다.
+// GetByID ID로 패키지을 조회합니다.
 func (r *JSONProgramRepository) GetByID(id int) (*domain.ProcessInfo, error) {
 	p, err := r.store.GetProgram(id)
 	if err != nil {
@@ -34,7 +34,7 @@ func (r *JSONProgramRepository) GetByID(id int) (*domain.ProcessInfo, error) {
 	return r.toDomain(p), nil
 }
 
-// GetByName 이름으로 프로그램을 조회합니다.
+// GetByName 이름으로 패키지을 조회합니다.
 func (r *JSONProgramRepository) GetByName(name string) (*domain.ProcessInfo, error) {
 	p, err := r.store.GetProgramByName(name)
 	if err != nil {
@@ -43,7 +43,7 @@ func (r *JSONProgramRepository) GetByName(name string) (*domain.ProcessInfo, err
 	return r.toDomain(p), nil
 }
 
-// Save 프로그램을 저장합니다.
+// Save 패키지을 저장합니다.
 func (r *JSONProgramRepository) Save(p *domain.ProcessInfo) error {
 	modelP := r.toModel(p)
 	err := r.store.SaveProgram(modelP)
@@ -55,17 +55,17 @@ func (r *JSONProgramRepository) Save(p *domain.ProcessInfo) error {
 	return nil
 }
 
-// Delete 프로그램을 삭제합니다.
+// Delete 패키지을 삭제합니다.
 func (r *JSONProgramRepository) Delete(id int) error {
 	return r.store.DeleteProgram(id)
 }
 
-// Clear 모든 프로그램을 삭제합니다.
+// Clear 모든 패키지을 삭제합니다.
 func (r *JSONProgramRepository) Clear() error {
 	return r.store.ClearPrograms()
 }
 
-// Count 프로그램 수를 반환합니다.
+// Count 패키지 수를 반환합니다.
 func (r *JSONProgramRepository) Count() int {
 	return r.store.CountPrograms()
 }

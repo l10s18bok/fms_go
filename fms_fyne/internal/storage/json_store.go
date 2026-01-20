@@ -19,7 +19,7 @@ type JSONStore struct {
 	templates map[string]*model.Template
 	firewalls map[int]*model.Firewall
 	history   map[int]*model.DeployHistory
-	programs  map[int]*model.ProcessInfo // 신규: 프로그램 정보
+	programs  map[int]*model.ProcessInfo // 신규: 패키지 정보
 
 	// Auto increment 카운터
 	nextFirewallID int
@@ -155,7 +155,7 @@ func (s *JSONStore) loadHistory() error {
 	return nil
 }
 
-// 프로그램 데이터를 로드합니다.
+// 패키지 데이터를 로드합니다.
 func (s *JSONStore) loadPrograms() error {
 	path := filepath.Join(s.configDir, programsFile)
 
@@ -231,7 +231,7 @@ func (s *JSONStore) saveHistory() error {
 	return os.WriteFile(path, data, 0644)
 }
 
-// 프로그램 데이터를 저장합니다.
+// 패키지 데이터를 저장합니다.
 func (s *JSONStore) savePrograms() error {
 	programs := make([]*model.ProcessInfo, 0, len(s.programs))
 	for _, p := range s.programs {
@@ -580,7 +580,7 @@ func (s *JSONStore) SaveConfig(config *model.Config) error {
 
 // ===== ProcessInfo 메서드 =====
 
-// 모든 프로그램을 반환합니다.
+// 모든 패키지을 반환합니다.
 func (s *JSONStore) GetAllPrograms() ([]*model.ProcessInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -592,19 +592,19 @@ func (s *JSONStore) GetAllPrograms() ([]*model.ProcessInfo, error) {
 	return programs, nil
 }
 
-// 특정 ID의 프로그램을 반환합니다.
+// 특정 ID의 패키지을 반환합니다.
 func (s *JSONStore) GetProgram(id int) (*model.ProcessInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	p, ok := s.programs[id]
 	if !ok {
-		return nil, fmt.Errorf("프로그램을 찾을 수 없습니다: %d", id)
+		return nil, fmt.Errorf("패키지을 찾을 수 없습니다: %d", id)
 	}
 	return p.Clone(), nil
 }
 
-// 이름으로 프로그램을 검색합니다.
+// 이름으로 패키지을 검색합니다.
 func (s *JSONStore) GetProgramByName(name string) (*model.ProcessInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -614,24 +614,24 @@ func (s *JSONStore) GetProgramByName(name string) (*model.ProcessInfo, error) {
 			return p.Clone(), nil
 		}
 	}
-	return nil, fmt.Errorf("프로그램을 찾을 수 없습니다: %s", name)
+	return nil, fmt.Errorf("패키지을 찾을 수 없습니다: %s", name)
 }
 
-// 프로그램을 저장합니다.
+// 패키지을 저장합니다.
 func (s *JSONStore) SaveProgram(program *model.ProcessInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 기존 프로그램인지 확인 (ID로 판단)
+	// 기존 패키지인지 확인 (ID로 판단)
 	_, exists := s.programs[program.ID]
 
-	// 새 프로그램인 경우에만 ID 할당 (ID가 -1인 경우)
+	// 새 패키지인 경우에만 ID 할당 (ID가 -1인 경우)
 	if program.ID < 0 {
 		program.ID = s.nextProgramID
 		s.nextProgramID++
 	}
 
-	// 기존 프로그램이 아니고 ID >= nextProgramID인 경우, nextProgramID 업데이트
+	// 기존 패키지이 아니고 ID >= nextProgramID인 경우, nextProgramID 업데이트
 	if !exists && program.ID >= s.nextProgramID {
 		s.nextProgramID = program.ID + 1
 	}
@@ -640,20 +640,20 @@ func (s *JSONStore) SaveProgram(program *model.ProcessInfo) error {
 	return s.savePrograms()
 }
 
-// 프로그램을 삭제합니다.
+// 패키지을 삭제합니다.
 func (s *JSONStore) DeleteProgram(id int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, ok := s.programs[id]; !ok {
-		return fmt.Errorf("프로그램을 찾을 수 없습니다: %d", id)
+		return fmt.Errorf("패키지을 찾을 수 없습니다: %d", id)
 	}
 
 	delete(s.programs, id)
 	return s.savePrograms()
 }
 
-// 모든 프로그램을 삭제합니다.
+// 모든 패키지을 삭제합니다.
 func (s *JSONStore) ClearPrograms() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -663,7 +663,7 @@ func (s *JSONStore) ClearPrograms() error {
 	return s.savePrograms()
 }
 
-// 프로그램 수를 반환합니다.
+// 패키지 수를 반환합니다.
 func (s *JSONStore) CountPrograms() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

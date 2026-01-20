@@ -337,7 +337,7 @@ func (m *MainUI) showHelpDialog() {
 	component.ShowHelpPopup("도움말", component.AppHelpText, m.window.Canvas().Content())
 }
 
-// 현재 선택된 탭 유형을 반환합니다. (0: 룰, 1: 장비, 2: 이력, 3: 프로그램, -1: 없음)
+// 현재 선택된 탭 유형을 반환합니다. (0: 룰, 1: 장비, 2: 이력, 3: 패키지, -1: 없음)
 func (m *MainUI) getSelectedTabType() int {
 	selected := m.tabs.Selected()
 	if selected == nil {
@@ -367,7 +367,7 @@ func (m *MainUI) showImportDialog() {
 	}
 
 	// 탭별 데이터 타입명
-	tabNames := []string{"룰", "장비", "배포 이력", "프로그램"}
+	tabNames := []string{"룰", "장비", "배포 이력", "패키지"}
 	tabName := tabNames[tabType]
 
 	// 파일 선택 다이얼로그
@@ -491,7 +491,7 @@ func (m *MainUI) showImportDialog() {
 					}
 					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 배포 이력이 가져오기 되었습니다.", validCount), m.window)
 					m.historyTab.RefreshHistory()
-				case 3: // 프로그램 탭
+				case 3: // 패키지 탭
 					var programs []*model.ProcessInfo
 					if err := json.Unmarshal(data, &programs); err != nil {
 						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
@@ -504,11 +504,11 @@ func (m *MainUI) showImportDialog() {
 						return
 					}
 
-					// 프로그램 형식 검증: ProcessName이 유효한지 확인
+					// 패키지 형식 검증: ProcessName이 유효한지 확인
 					validCount := 0
 					for _, p := range programs {
 						if p.ProcessName == "" || p.ProcessName == "-" {
-							continue // 유효하지 않은 프로그램은 건너뜀
+							continue // 유효하지 않은 패키지은 건너뜀
 						}
 						if err := m.store.SaveProgram(p); err != nil {
 							dialog.ShowError(err, m.window)
@@ -517,10 +517,10 @@ func (m *MainUI) showImportDialog() {
 						validCount++
 					}
 					if validCount == 0 {
-						dialog.ShowError(fmt.Errorf("유효한 프로그램 데이터가 없습니다. 프로그램 형식의 JSON 파일을 선택해주세요."), m.window)
+						dialog.ShowError(fmt.Errorf("유효한 패키지 데이터가 없습니다. 패키지 형식의 JSON 파일을 선택해주세요."), m.window)
 						return
 					}
-					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 프로그램이 가져오기 되었습니다.", validCount), m.window)
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 패키지이 가져오기 되었습니다.", validCount), m.window)
 					m.programTab.RefreshPrograms()
 				}
 			}, m.window)
@@ -586,14 +586,14 @@ func (m *MainUI) showExportDialog() {
 			dialog.ShowInformation("알림", "내보낼 배포 이력이 없습니다.", m.window)
 			return
 		}
-	case 3: // 프로그램 탭
+	case 3: // 패키지 탭
 		programs, err := m.store.GetAllPrograms()
 		if err != nil {
 			dialog.ShowError(err, m.window)
 			return
 		}
 		if len(programs) == 0 {
-			dialog.ShowInformation("알림", "내보낼 프로그램이 없습니다.", m.window)
+			dialog.ShowInformation("알림", "내보낼 패키지이 없습니다.", m.window)
 			return
 		}
 	}
@@ -635,7 +635,7 @@ func (m *MainUI) showExportDialog() {
 				return
 			}
 			data, jsonErr = json.MarshalIndent(histories, "", "  ")
-		case 3: // 프로그램 탭
+		case 3: // 패키지 탭
 			programs, err := m.store.GetAllPrograms()
 			if err != nil {
 				dialog.ShowError(err, m.window)
@@ -690,7 +690,7 @@ func (m *MainUI) showExportDialog() {
 func (m *MainUI) showResetDialog() {
 	// 경고 다이얼로그 표시
 	dialog.ShowConfirm("⚠️ 경고",
-		"모든 데이터(템플릿, 장비, 배포이력, 프로그램)를 초기화하시겠습니까?",
+		"모든 데이터(템플릿, 장비, 배포이력, 패키지)를 초기화하시겠습니까?",
 		func(ok bool) {
 			if !ok {
 				return
@@ -714,7 +714,7 @@ func (m *MainUI) showResetDialog() {
 				return
 			}
 
-			// 모든 프로그램 삭제
+			// 모든 패키지 삭제
 			if err := m.store.ClearPrograms(); err != nil {
 				dialog.ShowError(err, m.window)
 				return

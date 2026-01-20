@@ -34,7 +34,7 @@ type ProgramTab struct {
 	filteredPrograms []*model.ProcessInfo
 }
 
-// NewProgramTab 새로운 프로그램 탭을 생성합니다.
+// NewProgramTab 새로운 패키지 탭을 생성합니다.
 func NewProgramTab(window fyne.Window, store *storage.JSONStore) *ProgramTab {
 	tab := &ProgramTab{
 		window:   window,
@@ -114,7 +114,7 @@ func (t *ProgramTab) createUI() {
 	)
 }
 
-// loadPrograms 프로그램 목록을 로드합니다.
+// loadPrograms 패키지 목록을 로드합니다.
 func (t *ProgramTab) loadPrograms() {
 	programs, err := t.store.GetAllPrograms()
 	if err != nil {
@@ -132,12 +132,12 @@ func (t *ProgramTab) loadPrograms() {
 	t.programTable.SetData(len(t.filteredPrograms))
 }
 
-// RefreshPrograms 프로그램 목록을 새로고침합니다.
+// RefreshPrograms 패키지 목록을 새로고침합니다.
 func (t *ProgramTab) RefreshPrograms() {
 	t.loadPrograms()
 }
 
-// filterPrograms 검색어로 프로그램을 필터링합니다.
+// filterPrograms 검색어로 패키지을 필터링합니다.
 func (t *ProgramTab) filterPrograms(query string) {
 	if query == "" {
 		t.filteredPrograms = t.programs
@@ -201,7 +201,7 @@ func (t *ProgramTab) onRowDoubleClick(row int) {
 	t.showEditDialog(t.filteredPrograms[row])
 }
 
-// onDeleteSelected 선택된 프로그램을 삭제합니다.
+// onDeleteSelected 선택된 패키지을 삭제합니다.
 func (t *ProgramTab) onDeleteSelected() {
 	checkedRows := t.programTable.GetCheckedRows()
 	if len(checkedRows) == 0 {
@@ -209,7 +209,7 @@ func (t *ProgramTab) onDeleteSelected() {
 	}
 
 	dialog.ShowConfirm("삭제 확인",
-		fmt.Sprintf("선택한 %d개 프로그램을 삭제하시겠습니까?", len(checkedRows)),
+		fmt.Sprintf("선택한 %d개 패키지을 삭제하시겠습니까?", len(checkedRows)),
 		func(ok bool) {
 			if !ok {
 				return
@@ -227,7 +227,7 @@ func (t *ProgramTab) onDeleteSelected() {
 			}
 
 			t.loadPrograms()
-			dialog.ShowInformation("삭제 완료", fmt.Sprintf("%d개 프로그램이 삭제되었습니다.", len(checkedRows)), t.window)
+			dialog.ShowInformation("삭제 완료", fmt.Sprintf("%d개 패키지이 삭제되었습니다.", len(checkedRows)), t.window)
 		}, t.window)
 }
 
@@ -252,7 +252,7 @@ func (t *ProgramTab) onAddOrEdit() {
 	}
 }
 
-// showEditDialog 프로그램 추가/수정 다이얼로그를 표시합니다.
+// showEditDialog 패키지 추가/수정 다이얼로그를 표시합니다.
 func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	isEdit := program != nil
 
@@ -265,7 +265,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 
 	// 입력 필드 생성
 	nameEntry := widget.NewEntry()
-	nameEntry.SetPlaceHolder("프로그램 이름")
+	nameEntry.SetPlaceHolder("패키지 이름")
 
 	versionEntry := widget.NewEntry()
 	versionEntry.SetPlaceHolder("버전 (예: v1.0.0)")
@@ -294,9 +294,9 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	browseBtn := widget.NewButton("찾아보기...", nil)
 
 	// 헤더 (큰 폰트 - RichText 사용)
-	title := "프로그램 추가"
+	title := "패키지 추가"
 	if isEdit {
-		title = "프로그램 수정"
+		title = "패키지 수정"
 	}
 	headerText := widget.NewRichTextFromMarkdown("## " + title)
 
@@ -335,7 +335,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	onSave := func() {
 		// 유효성 검사
 		if nameEntry.Text == "" {
-			dialog.ShowError(fmt.Errorf("프로그램 이름을 입력해주세요"), t.window)
+			dialog.ShowError(fmt.Errorf("패키지 이름을 입력해주세요"), t.window)
 			return
 		}
 		if versionEntry.Text == "" {
@@ -369,9 +369,9 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 		t.programTable.ClearChecked()
 		t.loadPrograms()
 		if isEdit {
-			dialog.ShowInformation("수정 완료", "프로그램이 수정되었습니다.", t.window)
+			dialog.ShowInformation("수정 완료", "패키지이 수정되었습니다.", t.window)
 		} else {
-			dialog.ShowInformation("추가 완료", "프로그램이 추가되었습니다.", t.window)
+			dialog.ShowInformation("추가 완료", "패키지이 추가되었습니다.", t.window)
 		}
 	}
 
@@ -425,7 +425,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	popup.Show()
 }
 
-// GetAllPrograms 모든 프로그램 목록을 반환합니다.
+// GetAllPrograms 모든 패키지 목록을 반환합니다.
 func (t *ProgramTab) GetAllPrograms() []*model.ProcessInfo {
 	return t.programs
 }

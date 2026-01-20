@@ -569,7 +569,7 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		deployInfo = "-"
 	}
 
-	// 프로그램 버전 정보
+	// 패키지 버전 정보
 	programInfo := "-"
 	if len(fw.ProgramVersions) > 0 {
 		programInfo = ""
@@ -629,9 +629,9 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(deployInfo)),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
-		// 프로그램 버전
+		// 패키지 버전
 		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabelWithStyle("프로그램:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})),
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabelWithStyle("패키지:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})),
 			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(programInfo)),
 		),
 		container.NewGridWrap(fyne.NewSize(1, 30), layout.NewSpacer()),
@@ -716,7 +716,7 @@ func (d *DeviceTab) onDeploy() {
 	ipListScroll.SetMinSize(fyne.NewSize(entryWidth, 54)) // 약 3줄 높이 (18px * 3)
 
 	// 배포선택 드롭다운
-	deployTypeSelect := widget.NewSelect([]string{"방화벽 룰 배포", "프로그램 배포"}, nil)
+	deployTypeSelect := widget.NewSelect([]string{"방화벽 룰 배포", "패키지 배포"}, nil)
 	deployTypeSelect.SetSelected("방화벽 룰 배포")
 
 	// 배포 리스트 (라디오 버튼 그룹)
@@ -724,7 +724,7 @@ func (d *DeviceTab) onDeploy() {
 
 	// 방화벽 룰 목록
 	templates := d.templateTab.GetTemplateVersions()
-	// 프로그램 목록
+	// 패키지 목록
 	programs, _ := d.store.GetAllPrograms()
 	programItems := make([]string, len(programs))
 	for i, p := range programs {
@@ -791,7 +791,7 @@ func (d *DeviceTab) onDeploy() {
 		if deployTypeSelect.Selected == "방화벽 룰 배포" {
 			d.executeFirewallDeploy(checkedFirewalls, selectedItem)
 		} else {
-			// 프로그램 배포
+			// 패키지 배포
 			for _, p := range programs {
 				displayName := fmt.Sprintf("%s %s", p.ProcessName, p.ProcessVersion)
 				if displayName == selectedItem {
@@ -910,7 +910,7 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, templateV
 	}()
 }
 
-// 프로그램 업데이트를 실행합니다.
+// 패키지 업데이트를 실행합니다.
 func (d *DeviceTab) executeProgramUpdate(devices []*model.Firewall, program *model.ProcessInfo) {
 	// SSH 인증 정보 확인
 	for _, fw := range devices {
@@ -936,7 +936,7 @@ func (d *DeviceTab) executeProgramUpdate(devices []*model.Firewall, program *mod
 	progressLabel := widget.NewLabel("업데이트 준비 중...")
 	progressBar := widget.NewProgressBar()
 	progressContent := container.NewVBox(progressLabel, progressBar)
-	progressDialog := dialog.NewCustomWithoutButtons("프로그램 업데이트 중", progressContent, d.window)
+	progressDialog := dialog.NewCustomWithoutButtons("패키지 업데이트 중", progressContent, d.window)
 	progressDialog.Show()
 
 	go func() {
@@ -979,7 +979,7 @@ func (d *DeviceTab) executeProgramUpdate(devices []*model.Firewall, program *mod
 				d.historyTab.loadHistory()
 			}
 
-			resultMsg := fmt.Sprintf("프로그램 업데이트 완료\n\n프로그램: %s %s\n성공: %d개\n실패: %d개",
+			resultMsg := fmt.Sprintf("패키지 업데이트 완료\n\n패키지: %s %s\n성공: %d개\n실패: %d개",
 				program.ProcessName, program.ProcessVersion, successCount, failCount)
 			dialog.ShowInformation("업데이트 결과", resultMsg, d.window)
 		})
@@ -1099,7 +1099,7 @@ func (d *DeviceTab) SetHistoryTab(historyTab *HistoryTab) {
 	d.historyTab = historyTab
 }
 
-// 프로그램 탭 참조를 설정합니다.
+// 패키지 탭 참조를 설정합니다.
 func (d *DeviceTab) SetProgramTab(programTab *ProgramTab) {
 	d.programTab = programTab
 }

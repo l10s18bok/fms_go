@@ -21,21 +21,21 @@ type FirewallRepository interface {
 	Count() int
 }
 
-// ProgramRepository 프로그램 저장소 인터페이스 (신규)
+// ProgramRepository 패키지 저장소 인터페이스 (신규)
 type ProgramRepository interface {
-	// GetAll 모든 프로그램을 조회합니다.
+	// GetAll 모든 패키지을 조회합니다.
 	GetAll() ([]*domain.ProcessInfo, error)
-	// GetByID ID로 프로그램을 조회합니다.
+	// GetByID ID로 패키지을 조회합니다.
 	GetByID(id int) (*domain.ProcessInfo, error)
-	// GetByName 이름으로 프로그램을 조회합니다.
+	// GetByName 이름으로 패키지을 조회합니다.
 	GetByName(name string) (*domain.ProcessInfo, error)
-	// Save 프로그램을 저장합니다. (신규 생성 또는 업데이트)
+	// Save 패키지을 저장합니다. (신규 생성 또는 업데이트)
 	Save(p *domain.ProcessInfo) error
-	// Delete 프로그램을 삭제합니다.
+	// Delete 패키지을 삭제합니다.
 	Delete(id int) error
-	// Clear 모든 프로그램을 삭제합니다.
+	// Clear 모든 패키지을 삭제합니다.
 	Clear() error
-	// Count 프로그램 수를 반환합니다.
+	// Count 패키지 수를 반환합니다.
 	Count() int
 }
 

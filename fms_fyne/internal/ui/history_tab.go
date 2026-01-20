@@ -75,8 +75,8 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 		OnRowDoubleClick: func(row int) {},
 	})
 
-	// 유형 필터 드롭다운 (전체, 프로그램, 방화벽 룰)
-	h.typeFilter = widget.NewSelect([]string{"전체", "프로그램", "방화벽 룰"}, func(selected string) {
+	// 유형 필터 드롭다운 (전체, 패키지, 방화벽 룰)
+	h.typeFilter = widget.NewSelect([]string{"전체", "패키지", "방화벽 룰"}, func(selected string) {
 		h.applyFilter()
 	})
 	h.typeFilter.SetSelected("전체") // 기본값: 전체
@@ -175,7 +175,7 @@ func (h *HistoryTab) applyFilter() {
 				typeFiltered = append(typeFiltered, history)
 			}
 		}
-	} else { // 프로그램
+	} else { // 패키지
 		for _, history := range h.histories {
 			if history.Type == model.HistoryTypeProgram {
 				typeFiltered = append(typeFiltered, history)

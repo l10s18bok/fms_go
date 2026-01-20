@@ -10,13 +10,13 @@ type Firewall struct {
 	Version      string        `json:"version"`                // 배포된 템플릿 버전
 	DeployResult *DeployResult `json:"deployResult,omitempty"` // 마지막 배포 결과
 
-	// SSH 인증 정보 (프로그램 업데이트용)
+	// SSH 인증 정보 (패키지 업데이트용)
 	DeviceID  string `json:"device_id,omitempty"`  // SSH 사용자 ID (PRD: device_id)
 	DevicePW  string `json:"device_pw,omitempty"`  // SSH 비밀번호 (PRD: device_pw)
 	DevicePPK string `json:"device_ppk,omitempty"` // PPK 키 파일 경로 (PRD: device_ppk)
 
-	// 프로그램 버전 정보
-	ProgramVersions map[string]string `json:"program_versions,omitempty"` // 프로그램명 -> 버전
+	// 패키지 버전 정보
+	ProgramVersions map[string]string `json:"program_versions,omitempty"` // 패키지명 -> 버전
 
 	// 상태 정보 (PRD: lastCheckedAt)
 	LastCheckedAt string `json:"lastCheckedAt,omitempty"` // 마지막 상태 확인 시간
@@ -31,11 +31,11 @@ type DeployResult struct {
 
 // 규칙별 배포 결과 상세 정보를 나타냅니다.
 type ResultInfo struct {
-	Index   int    `json:"index"`  // 규칙 순서
-	Rule    string `json:"rule"`   // 실제 적용된 규칙
-	Text    string `json:"text"`   // 서버에서 처리된 규칙 텍스트
-	Status  string `json:"status"` // 결과 (ok/fail)
-	Reason  string `json:"reason"` // 사유
+	Index  int    `json:"index"`  // 규칙 순서
+	Rule   string `json:"rule"`   // 실제 적용된 규칙
+	Text   string `json:"text"`   // 서버에서 처리된 규칙 텍스트
+	Status string `json:"status"` // 결과 (ok/fail)
+	Reason string `json:"reason"` // 사유
 }
 
 // 서버 상태 상수

@@ -57,13 +57,13 @@ func Now() JSONTime {
 
 // DeployHistory 배포 이력 엔티티 (확장)
 type DeployHistory struct {
-	ID         int      `json:"id"`              // 고유 ID (Auto Increment)
-	Timestamp  JSONTime `json:"timestamp"`       // 배포 시간
-	DeviceName string   `json:"deviceName"`      // 장비명
-	DeviceIP   string   `json:"deviceIp"`        // 장비 IP
-	Type       string   `json:"type"`            // 이력 유형: "firewall" 또는 "program"
-	Version    string   `json:"version"`         // 배포 버전 (룰/프로그램 공통)
-	Status     string   `json:"status"`          // 배포 상태 (success/fail/error)
+	ID         int      `json:"id"`         // 고유 ID (Auto Increment)
+	Timestamp  JSONTime `json:"timestamp"`  // 배포 시간
+	DeviceName string   `json:"deviceName"` // 장비명
+	DeviceIP   string   `json:"deviceIp"`   // 장비 IP
+	Type       string   `json:"type"`       // 이력 유형: "firewall" 또는 "program"
+	Version    string   `json:"version"`    // 배포 버전 (룰/패키지 공통)
+	Status     string   `json:"status"`     // 배포 상태 (success/fail/error)
 
 	// 방화벽 룰 배포 전용 (Type="firewall")
 	Results []RuleResult `json:"results,omitempty"` // 규칙별 결과
@@ -71,8 +71,8 @@ type DeployHistory struct {
 	// 하위 호환성 (기존 필드)
 	TemplateVer string `json:"templateVersion,omitempty"` // 기존 템플릿 버전 (읽기 전용)
 
-	// 프로그램 업데이트 전용 (Type="program")
-	ProgramName string `json:"programName,omitempty"` // 프로그램 이름
+	// 패키지 업데이트 전용 (Type="program")
+	ProgramName string `json:"programName,omitempty"` // 패키지 이름
 	Message     string `json:"message,omitempty"`     // 상세 메시지
 }
 
@@ -98,7 +98,7 @@ func NewDeployHistory(deviceName, deviceIP, version string) *DeployHistory {
 	}
 }
 
-// NewProgramHistory 새로운 프로그램 업데이트 이력을 생성합니다.
+// NewProgramHistory 새로운 패키지 업데이트 이력을 생성합니다.
 func NewProgramHistory(deviceName, deviceIP, programName, version string) *DeployHistory {
 	return &DeployHistory{
 		ID:          -1,
@@ -117,7 +117,7 @@ func (h *DeployHistory) IsFirewallHistory() bool {
 	return h.Type == HistoryTypeFirewall || h.Type == ""
 }
 
-// IsProgramHistory 프로그램 업데이트 이력인지 확인합니다.
+// IsProgramHistory 패키지 업데이트 이력인지 확인합니다.
 func (h *DeployHistory) IsProgramHistory() bool {
 	return h.Type == HistoryTypeProgram
 }
@@ -204,7 +204,7 @@ func GetHistoryTypeText(historyType string) string {
 	case HistoryTypeFirewall, "":
 		return "방화벽 룰"
 	case HistoryTypeProgram:
-		return "프로그램"
+		return "패키지"
 	default:
 		return historyType
 	}

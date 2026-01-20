@@ -2,20 +2,20 @@ package domain
 
 import "time"
 
-// ProcessInfo 업데이트 프로그램 정보 엔티티
+// ProcessInfo 업데이트 패키지 정보 엔티티
 type ProcessInfo struct {
 	ID                int    `json:"id"`                  // 고유 ID (Auto Increment)
-	ProcessName       string `json:"process_name"`        // 프로그램 이름
+	ProcessName       string `json:"process_name"`        // 패키지 이름
 	ProcessFilePath   string `json:"process_file_path"`   // 로컬 파일 경로
 	ProcessUploadPath string `json:"process_upload_path"` // 서버 업로드 경로
-	ProcessVersion    string `json:"process_version"`     // 프로그램 버전
+	ProcessVersion    string `json:"process_version"`     // 패키지 버전
 	ProcessCreatedAt  string `json:"process_created_at"`  // 추가/수정 시간
 }
 
-// NewProcessInfo 새로운 프로그램 정보를 생성합니다.
+// NewProcessInfo 새로운 패키지 정보를 생성합니다.
 func NewProcessInfo(name, version string) *ProcessInfo {
 	return &ProcessInfo{
-		ID:                -1, // 새 프로그램은 -1로 시작, 저장 시 ID 할당
+		ID:                -1, // 새 패키지은 -1로 시작, 저장 시 ID 할당
 		ProcessName:       name,
 		ProcessVersion:    version,
 		ProcessUploadPath: DefaultRemotePath, // 기본 업로드 경로
@@ -23,7 +23,7 @@ func NewProcessInfo(name, version string) *ProcessInfo {
 	}
 }
 
-// IsValid 프로그램 정보가 유효한지 검사합니다.
+// IsValid 패키지 정보가 유효한지 검사합니다.
 func (p *ProcessInfo) IsValid() bool {
 	return p.ProcessName != "" && p.ProcessVersion != "" && p.ProcessFilePath != ""
 }
@@ -38,7 +38,7 @@ func (p *ProcessInfo) GetDisplayName() string {
 	return p.ProcessName + " " + p.ProcessVersion
 }
 
-// Clone 프로그램 정보의 복사본을 반환합니다.
+// Clone 패키지 정보의 복사본을 반환합니다.
 func (p *ProcessInfo) Clone() *ProcessInfo {
 	return &ProcessInfo{
 		ID:                p.ID,

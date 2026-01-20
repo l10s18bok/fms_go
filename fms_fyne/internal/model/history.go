@@ -9,22 +9,22 @@ import (
 // 이력 유형 상수
 const (
 	HistoryTypeFirewall = "firewall" // 방화벽 룰 배포
-	HistoryTypeProgram  = "program"  // 프로그램 업데이트
+	HistoryTypeProgram  = "program"  // 패키지 업데이트
 )
 
 // 배포 이력을 나타냅니다. (PRD 3.3.4 기준)
 type DeployHistory struct {
-	ID          int            `json:"id"`                        // 고유 ID (Auto Increment)
-	Type        string         `json:"type,omitempty"`            // 이력 유형 (firewall/program)
-	Timestamp   utils.JSONTime `json:"timestamp"`                 // 배포 시간
-	DeviceName  string         `json:"deviceName,omitempty"`      // 장비명 (PRD 3.3.4)
-	DeviceIP    string         `json:"deviceIp"`                  // 장비 IP
-	TemplateVer string         `json:"templateVersion"`           // 배포한 템플릿 버전 (방화벽 룰)
-	ProgramName string         `json:"programName,omitempty"`     // 프로그램 이름 (프로그램 업데이트)
-	ProgramVer  string         `json:"programVersion,omitempty"`  // 프로그램 버전 (프로그램 업데이트)
-	Message     string         `json:"message,omitempty"`         // 결과 메시지
-	Status      string         `json:"status"`                    // 배포 상태 (success/fail/error)
-	Results     []RuleResult   `json:"results"`                   // 규칙별 결과 (방화벽 룰)
+	ID          int            `json:"id"`                       // 고유 ID (Auto Increment)
+	Type        string         `json:"type,omitempty"`           // 이력 유형 (firewall/program)
+	Timestamp   utils.JSONTime `json:"timestamp"`                // 배포 시간
+	DeviceName  string         `json:"deviceName,omitempty"`     // 장비명 (PRD 3.3.4)
+	DeviceIP    string         `json:"deviceIp"`                 // 장비 IP
+	TemplateVer string         `json:"templateVersion"`          // 배포한 템플릿 버전 (방화벽 룰)
+	ProgramName string         `json:"programName,omitempty"`    // 패키지 이름 (패키지 업데이트)
+	ProgramVer  string         `json:"programVersion,omitempty"` // 패키지 버전 (패키지 업데이트)
+	Message     string         `json:"message,omitempty"`        // 결과 메시지
+	Status      string         `json:"status"`                   // 배포 상태 (success/fail/error)
+	Results     []RuleResult   `json:"results"`                  // 규칙별 결과 (방화벽 룰)
 }
 
 // 개별 규칙의 배포 결과를 나타냅니다.
@@ -57,7 +57,7 @@ func NewDeployHistory(deviceName, deviceIP, templateVer string) *DeployHistory {
 	}
 }
 
-// 새로운 프로그램 업데이트 이력을 생성합니다.
+// 새로운 패키지 업데이트 이력을 생성합니다.
 func NewProgramUpdateHistory(deviceName, deviceIP, programName, programVer string) *DeployHistory {
 	return &DeployHistory{
 		Type:        HistoryTypeProgram,
@@ -77,7 +77,7 @@ func GetHistoryTypeText(historyType string) string {
 	case HistoryTypeFirewall:
 		return "방화벽 룰"
 	case HistoryTypeProgram:
-		return "프로그램"
+		return "패키지"
 	default:
 		return "방화벽 룰" // 기존 데이터 호환성
 	}

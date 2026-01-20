@@ -13,7 +13,7 @@ import (
 	"fms/internal/utils"
 )
 
-// UpdateUseCase 프로그램 업데이트 유스케이스
+// UpdateUseCase 패키지 업데이트 유스케이스
 type UpdateUseCase struct {
 	sshClientFactory  func() ssh.SSHClient
 	sftpClientFactory func() ssh.SFTPClient
@@ -34,7 +34,7 @@ type UpdateResult struct {
 	History *model.DeployHistory
 }
 
-// UpdateProgram 단일 장비에 프로그램을 업데이트합니다.
+// UpdateProgram 단일 장비에 패키지을 업데이트합니다.
 func (u *UpdateUseCase) UpdateProgram(
 	device *model.Firewall,
 	program *model.ProcessInfo,
@@ -43,7 +43,7 @@ func (u *UpdateUseCase) UpdateProgram(
 	if deviceIP == "" {
 		deviceIP = device.DeviceName
 	}
-	log.Printf("[UpdateProgram] 시작 - 장비: %s, 프로그램: %s %s", deviceIP, program.ProcessName, program.ProcessVersion)
+	log.Printf("[UpdateProgram] 시작 - 장비: %s, 패키지: %s %s", deviceIP, program.ProcessName, program.ProcessVersion)
 
 	result := &UpdateResult{
 		Success: false,
@@ -61,7 +61,7 @@ func (u *UpdateUseCase) UpdateProgram(
 
 	// 로컬 파일 확인
 	if program.ProcessFilePath == "" {
-		result.Message = "프로그램 파일 경로가 설정되지 않았습니다"
+		result.Message = "패키지 파일 경로가 설정되지 않았습니다"
 		result.History.Status = model.DeployStatusFail
 		result.History.Message = result.Message
 		log.Printf("[UpdateProgram] 실패 - %s: %s", deviceIP, result.Message)
@@ -138,7 +138,7 @@ func (u *UpdateUseCase) UpdateProgram(
 	}
 	log.Printf("[UpdateProgram] 파일 업로드 성공 - %s:%s", deviceIP, remoteFilePath)
 
-	// 장비의 프로그램 버전 업데이트
+	// 장비의 패키지 버전 업데이트
 	if device.ProgramVersions == nil {
 		device.ProgramVersions = make(map[string]string)
 	}
@@ -146,7 +146,7 @@ func (u *UpdateUseCase) UpdateProgram(
 
 	// 성공
 	result.Success = true
-	result.Message = fmt.Sprintf("프로그램 업데이트 완료: %s → %s", remoteFilePath, program.ProcessVersion)
+	result.Message = fmt.Sprintf("패키지 업데이트 완료: %s → %s", remoteFilePath, program.ProcessVersion)
 	result.History.Status = model.DeployStatusSuccess
 	result.History.Message = result.Message
 	result.History.Timestamp = utils.Now()
@@ -155,7 +155,7 @@ func (u *UpdateUseCase) UpdateProgram(
 	return result
 }
 
-// UpdateProgramBatch 여러 장비에 프로그램을 업데이트합니다.
+// UpdateProgramBatch 여러 장비에 패키지을 업데이트합니다.
 func (u *UpdateUseCase) UpdateProgramBatch(
 	devices []*model.Firewall,
 	program *model.ProcessInfo,

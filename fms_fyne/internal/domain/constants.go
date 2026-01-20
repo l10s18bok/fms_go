@@ -28,7 +28,7 @@ const (
 // 이력 유형 상수
 const (
 	HistoryTypeFirewall = "firewall" // 방화벽 룰 배포
-	HistoryTypeProgram  = "program"  // 프로그램 업데이트
+	HistoryTypeProgram  = "program"  // 패키지 업데이트
 )
 
 // 연결 모드 상수

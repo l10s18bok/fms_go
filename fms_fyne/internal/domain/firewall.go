@@ -1,8 +1,8 @@
 package domain
 
-// DeviceProcessInfo 장비에 설치된 프로그램 정보 (device-report 응답용)
+// DeviceProcessInfo 장비에 설치된 패키지 정보 (device-report 응답용)
 type DeviceProcessInfo struct {
-	Name    string `json:"name"`    // 프로그램 이름
+	Name    string `json:"name"`    // 패키지 이름
 	Version string `json:"version"` // 설치된 버전
 }
 
@@ -22,8 +22,8 @@ type Firewall struct {
 	DevicePW  string `json:"device_pw"`  // SSH 비밀번호
 	DevicePPK string `json:"device_ppk"` // PPK 파일 경로
 
-	// 신규 필드 (프로그램 버전)
-	Processes []DeviceProcessInfo `json:"processes"` // 설치된 프로그램 목록
+	// 신규 필드 (패키지 버전)
+	Processes []DeviceProcessInfo `json:"processes"` // 설치된 패키지 목록
 
 	// 신규 필드 (상태 정보)
 	LastCheckedAt string `json:"lastCheckedAt"` // 마지막 상태 확인 시간
@@ -85,7 +85,7 @@ func (f *Firewall) HasSSHCredentials() bool {
 	return f.DeviceID != "" && (f.DevicePW != "" || f.DevicePPK != "")
 }
 
-// GetProcessVersion 특정 프로그램의 버전을 반환합니다.
+// GetProcessVersion 특정 패키지의 버전을 반환합니다.
 func (f *Firewall) GetProcessVersion(processName string) string {
 	for _, p := range f.Processes {
 		if p.Name == processName {
