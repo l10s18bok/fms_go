@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"fms/internal/model"
 	"fms/internal/parser"
@@ -247,7 +248,7 @@ func (t *FirewallEditTab) onSave() {
 
 	// 저장 처리 함수
 	onSaveConfirm := func() {
-		newFileName := model.EnsureTxtExtension(fileNameEntry.Text)
+		newFileName := strings.TrimSpace(fileNameEntry.Text)
 
 		// 파일명 변경 확인
 		if newFileName != t.file.FileName {

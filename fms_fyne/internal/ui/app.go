@@ -43,6 +43,9 @@ type MainUI struct {
 
 	// 동적 편집 탭 관리
 	editTabs map[string]*container.TabItem // 파일명 -> 탭 아이템 매핑
+
+	// 상태바 라벨
+	statusLabel *widget.Label // 현재 탭 정보 표시
 }
 
 // 새로운 메인 UI 인스턴스를 생성합니다.
@@ -90,6 +93,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.
 		if tab == ui.deviceTabItem {
 			ui.deviceTab.RefreshFiles()
 		}
+		ui.updateStatusBar(tab)
 	}
 
 	// 왼쪽 메뉴 생성
@@ -97,6 +101,9 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.
 
 	// 네이티브 메뉴바 설정
 	ui.setupMainMenu()
+
+	// 파일 드롭 핸들러 설정
+	ui.setupFileDrop()
 
 	// 초기 탭 열기: 방화벽 관리
 	ui.openTab(ui.firewallTabItem)
@@ -169,9 +176,10 @@ func (m *MainUI) Content() fyne.CanvasObject {
 		leftPanelWithSize,
 	)
 
-	// 하단 버전 표시 (상단 구분선 포함)
+	// 하단 상태바 (왼쪽: 탭 정보, 오른쪽: 버전)
+	m.statusLabel = widget.NewLabel("")
 	versionLabel := widget.NewLabel(version.GetVersionString())
-	bottomBar := container.NewBorder(widget.NewSeparator(), nil, versionLabel, nil, nil)
+	bottomBar := container.NewBorder(widget.NewSeparator(), nil, m.statusLabel, versionLabel, nil)
 
 	// 왼쪽 메뉴 너비 고정 (Border 레이아웃 사용)
 	return container.NewBorder(
@@ -710,6 +718,8 @@ func (m *MainUI) OpenFirewallEditTab(file *model.FirewallFile) {
 	// 이미 열려있는지 확인
 	if existingTab, ok := m.editTabs[file.FileName]; ok {
 		m.tabs.Select(existingTab)
+		// 상태바 업데이트
+		m.updateStatusBar(existingTab)
 		return
 	}
 
@@ -726,6 +736,9 @@ func (m *MainUI) OpenFirewallEditTab(file *model.FirewallFile) {
 
 	// editTabs 맵에 등록
 	m.editTabs[file.FileName] = tabItem
+
+	// 상태바 업데이트
+	m.updateStatusBar(tabItem)
 }
 
 // CloseFirewallEditTab 방화벽 파일 편집 탭을 닫습니다.
@@ -751,6 +764,11 @@ func (m *MainUI) UpdateFirewallEditTabName(oldFileName string, file *model.Firew
 		}
 		tabItem.Text = name
 		m.tabs.Refresh()
+
+		// 현재 선택된 탭이면 상태바도 업데이트
+		if m.tabs.Selected() == tabItem {
+			m.updateStatusBar(tabItem)
+		}
 	}
 }
 
@@ -762,4 +780,74 @@ func (m *MainUI) saveThemeSetting(themeName string) {
 	}
 	config.Theme = themeName
 	m.store.SaveConfig(config)
+}
+
+// setupFileDrop 파일 드래그 앤 드롭 핸들러를 설정합니다.
+func (m *MainUI) setupFileDrop() {
+	m.window.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {
+		if len(uris) == 0 {
+			return
+		}
+
+		// 추가할 파일 목록 생성 (중복 제외)
+		var filesToAdd []fyne.URI
+		var duplicateFiles []string
+
+		for _, uri := range uris {
+			fileName := filepath.Base(uri.Path())
+			if m.fileStore.FileExists(fileName) {
+				duplicateFiles = append(duplicateFiles, fileName)
+			} else {
+				filesToAdd = append(filesToAdd, uri)
+			}
+		}
+
+		// 추가할 파일이 없으면 알림
+		if len(filesToAdd) == 0 {
+			dialog.ShowInformation("알림", "모든 파일이 이미 존재합니다.", m.window)
+			return
+		}
+
+		// 확인 메시지 생성
+		msg := fmt.Sprintf("%d개 파일을 추가하시겠습니까?", len(filesToAdd))
+		if len(duplicateFiles) > 0 {
+			msg += fmt.Sprintf("\n(%d개 파일은 중복으로 제외됩니다)", len(duplicateFiles))
+		}
+
+		// 확인 다이얼로그 표시
+		dialog.ShowConfirm("파일 추가", msg, func(confirmed bool) {
+			if !confirmed {
+				return
+			}
+
+			// 파일 복사
+			for _, uri := range filesToAdd {
+				fileName := filepath.Base(uri.Path())
+				m.fileStore.CopyFileToData(uri.Path(), fileName)
+			}
+
+			// 테이블 새로고침
+			m.firewallTab.RefreshFiles()
+		}, m.window)
+	})
+}
+
+// updateStatusBar 현재 선택된 탭에 따라 상태바를 업데이트합니다.
+func (m *MainUI) updateStatusBar(tab *container.TabItem) {
+	if tab == nil || m.statusLabel == nil {
+		return
+	}
+
+	// 편집 탭인 경우 파일 경로 표시
+	for fileName, tabItem := range m.editTabs {
+		if tabItem == tab {
+			// 파일 경로 조합
+			filePath := filepath.Join(m.fileStore.GetDataDir(), fileName)
+			m.statusLabel.SetText(filePath)
+			return
+		}
+	}
+
+	// 기본 탭인 경우 빈 문자열
+	m.statusLabel.SetText("")
 }
