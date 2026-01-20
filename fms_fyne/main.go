@@ -35,6 +35,12 @@ func main() {
 		log.Fatalf("저장소 초기화 실패: %v", err)
 	}
 
+	// 파일 저장소 초기화 (data 디렉토리)
+	fileStore, err := storage.NewFileStore(execDir)
+	if err != nil {
+		log.Fatalf("파일 저장소 초기화 실패: %v", err)
+	}
+
 	// Fyne 애플리케이션 생성
 	a := app.New()
 
@@ -62,7 +68,7 @@ func main() {
 	}
 
 	// 메인 UI 생성 및 설정
-	mainUI := ui.NewMainUI(w, store)
+	mainUI := ui.NewMainUI(w, store, fileStore)
 	w.SetContent(mainUI.Content())
 
 	// 윈도우 표시 및 실행

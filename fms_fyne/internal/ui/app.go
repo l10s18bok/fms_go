@@ -23,33 +23,40 @@ import (
 
 // 메인 애플리케이션 UI를 관리합니다.
 type MainUI struct {
-	window      fyne.Window
-	store       *storage.JSONStore
-	tabs        *container.DocTabs // 닫기 버튼이 있는 탭
-	leftMenu    *fyne.Container    // 왼쪽 메뉴
-	templateTab *TemplateTab
+	window    fyne.Window
+	store     *storage.JSONStore
+	fileStore *storage.FileStore // 파일 저장소 (data 디렉토리)
+	tabs      *container.DocTabs // 닫기 버튼이 있는 탭
+	leftMenu  *fyne.Container    // 왼쪽 메뉴
+
+	// 탭
+	firewallTab *FirewallTab // 방화벽 관리 탭
 	deviceTab   *DeviceTab
 	historyTab  *HistoryTab
 	programTab  *ProgramTab // 패키지 관리 탭
 
 	// 탭 아이템 참조 (동적 추가/제거용)
-	templateTabItem *container.TabItem
+	firewallTabItem *container.TabItem // 방화벽 관리 탭 아이템
 	deviceTabItem   *container.TabItem
 	historyTabItem  *container.TabItem
 	programTabItem  *container.TabItem // 패키지 관리 탭 아이템
 
+	// 동적 편집 탭 관리
+	editTabs map[string]*container.TabItem // 파일명 -> 탭 아이템 매핑
 }
 
 // 새로운 메인 UI 인스턴스를 생성합니다.
-func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
+func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.FileStore) *MainUI {
 	ui := &MainUI{
-		window: window,
-		store:  store,
+		window:    window,
+		store:     store,
+		fileStore: fileStore,
+		editTabs:  make(map[string]*container.TabItem),
 	}
 
 	// 각 탭 생성
-	ui.templateTab = NewTemplateTab(window, store)
-	ui.deviceTab = NewDeviceTab(window, store, ui.templateTab)
+	ui.firewallTab = NewFirewallTab(window, fileStore, ui)
+	ui.deviceTab = NewDeviceTab(window, store, ui.firewallTab)
 	ui.historyTab = NewHistoryTab(window, store)
 	ui.programTab = NewProgramTab(window, store)
 
@@ -58,7 +65,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 	ui.historyTab.SetDeviceTab(ui.deviceTab)
 
 	// 탭 아이템 생성 (동적 추가/제거용)
-	ui.templateTabItem = container.NewTabItemWithIcon("방화벽 관리", theme.DocumentIcon(), ui.templateTab.Content())
+	ui.firewallTabItem = container.NewTabItemWithIcon("방화벽 관리", theme.DocumentIcon(), ui.firewallTab.Content())
 	ui.deviceTabItem = container.NewTabItemWithIcon("장비 관리", theme.ComputerIcon(), ui.deviceTab.Content())
 	ui.historyTabItem = container.NewTabItemWithIcon("배포 이력", theme.HistoryIcon(), ui.historyTab.Content())
 	ui.programTabItem = container.NewTabItemWithIcon("패키지 관리", theme.FolderOpenIcon(), ui.programTab.Content())
@@ -69,13 +76,19 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 
 	// 탭 닫기 시 처리
 	ui.tabs.OnClosed = func(tab *container.TabItem) {
-		// 탭이 닫혀도 데이터는 유지됨 (다시 열 수 있음)
+		// 편집 탭이 닫히면 editTabs에서 제거
+		for fileName, tabItem := range ui.editTabs {
+			if tabItem == tab {
+				delete(ui.editTabs, fileName)
+				break
+			}
+		}
 	}
 
 	// 탭 변경 시 이벤트 처리
 	ui.tabs.OnSelected = func(tab *container.TabItem) {
 		if tab == ui.deviceTabItem {
-			ui.deviceTab.RefreshTemplates()
+			ui.deviceTab.RefreshFiles()
 		}
 	}
 
@@ -86,7 +99,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 	ui.setupMainMenu()
 
 	// 초기 탭 열기: 방화벽 관리
-	ui.openTab(ui.templateTabItem)
+	ui.openTab(ui.firewallTabItem)
 
 	return ui
 }
@@ -95,7 +108,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 func (m *MainUI) createLeftMenu() {
 	// 방화벽 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
 	ruleBtn := component.NewCustomButton("방화벽 관리", nil, nil, nil, func() {
-		m.openTab(m.templateTabItem)
+		m.openTab(m.firewallTabItem)
 	}, 4, 4, 0, 0)
 
 	// 장비 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
@@ -337,14 +350,14 @@ func (m *MainUI) showHelpDialog() {
 	component.ShowHelpPopup("도움말", component.AppHelpText, m.window.Canvas().Content())
 }
 
-// 현재 선택된 탭 유형을 반환합니다. (0: 룰, 1: 장비, 2: 이력, 3: 패키지, -1: 없음)
+// 현재 선택된 탭 유형을 반환합니다. (0: 방화벽, 1: 장비, 2: 이력, 3: 패키지, -1: 없음)
 func (m *MainUI) getSelectedTabType() int {
 	selected := m.tabs.Selected()
 	if selected == nil {
 		return -1
 	}
 	switch selected {
-	case m.templateTabItem:
+	case m.firewallTabItem:
 		return 0
 	case m.deviceTabItem:
 		return 1
@@ -366,8 +379,14 @@ func (m *MainUI) showImportDialog() {
 		return
 	}
 
-	// 탭별 데이터 타입명
-	tabNames := []string{"룰", "장비", "배포 이력", "패키지"}
+	// 방화벽 관리 탭은 Import 지원 안함 (파일 기반)
+	if tabType == 0 {
+		dialog.ShowInformation("알림", "방화벽 관리 탭은 Import 기능을 지원하지 않습니다.\n파일추가/수정 버튼을 사용해주세요.", m.window)
+		return
+	}
+
+	// 탭별 데이터 타입명 (방화벽 관리 제외)
+	tabNames := []string{"", "장비", "배포 이력", "패키지"}
 	tabName := tabNames[tabType]
 
 	// 파일 선택 다이얼로그
@@ -398,37 +417,6 @@ func (m *MainUI) showImportDialog() {
 
 				// 현재 탭에 따라 처리
 				switch tabType {
-				case 0: // 룰 탭
-					var templates []*model.Template
-					if err := json.Unmarshal(data, &templates); err != nil {
-						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
-						return
-					}
-
-					// 기존 데이터 모두 삭제
-					if err := m.store.ClearTemplates(); err != nil {
-						dialog.ShowError(err, m.window)
-						return
-					}
-
-					// 룰 형식 검증: version과 contents가 유효한지 확인
-					validCount := 0
-					for _, tmpl := range templates {
-						if tmpl.Version == "" || tmpl.Version == "-" || tmpl.Contents == "" || tmpl.Contents == "-" {
-							continue // 유효하지 않은 룰은 건너뜀
-						}
-						if err := m.store.SaveTemplate(tmpl); err != nil {
-							dialog.ShowError(err, m.window)
-							return
-						}
-						validCount++
-					}
-					if validCount == 0 {
-						dialog.ShowError(fmt.Errorf("유효한 룰 데이터가 없습니다. 룰 형식의 JSON 파일을 선택해주세요."), m.window)
-						return
-					}
-					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 룰이 가져오기 되었습니다.", validCount), m.window)
-					m.templateTab.RefreshTemplates()
 				case 1: // 장비 관리 탭
 					var firewalls []*model.Firewall
 					if err := json.Unmarshal(data, &firewalls); err != nil {
@@ -554,18 +542,14 @@ func (m *MainUI) showExportDialog() {
 		return
 	}
 
+	// 방화벽 관리 탭은 Export 지원 안함 (파일 기반)
+	if tabType == 0 {
+		dialog.ShowInformation("알림", "방화벽 관리 탭은 Export 기능을 지원하지 않습니다.\ndata 디렉토리에서 파일을 직접 복사해주세요.", m.window)
+		return
+	}
+
 	// 데이터 확인
 	switch tabType {
-	case 0: // 룰 탭
-		templates, err := m.store.GetAllTemplates()
-		if err != nil {
-			dialog.ShowError(err, m.window)
-			return
-		}
-		if len(templates) == 0 {
-			dialog.ShowInformation("알림", "내보낼 룰이 없습니다.", m.window)
-			return
-		}
 	case 1: // 장비 관리 탭
 		firewalls, err := m.store.GetAllFirewalls()
 		if err != nil {
@@ -614,13 +598,6 @@ func (m *MainUI) showExportDialog() {
 
 		// 현재 탭에 따라 처리
 		switch tabType {
-		case 0: // 룰 탭
-			templates, err := m.store.GetAllTemplates()
-			if err != nil {
-				dialog.ShowError(err, m.window)
-				return
-			}
-			data, jsonErr = json.MarshalIndent(templates, "", "  ")
 		case 1: // 장비 관리 탭
 			firewalls, err := m.store.GetAllFirewalls()
 			if err != nil {
@@ -659,8 +636,6 @@ func (m *MainUI) showExportDialog() {
 
 	// 기본 파일명 설정
 	switch tabType {
-	case 0:
-		saveDialog.SetFileName("ruleList.json")
 	case 1:
 		saveDialog.SetFileName("firewallList.json")
 	case 2:
@@ -690,14 +665,14 @@ func (m *MainUI) showExportDialog() {
 func (m *MainUI) showResetDialog() {
 	// 경고 다이얼로그 표시
 	dialog.ShowConfirm("⚠️ 경고",
-		"모든 데이터(템플릿, 장비, 배포이력, 패키지)를 초기화하시겠습니까?",
+		"모든 데이터(방화벽 파일, 장비, 배포이력, 패키지)를 초기화하시겠습니까?",
 		func(ok bool) {
 			if !ok {
 				return
 			}
 
-			// 모든 템플릿 삭제
-			if err := m.store.ClearTemplates(); err != nil {
+			// 모든 방화벽 파일 삭제
+			if err := m.fileStore.ClearAllFiles(); err != nil {
 				dialog.ShowError(err, m.window)
 				return
 			}
@@ -721,14 +696,62 @@ func (m *MainUI) showResetDialog() {
 			}
 
 			// UI 초기화 (서버 상태 체크 없이, 다이얼로그 없이)
-			m.templateTab.ClearSelection()
-			m.templateTab.RefreshTemplates()
+			m.firewallTab.RefreshFiles()
 			m.deviceTab.ReloadDevices()
 			m.historyTab.ReloadHistory()
 			m.programTab.RefreshPrograms()
 
 			dialog.ShowInformation("완료", "모든 데이터가 초기화되었습니다.", m.window)
 		}, m.window)
+}
+
+// OpenFirewallEditTab 방화벽 파일 편집 탭을 엽니다.
+func (m *MainUI) OpenFirewallEditTab(file *model.FirewallFile) {
+	// 이미 열려있는지 확인
+	if existingTab, ok := m.editTabs[file.FileName]; ok {
+		m.tabs.Select(existingTab)
+		return
+	}
+
+	// 새 편집 탭 생성
+	editTab := NewFirewallEditTab(m.window, m.fileStore, m, file)
+
+	// 탭 이름 설정 (truncation 적용)
+	tabName := editTab.GetTabName()
+	tabItem := container.NewTabItem(tabName, editTab.Content())
+
+	// 탭 추가 및 선택
+	m.tabs.Append(tabItem)
+	m.tabs.Select(tabItem)
+
+	// editTabs 맵에 등록
+	m.editTabs[file.FileName] = tabItem
+}
+
+// CloseFirewallEditTab 방화벽 파일 편집 탭을 닫습니다.
+func (m *MainUI) CloseFirewallEditTab(fileName string) {
+	if tabItem, ok := m.editTabs[fileName]; ok {
+		m.tabs.Remove(tabItem)
+		delete(m.editTabs, fileName)
+	}
+}
+
+// UpdateFirewallEditTabName 편집 탭의 파일명이 변경되었을 때 탭 이름을 업데이트합니다.
+func (m *MainUI) UpdateFirewallEditTabName(oldFileName string, file *model.FirewallFile) {
+	if tabItem, ok := m.editTabs[oldFileName]; ok {
+		// 맵에서 기존 항목 제거하고 새 파일명으로 등록
+		delete(m.editTabs, oldFileName)
+		m.editTabs[file.FileName] = tabItem
+
+		// 탭 이름 업데이트
+		maxLen := 25
+		name := "방화벽관리/" + file.FileName
+		if len(name) > maxLen {
+			name = name[:maxLen-3] + "..."
+		}
+		tabItem.Text = name
+		m.tabs.Refresh()
+	}
 }
 
 // 테마 설정을 저장합니다.

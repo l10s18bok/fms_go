@@ -28,7 +28,7 @@ import (
 type DeviceTab struct {
 	window      fyne.Window
 	store       *storage.JSONStore
-	templateTab *TemplateTab
+	firewallTab *FirewallTab
 	historyTab  *HistoryTab
 	programTab  *ProgramTab
 	content     fyne.CanvasObject
@@ -52,11 +52,11 @@ type DeviceTab struct {
 }
 
 // 새로운 장비 관리 탭을 생성합니다.
-func NewDeviceTab(window fyne.Window, store *storage.JSONStore, templateTab *TemplateTab) *DeviceTab {
+func NewDeviceTab(window fyne.Window, store *storage.JSONStore, firewallTab *FirewallTab) *DeviceTab {
 	tab := &DeviceTab{
 		window:            window,
 		store:             store,
-		templateTab:       templateTab,
+		firewallTab:       firewallTab,
 		firewalls:         []*model.Firewall{},
 		filteredFirewalls: []*model.Firewall{},
 	}
@@ -722,8 +722,8 @@ func (d *DeviceTab) onDeploy() {
 	// 배포 리스트 (라디오 버튼 그룹)
 	var selectedItem string
 
-	// 방화벽 룰 목록
-	templates := d.templateTab.GetTemplateVersions()
+	// 방화벽 룰 파일 목록
+	fileNames := d.firewallTab.GetFileNames()
 	// 패키지 목록
 	programs, _ := d.store.GetAllPrograms()
 	programItems := make([]string, len(programs))
@@ -740,7 +740,7 @@ func (d *DeviceTab) onDeploy() {
 	}
 
 	// 초기 방화벽 룰 리스트 (스크롤 가능)
-	radioGroup := createRadioList(templates)
+	radioGroup := createRadioList(fileNames)
 	deployListScroll := container.NewScroll(radioGroup)
 	deployListScroll.SetMinSize(fyne.NewSize(entryWidth, 150))
 
@@ -749,7 +749,7 @@ func (d *DeviceTab) onDeploy() {
 		selectedItem = ""
 		var newRadio *widget.RadioGroup
 		if selected == "방화벽 룰 배포" {
-			newRadio = createRadioList(templates)
+			newRadio = createRadioList(fileNames)
 		} else {
 			newRadio = createRadioList(programItems)
 		}
@@ -835,16 +835,22 @@ func (d *DeviceTab) onDeploy() {
 }
 
 // 방화벽 룰 배포를 실행합니다.
-func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, templateVersion string) {
-	template := d.templateTab.GetTemplate(templateVersion)
-	if template == nil {
-		dialog.ShowError(fmt.Errorf("템플릿을 찾을 수 없습니다: %s", templateVersion), d.window)
+func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName string) {
+	contents, err := d.firewallTab.GetFileContents(fileName)
+	if err != nil {
+		dialog.ShowError(fmt.Errorf("파일을 찾을 수 없습니다: %s", fileName), d.window)
 		return
 	}
 
-	if !template.IsValid() {
-		dialog.ShowError(fmt.Errorf("선택한 템플릿에 내용이 없습니다"), d.window)
+	if contents == "" {
+		dialog.ShowError(fmt.Errorf("선택한 파일에 내용이 없습니다"), d.window)
 		return
+	}
+
+	// 배포용 Template 구조체 생성
+	template := &model.Template{
+		Version:  fileName,
+		Contents: contents,
 	}
 
 	// 진행률 다이얼로그
@@ -1114,10 +1120,10 @@ func (d *DeviceTab) ReloadDevices() {
 	d.loadFirewalls()
 }
 
-// 템플릿 목록만 새로고침합니다.
-func (d *DeviceTab) RefreshTemplates() {
-	// 템플릿 탭 새로고침
-	d.templateTab.RefreshTemplates()
+// 파일 목록만 새로고침합니다.
+func (d *DeviceTab) RefreshFiles() {
+	// 방화벽 관리 탭 새로고침
+	d.firewallTab.RefreshFiles()
 }
 
 // 해당 IP의 장비 배포 상태를 초기화합니다.
