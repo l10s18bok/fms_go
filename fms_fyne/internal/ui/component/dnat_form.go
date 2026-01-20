@@ -18,10 +18,11 @@ type DNATForm struct {
 
 	// UI 요소
 	protoSel       *FixedWidthSelect // 프로토콜
-	matchPortEntry *widget.Entry     // 외부 포트 (매칭 포트)
-	matchIPEntry   *widget.Entry     // 소스 IP (선택)
-	transIPEntry   *widget.Entry     // 내부 IP (변환 대상)
-	transPortEntry *widget.Entry     // 내부 포트 (변환 포트)
+	matchPortEntry *widget.Entry     // 매칭 포트 (Match_Port)
+	matchIPEntry   *widget.Entry     // 매칭 IP (Match_IP)
+	transIPEntry   *widget.Entry     // 변환 IP (Trans_IP)
+	transPortEntry *widget.Entry     // 목적지 포트 (D_Port)
+	inIfEntry      *widget.Entry     // 입력 인터페이스 (In_IFace)
 	// descEntry      *widget.Entry     // 설명 (선택) - 현재 미사용
 	addBtn  fyne.CanvasObject
 	content *fyne.Container
@@ -44,7 +45,7 @@ func (f *DNATForm) createUI() {
 	// 프로토콜 선택
 	f.protoSel = NewFixedWidthSelect(model.GetProtocolOptions(), nil, selectWidth)
 
-	// 외부 포트 (매칭 포트) - 필수 필드
+	// 매칭 포트 (Match_Port) - 필수 필드
 	f.matchPortEntry = widget.NewEntry()
 	f.matchPortEntry.SetPlaceHolder("Port (필수)")
 	f.matchPortEntry.Validator = func(s string) error {
@@ -54,13 +55,13 @@ func (f *DNATForm) createUI() {
 		return nil
 	}
 
-	// 소스 IP (선택)
+	// 매칭 IP (Match_IP) - 선택
 	f.matchIPEntry = widget.NewEntry()
-	f.matchIPEntry.SetPlaceHolder("Source IP")
+	f.matchIPEntry.SetPlaceHolder("Match IP")
 
-	// 내부 IP - 필수 필드
+	// 변환 IP (Trans_IP) - 필수 필드
 	f.transIPEntry = widget.NewEntry()
-	f.transIPEntry.SetPlaceHolder("Dest IP (필수)")
+	f.transIPEntry.SetPlaceHolder("Trans IP (필수)")
 	f.transIPEntry.Validator = func(s string) error {
 		if s == "" {
 			return fmt.Errorf("필수 입력")
@@ -68,16 +69,19 @@ func (f *DNATForm) createUI() {
 		return nil
 	}
 
-	// 내부 포트
+	// 목적지 포트 (D_Port)
 	f.transPortEntry = widget.NewEntry()
 	f.transPortEntry.SetPlaceHolder("Port")
+
+	// 입력 인터페이스 (In_IFace)
+	f.inIfEntry = widget.NewEntry()
+	f.inIfEntry.SetPlaceHolder("eth0")
 
 	// // 설명 (선택) - 현재 미사용
 	// f.descEntry = widget.NewEntry()
 	// f.descEntry.SetPlaceHolder("설명")
 
-	// 레이블 너비 통일 (규칙 빌더와 동일)
-	labelWidth := float32(50)
+	// 행 높이
 	rowHeight := float32(36)
 
 	// 도움말 버튼 (아이콘)
@@ -85,27 +89,29 @@ func (f *DNATForm) createUI() {
 		f.showDNATHelp()
 	})
 
-	// 첫 번째 행: Proto, ExtPort, SIP, ? (오른쪽 끝)
+	// 첫 번째 행: Proto, Match_Port, Match_IP, ? (오른쪽 끝)
 	row1 := container.NewBorder(
 		nil, nil, nil,
 		helpBtn, // 오른쪽 끝에 도움말 버튼
 		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Proto:")),
+			container.NewGridWrap(fyne.NewSize(50, rowHeight), widget.NewLabel("Proto:")),
 			container.NewGridWrap(fyne.NewSize(100, rowHeight), f.protoSel),
-			container.NewGridWrap(fyne.NewSize(60, rowHeight), widget.NewLabel("ExtPort:")),
-			container.NewGridWrap(fyne.NewSize(150, rowHeight), f.matchPortEntry),
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("SIP:")),
-			container.NewGridWrap(fyne.NewSize(180, rowHeight), f.matchIPEntry),
+			container.NewGridWrap(fyne.NewSize(85, rowHeight), widget.NewLabel("Match_Port:")),
+			container.NewGridWrap(fyne.NewSize(140, rowHeight), f.matchPortEntry),
+			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("Match_IP:")),
+			container.NewGridWrap(fyne.NewSize(170, rowHeight), f.matchIPEntry),
 			layout.NewSpacer(),
 		),
 	)
 
-	// 두 번째 행: DstIP, DstPort
+	// 두 번째 행: Trans_IP, D_Port, In_IFace
 	row2 := container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("DIP:")),
-		container.NewGridWrap(fyne.NewSize(180, rowHeight), f.transIPEntry),
-		container.NewGridWrap(fyne.NewSize(60, rowHeight), widget.NewLabel("DPort:")),
-		container.NewGridWrap(fyne.NewSize(150, rowHeight), f.transPortEntry),
+		container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("Trans_IP:")),
+		container.NewGridWrap(fyne.NewSize(170, rowHeight), f.transIPEntry),
+		container.NewGridWrap(fyne.NewSize(55, rowHeight), widget.NewLabel("D_Port:")),
+		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.transPortEntry),
+		container.NewGridWrap(fyne.NewSize(65, rowHeight), widget.NewLabel("In_IFace:")),
+		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.inIfEntry),
 	)
 
 	// 전체 레이아웃 (행 간격 추가)
@@ -153,6 +159,7 @@ func (f *DNATForm) SubmitRule() bool {
 		MatchPort:     f.matchPortEntry.Text,
 		TranslateIP:   f.transIPEntry.Text,
 		TranslatePort: f.transPortEntry.Text,
+		InInterface:   f.inIfEntry.Text,
 		// Description:   f.descEntry.Text, // 현재 미사용
 	}
 
@@ -171,6 +178,7 @@ func (f *DNATForm) Reset() {
 	f.matchIPEntry.SetText("")
 	f.transIPEntry.SetText("")
 	f.transPortEntry.SetText("")
+	f.inIfEntry.SetText("")
 	// f.descEntry.SetText("") // 현재 미사용
 }
 

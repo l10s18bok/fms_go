@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -43,11 +44,11 @@ func (d *NATAddDialog) createUI() {
 	// 탭 구성 (내부 패딩 10)
 	d.tabs = container.NewAppTabs(
 		container.NewTabItem("DNAT (포트 포워딩)", container.New(layout.NewCustomPaddedLayout(10, 10, 10, 10), d.dnatForm.Content())),
-		container.NewTabItem("SNAT/MASQUERADE", container.New(layout.NewCustomPaddedLayout(10, 10, 10, 10), d.snatForm.Content())),
+		container.NewTabItem("SNAT", container.New(layout.NewCustomPaddedLayout(10, 10, 10, 10), d.snatForm.Content())),
 	)
 
-	// 닫기 버튼 (배경 없이 텍스트만)
-	closeBtn := NewCustomButton("X", nil, themes.Colors["black"], nil, func() {
+	// 닫기 버튼 (배경 없이 텍스트만, 테마에 따라 색상 변경)
+	closeBtn := NewCustomButton("X", nil, theme.ForegroundColor(), nil, func() {
 		d.Hide()
 	})
 
@@ -67,7 +68,7 @@ func (d *NATAddDialog) createUI() {
 			switch selectedTab.Text {
 			case "DNAT (포트 포워딩)":
 				success = d.dnatForm.SubmitRule()
-			case "SNAT/MASQUERADE":
+			case "SNAT":
 				success = d.snatForm.SubmitRule()
 			}
 		}

@@ -274,53 +274,46 @@ const DNATHelpText = `포트 포워딩 (DNAT) 도움말:
 
 [입력 필드 설명]
 
-• ExtPort (외부 포트)
+• Match_Port (매칭 포트)
   - 외부에서 접속할 포트 번호입니다.
   - 필수 입력 항목입니다.
   - 예: 8080, 443, 22
 
-• SIP (소스 IP)
+• Match_IP (매칭 IP)
   - 접속을 허용할 출발지 IP입니다.
   - 비워두면 모든 IP에서 접속을 허용합니다.
   - 예: 192.168.1.0/24, 10.0.0.5
 
-• DIP (목적지 IP)
+• Trans_IP (변환 IP)
   - 트래픽을 전달할 내부 서버 IP입니다.
   - 필수 입력 항목입니다.
   - 예: 192.168.1.10, 10.0.0.100
 
-• DPort (목적지 포트)
+• D_Port (목적지 포트)
   - 내부 서버의 실제 서비스 포트입니다.
-  - 비워두면 ExtPort와 동일한 포트를 사용합니다.
+  - 비워두면 Match_Port와 동일한 포트를 사용합니다.
   - 예: 80, 443, 3389
+
+• In_IFace (입력 인터페이스)
+  - 트래픽이 들어오는 인터페이스입니다.
+  - 선택 사항입니다.
+  - 예: eth0, wan0
 
 [사용 예시]
 
 웹 서버 포트 포워딩:
-  ExtPort=8080, DIP=192.168.1.10, DPort=80
+  Match_Port=8080, Trans_IP=192.168.1.10, D_Port=80
   → 외부:8080 접속 시 내부 192.168.1.10:80으로 전달
 
 SSH 포트 포워딩 (특정 IP만 허용):
-  ExtPort=2222, SIP=10.0.0.0/8, DIP=192.168.1.5, DPort=22
+  Match_Port=2222, Match_IP=10.0.0.0/8, Trans_IP=192.168.1.5, D_Port=22
   → 10.x.x.x 대역에서만 SSH 접속 허용`
 
-// SNATHelpText SNAT/MASQUERADE 도움말
-const SNATHelpText = `소스 NAT (SNAT/MASQUERADE) 도움말:
+// SNATHelpText SNAT 도움말
+const SNATHelpText = `소스 NAT (SNAT) 도움말:
 
 내부 네트워크에서 외부로 나가는 트래픽의 소스 IP를 변환합니다.
 예) 내부 192.168.1.x → 공인 IP로 변환하여 인터넷 접속
-
-[NAT 타입 선택]
-
-• SNAT
-  - 고정 IP 환경에서 사용합니다.
-  - 변환할 IP를 직접 지정합니다.
-  - 예: 내부 → 고정 공인 IP
-
-• MASQUERADE
-  - 유동 IP 환경(PPPoE, DHCP)에서 사용합니다.
-  - 출력 인터페이스의 IP를 자동으로 사용합니다.
-  - 예: 내부 → 인터넷 공유기의 현재 IP
 
 [입력 필드 설명]
 
@@ -328,6 +321,10 @@ const SNATHelpText = `소스 NAT (SNAT/MASQUERADE) 도움말:
   - NAT를 적용할 내부 네트워크입니다.
   - 필수 입력 항목입니다.
   - 예: 192.168.1.0/24, 10.0.0.0/8
+
+• TransIP (변환 IP)
+  - 소스 IP를 변환할 공인 IP입니다.
+  - 예: 203.0.113.1, 1.2.3.4
 
 • InIF (입력 인터페이스)
   - 트래픽이 들어오는 내부 인터페이스입니다.
@@ -339,17 +336,12 @@ const SNATHelpText = `소스 NAT (SNAT/MASQUERADE) 도움말:
   - 선택 사항입니다.
   - 예: eth0, ppp0, wan0
 
-• TransIP (변환 IP) - SNAT만
-  - 소스 IP를 변환할 공인 IP입니다.
-  - SNAT 선택 시 필수입니다.
-  - 예: 203.0.113.1, 1.2.3.4
-
 [사용 예시]
 
-가정용 공유기 (MASQUERADE):
-  Type=MASQUERADE, SIP=192.168.1.0/24, OutIF=eth0
-  → 내부 192.168.1.x가 eth0의 IP로 변환되어 외부 통신
-
 기업 네트워크 (SNAT):
-  Type=SNAT, SIP=10.0.0.0/8, TransIP=203.0.113.1
-  → 내부 10.x.x.x가 고정 IP 203.0.113.1로 변환`
+  SIP=10.0.0.0/8, TransIP=203.0.113.1
+  → 내부 10.x.x.x가 고정 IP 203.0.113.1로 변환
+
+인터페이스 지정:
+  SIP=192.168.1.0/24, TransIP=1.2.3.4, InIF=eth1, OutIF=eth0
+  → eth1에서 들어온 192.168.1.x가 eth0으로 나갈 때 1.2.3.4로 변환`
