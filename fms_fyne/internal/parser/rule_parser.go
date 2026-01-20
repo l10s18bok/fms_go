@@ -105,6 +105,40 @@ func FormatOptionsOnly(opts *model.ProtocolOptions) string {
 	return strings.Join(params, "&")
 }
 
+// ParseOptionsOnly 옵션 문자열만 파싱 (프로토콜 제외)
+// 입력: "flags=syn/syn" 또는 "type=8&code=0"
+// 출력: *ProtocolOptions
+func ParseOptionsOnly(s string) *model.ProtocolOptions {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "-" {
+		return nil
+	}
+
+	opts := &model.ProtocolOptions{}
+	params := strings.Split(s, "&")
+
+	for _, param := range params {
+		kv := strings.SplitN(param, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+
+		switch kv[0] {
+		case "flags":
+			opts.TCPFlags = kv[1]
+		case "type":
+			opts.ICMPType = kv[1]
+		case "code":
+			opts.ICMPCode = kv[1]
+		}
+	}
+
+	if opts.IsEmpty() {
+		return nil
+	}
+	return opts
+}
+
 // ParseLine 단일 라인을 파싱하여 FirewallRule로 변환
 // 빈 줄이나 주석은 nil을 반환
 func ParseLine(line string) (*model.FirewallRule, error) {

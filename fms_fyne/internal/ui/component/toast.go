@@ -28,12 +28,19 @@ var toastColors = map[ToastType]color.Color{
 
 // 토스트 메시지를 표시합니다 (일정 시간 후 사라짐).
 func ShowToast(parent fyne.Window, message string, toastType ToastType, duration time.Duration) {
-	bg := canvas.NewRectangle(toastColors[toastType])
+	// 테두리만 있는 배경 (내부는 투명)
+	borderColor := toastColors[toastType]
+	bg := canvas.NewRectangle(color.Transparent)
+	bg.SetMinSize(fyne.NewSize(200, 50))
+	bg.StrokeColor = borderColor
+	bg.StrokeWidth = 2
+
 	label := widget.NewLabel(message)
 	label.Alignment = fyne.TextAlignCenter
 
-	toast := container.NewStack(bg, container.NewCenter(label))
-	toast.Resize(fyne.NewSize(300, 50))
+	// 패딩을 추가하여 텍스트가 잘리지 않도록 함
+	paddedLabel := container.NewPadded(label)
+	toast := container.NewStack(bg, container.NewCenter(paddedLabel))
 
 	// 팝업으로 표시
 	popup := widget.NewModalPopUp(toast, parent.Canvas())

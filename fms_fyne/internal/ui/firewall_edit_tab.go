@@ -291,7 +291,7 @@ func (t *FirewallEditTab) onSave() {
 			t.mainUI.firewallTab.RefreshFiles()
 		}
 
-		dialog.ShowInformation("저장 완료", "파일이 저장되었습니다.", t.window)
+		component.ShowSuccessToast(t.window, "저장되었습니다")
 	}
 
 	// 버튼
@@ -320,7 +320,7 @@ func (t *FirewallEditTab) onSave() {
 
 	// 고정 크기 컨테이너
 	paddedContent := container.New(layout.NewCustomPaddedLayout(20, 20, 20, 20), content)
-	sizedContent := container.NewGridWrap(fyne.NewSize(450, 220), paddedContent)
+	sizedContent := container.NewGridWrap(fyne.NewSize(450, 240), paddedContent)
 
 	// 팝업 생성
 	popup = widget.NewModalPopUp(sizedContent, t.window.Canvas())
