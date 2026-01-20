@@ -242,6 +242,7 @@ func (t *FirewallTab) onDeleteSelected() {
 				return
 			}
 
+			t.fileTable.ClearChecked()
 			t.loadFiles()
 			dialog.ShowInformation("삭제 완료", fmt.Sprintf("%d개 파일이 삭제되었습니다.", len(fileNames)), t.window)
 		}, t.window)
