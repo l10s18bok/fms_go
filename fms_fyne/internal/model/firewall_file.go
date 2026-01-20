@@ -86,13 +86,5 @@ func (f *FirewallFile) Clone() *FirewallFile {
 
 // IsValid 파일 정보가 유효한지 확인합니다.
 func (f *FirewallFile) IsValid() bool {
-	return f.FileName != "" && strings.HasSuffix(f.FileName, ".txt")
-}
-
-// EnsureTxtExtension 파일명에 .txt 확장자가 없으면 추가합니다.
-func EnsureTxtExtension(fileName string) string {
-	if !strings.HasSuffix(fileName, ".txt") {
-		return fileName + ".txt"
-	}
-	return fileName
+	return f.FileName != ""
 }

@@ -17,6 +17,22 @@ type ColumnDef struct {
 	Width  float32 // 컬럼 너비 (0이면 자동)
 }
 
+// EditColumnType 편집 컬럼 타입
+type EditColumnType int
+
+const (
+	EditTypeEntry  EditColumnType = iota // Entry 위젯 (텍스트 입력)
+	EditTypeSelect                       // Select 위젯 (드롭다운)
+)
+
+// EditColumnConfig 편집 가능 컬럼 설정
+type EditColumnConfig struct {
+	Type       EditColumnType                        // 편집 위젯 타입
+	Options    []string                              // Select 타입일 때 옵션 목록
+	OnEdit     func(row int, oldValue, newValue string) bool // 편집 완료 콜백 (false 반환 시 취소)
+	GetValue   func(row int) string                  // 현재 값 조회 콜백
+}
+
 // PagedTableConfig 페이지네이션 테이블 설정
 type PagedTableConfig struct {
 	Columns          []ColumnDef                                    // 컬럼 정의 (첫 번째는 체크박스 컬럼)
@@ -25,6 +41,7 @@ type PagedTableConfig struct {
 	OnRowSelected    func(row int)                                  // 행 선택 콜백 (단일 클릭/Enter)
 	OnRowDoubleClick func(row int)                                  // 행 더블클릭 콜백
 	OnCheckChange    func(row int, checked bool)                    // 체크 변경 콜백
+	EditableColumns  map[int]EditColumnConfig                       // 인라인 편집 가능 컬럼 (컬럼 인덱스 → 설정)
 }
 
 // PagedTable 페이지네이션 지원 테이블
@@ -39,6 +56,10 @@ type PagedTable struct {
 	selectedRow  int          // 현재 선택된 행 (페이지 내 인덱스, -1이면 선택 없음)
 	allSelected  bool         // 전체 선택 상태
 
+	// 인라인 편집 상태
+	editingCell    *widget.TableCellID // 현재 편집 중인 셀 (nil이면 편집 중 아님)
+	editingValue   string              // 편집 전 원본 값
+	window         fyne.Window         // ESC 키 처리용 윈도우
 
 	// 페이지네이션 UI
 	pageLabel   *widget.Label
@@ -52,6 +73,11 @@ type PagedTable struct {
 
 // NewPagedTable 새 페이지네이션 테이블 생성
 func NewPagedTable(config PagedTableConfig) *PagedTable {
+	return NewPagedTableWithWindow(config, nil)
+}
+
+// NewPagedTableWithWindow 윈도우와 함께 새 페이지네이션 테이블 생성 (인라인 편집 시 ESC 키 처리용)
+func NewPagedTableWithWindow(config PagedTableConfig, window fyne.Window) *PagedTable {
 	if config.PageSize <= 0 {
 		config.PageSize = 10 // 기본값
 	}
@@ -63,6 +89,7 @@ func NewPagedTable(config PagedTableConfig) *PagedTable {
 		checkedRows: make(map[int]bool),
 		selectedRow: -1,
 		allSelected: false,
+		window:      window,
 	}
 	t.ExtendBaseWidget(t)
 	t.createUI()
@@ -286,11 +313,61 @@ func (t *PagedTable) updateCell(id widget.TableCellID, cell fyne.CanvasObject) {
 		}
 		checkText.Refresh()
 	} else {
-		// 일반 컬럼 - 콜백으로 처리
-		if t.config.OnCellUpdate != nil {
-			// customContainer를 사용하여 커스텀 셀 렌더링 지원
-			t.config.OnCellUpdate(dataIndex, id.Col, label)
-			label.Show()
+		// 편집 가능 컬럼 확인
+		editConfig, isEditable := t.config.EditableColumns[id.Col]
+
+		// 현재 편집 중인 셀인지 확인
+		isEditingThis := t.editingCell != nil && t.editingCell.Row == id.Row && t.editingCell.Col == id.Col
+
+		if isEditingThis && isEditable {
+			// 편집 모드: 편집 위젯 표시
+			customContainer.Objects = nil
+
+			if editConfig.Type == EditTypeSelect {
+				// Select 위젯
+				selectWidget := widget.NewSelect(editConfig.Options, func(selected string) {
+					// 선택 변경 시 즉시 저장
+					t.finishEditing(dataIndex, id.Col, selected, editConfig)
+				})
+				// 현재 값 설정
+				if editConfig.GetValue != nil {
+					selectWidget.SetSelected(editConfig.GetValue(dataIndex))
+				}
+				customContainer.Objects = append(customContainer.Objects, selectWidget)
+			} else {
+				// Entry 위젯 (ESC 키 및 포커스 잃음 처리 포함)
+				var currentValue string
+				if editConfig.GetValue != nil {
+					currentValue = editConfig.GetValue(dataIndex)
+				}
+				entry := newEditableEntry(
+					currentValue,
+					func(text string) {
+						// Enter 키 누르면 저장
+						t.finishEditing(dataIndex, id.Col, text, editConfig)
+					},
+					func() {
+						// ESC 키 또는 포커스 잃으면 취소
+						t.cancelEditing()
+					},
+				)
+				customContainer.Objects = append(customContainer.Objects, entry)
+			}
+			customContainer.Show()
+			label.Hide()
+		} else {
+			// 일반 모드: 라벨 표시
+			if t.config.OnCellUpdate != nil {
+				t.config.OnCellUpdate(dataIndex, id.Col, label)
+				label.Show()
+			}
+
+			// 편집 가능 컬럼이면 클릭 시 편집 모드 진입
+			if isEditable {
+				dtCell.onTap = func() {
+					t.startEditing(id, dataIndex, editConfig)
+				}
+			}
 		}
 	}
 }
@@ -595,5 +672,103 @@ func (c *doubleTappableCell) Tapped(_ *fyne.PointEvent) {
 func (c *doubleTappableCell) DoubleTapped(_ *fyne.PointEvent) {
 	if c.onDoubleTap != nil {
 		c.onDoubleTap()
+	}
+}
+
+// startEditing 편집 모드 시작
+func (t *PagedTable) startEditing(id widget.TableCellID, dataIndex int, config EditColumnConfig) {
+	// 이미 편집 중이면 먼저 취소
+	if t.editingCell != nil {
+		t.cancelEditing()
+	}
+
+	// 원본 값 저장
+	if config.GetValue != nil {
+		t.editingValue = config.GetValue(dataIndex)
+	}
+
+	// 편집 셀 설정
+	t.editingCell = &id
+
+	// 테이블 새로고침으로 편집 위젯 표시
+	t.table.Refresh()
+}
+
+// finishEditing 편집 완료 (저장)
+func (t *PagedTable) finishEditing(dataIndex int, col int, newValue string, config EditColumnConfig) {
+	if t.editingCell == nil {
+		return
+	}
+
+	oldValue := t.editingValue
+
+	// 값이 변경되었으면 콜백 호출
+	if newValue != oldValue && config.OnEdit != nil {
+		if !config.OnEdit(dataIndex, oldValue, newValue) {
+			// 저장 실패 시 취소
+			t.cancelEditing()
+			return
+		}
+	}
+
+	// 편집 상태 초기화
+	t.editingCell = nil
+	t.editingValue = ""
+
+	// 테이블 새로고침
+	t.table.Refresh()
+}
+
+// cancelEditing 편집 취소
+func (t *PagedTable) cancelEditing() {
+	if t.editingCell == nil {
+		return
+	}
+
+	// 편집 상태 초기화
+	t.editingCell = nil
+	t.editingValue = ""
+
+	// 테이블 새로고침
+	t.table.Refresh()
+}
+
+// editableEntry ESC 키 및 포커스 잃음 처리가 가능한 Entry 확장
+type editableEntry struct {
+	widget.Entry
+	onCancel  func()
+	submitted bool // 제출 완료 여부 (FocusLost에서 중복 취소 방지)
+}
+
+func newEditableEntry(text string, onSubmit func(string), onCancel func()) *editableEntry {
+	e := &editableEntry{
+		onCancel:  onCancel,
+		submitted: false,
+	}
+	e.ExtendBaseWidget(e)
+	e.SetText(text)
+	e.OnSubmitted = func(text string) {
+		e.submitted = true
+		onSubmit(text)
+	}
+	return e
+}
+
+func (e *editableEntry) TypedKey(key *fyne.KeyEvent) {
+	if key.Name == fyne.KeyEscape {
+		e.submitted = true // ESC도 의도적 종료로 처리
+		if e.onCancel != nil {
+			e.onCancel()
+		}
+		return
+	}
+	e.Entry.TypedKey(key)
+}
+
+func (e *editableEntry) FocusLost() {
+	e.Entry.FocusLost()
+	// 제출되지 않은 상태에서 포커스를 잃으면 편집 취소
+	if !e.submitted && e.onCancel != nil {
+		e.onCancel()
 	}
 }

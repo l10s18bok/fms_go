@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
 	"fms/internal/model"
@@ -43,11 +42,6 @@ func (s *FileStore) GetAllFiles() ([]*model.FirewallFile, error) {
 	var files []*model.FirewallFile
 	for _, entry := range entries {
 		if entry.IsDir() {
-			continue
-		}
-
-		// .txt 파일만 처리
-		if !strings.HasSuffix(entry.Name(), ".txt") {
 			continue
 		}
 
@@ -197,9 +191,6 @@ func (s *FileStore) ClearAllFiles() error {
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			continue
-		}
-		if !strings.HasSuffix(entry.Name(), ".txt") {
 			continue
 		}
 		filePath := filepath.Join(s.dataDir, entry.Name())

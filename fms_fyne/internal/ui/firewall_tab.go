@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
-	fynestorage "fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -88,7 +87,7 @@ func (t *FirewallTab) createUI() {
 	topBar := container.New(layout.NewCustomPaddedLayout(10, 10, 10, 10), topBarLine)
 
 	// 테이블 설정 (5컬럼: 선택, 파일이름, 만든날짜, 수정한날짜, 버전)
-	t.fileTable = component.NewPagedTable(component.PagedTableConfig{
+	t.fileTable = component.NewPagedTableWithWindow(component.PagedTableConfig{
 		Columns: []component.ColumnDef{
 			{Header: "선택", Width: 50},
 			{Header: "파일이름", Width: 200},
@@ -103,7 +102,22 @@ func (t *FirewallTab) createUI() {
 		OnRowDoubleClick: func(row int) {
 			t.onRowDoubleClick(row)
 		},
-	})
+		// 인라인 편집 설정: 파일이름 컬럼 (컬럼 1)
+		EditableColumns: map[int]component.EditColumnConfig{
+			1: { // 파일이름 컬럼
+				Type: component.EditTypeEntry,
+				GetValue: func(row int) string {
+					if row < len(t.filteredFiles) {
+						return t.filteredFiles[row].FileName
+					}
+					return ""
+				},
+				OnEdit: func(row int, oldValue, newValue string) bool {
+					return t.onInlineEditFileName(row, oldValue, newValue)
+				},
+			},
+		},
+	}, t.window)
 
 	// 메인 컨텐츠
 	t.content = container.NewBorder(
@@ -370,9 +384,6 @@ func (t *FirewallTab) showFileDialog(file *model.FirewallFile) {
 				dialog.ShowError(fmt.Errorf("파일명을 입력해주세요"), t.window)
 				return
 			}
-			// .txt 확장자 자동 추가
-			fileName = model.EnsureTxtExtension(fileName)
-
 			// 파일명이 변경된 경우
 			if fileName != file.FileName {
 				// 중복 확인
@@ -415,8 +426,6 @@ func (t *FirewallTab) showFileDialog(file *model.FirewallFile) {
 					dialog.ShowError(fmt.Errorf("파일명을 입력해주세요"), t.window)
 					return
 				}
-				// .txt 확장자 자동 추가
-				fileName = model.EnsureTxtExtension(fileName)
 				contents = "" // 빈 파일
 			} else {
 				// 파일찾기 모드
@@ -430,7 +439,6 @@ func (t *FirewallTab) showFileDialog(file *model.FirewallFile) {
 					parts = strings.Split(filePath, "\\")
 				}
 				fileName = parts[len(parts)-1]
-				fileName = model.EnsureTxtExtension(fileName)
 			}
 
 			// 중복 확인
@@ -531,12 +539,53 @@ func (t *FirewallTab) showFileDialog(file *model.FirewallFile) {
 				}
 				popup.Show()
 			}, t.window)
-			fileDialog.SetFilter(fynestorage.NewExtensionFileFilter([]string{".txt"}))
 			fileDialog.Show()
 		}
 	}
 
 	popup.Show()
+}
+
+// onInlineEditFileName 인라인 편집으로 파일명을 변경합니다.
+func (t *FirewallTab) onInlineEditFileName(row int, oldValue, newValue string) bool {
+	if row >= len(t.filteredFiles) {
+		return false
+	}
+
+	newValue = strings.TrimSpace(newValue)
+	if newValue == "" {
+		dialog.ShowError(fmt.Errorf("파일명을 입력해주세요"), t.window)
+		return false
+	}
+
+	// 값이 같으면 변경 없음
+	if newValue == oldValue {
+		return true
+	}
+
+	// 중복 확인
+	if t.fileStore.FileExists(newValue) {
+		dialog.ShowError(fmt.Errorf("이미 존재하는 파일명입니다: %s", newValue), t.window)
+		return false
+	}
+
+	// 파일 이름 변경
+	if err := t.fileStore.RenameFile(oldValue, newValue); err != nil {
+		dialog.ShowError(err, t.window)
+		return false
+	}
+
+	// 편집 탭이 열려있으면 탭 이름 업데이트
+	if t.mainUI != nil {
+		loadedFile, err := t.fileStore.GetFile(newValue)
+		if err == nil {
+			t.mainUI.UpdateFirewallEditTabName(oldValue, loadedFile)
+		}
+	}
+
+	// 목록 새로고침
+	t.loadFiles()
+	return true
 }
 
 // GetFileNames 모든 파일명 목록을 반환합니다. (배포 시 드롭다운용)
