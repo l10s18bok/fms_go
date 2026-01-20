@@ -112,8 +112,9 @@ func (t *FirewallEditTab) createUI() {
 
 	buttons := container.NewHBox(t.addBtn, saveBtn)
 
-	// 헤더: 저장 버튼 (오른쪽 정렬)
-	header := container.NewBorder(nil, nil, nil, buttons, nil)
+	// 헤더: 왼쪽에 "방화벽 상세보기" 레이블, 오른쪽에 버튼
+	titleLabel := widget.NewLabelWithStyle("방화벽 상세보기", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	header := container.NewBorder(nil, nil, titleLabel, buttons, nil)
 
 	// 전체 레이아웃
 	t.content = container.NewBorder(

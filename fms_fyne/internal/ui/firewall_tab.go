@@ -287,10 +287,21 @@ func (t *FirewallTab) showFileDialog(file *model.FirewallFile) {
 
 	// 파일명 입력 필드
 	fileNameEntry := widget.NewEntry()
+	// "파일찾기" 모드에서 파일명 수정 방지를 위한 변수
+	isFileBrowseMode := false
+	selectedFileName := ""
+
 	if isEditMode {
 		fileNameEntry.SetText(file.FileName)
 	} else {
 		fileNameEntry.SetPlaceHolder("파일명 (예: rules-v1_0_1.txt)")
+	}
+
+	// 파일찾기 모드에서 파일명 수정 방지
+	fileNameEntry.OnChanged = func(s string) {
+		if isFileBrowseMode && selectedFileName != "" && s != selectedFileName {
+			fileNameEntry.SetText(selectedFileName)
+		}
 	}
 
 	// 파일 경로 라벨 (파일찾기 모드용)
@@ -308,12 +319,16 @@ func (t *FirewallTab) showFileDialog(file *model.FirewallFile) {
 	// 모드 변경 시 UI 업데이트 (추가 모드에서만 사용)
 	modeSelect.OnChanged = func(selected string) {
 		if selected == "파일생성" {
-			fileNameEntry.Enable()
+			isFileBrowseMode = false
+			selectedFileName = ""
 			fileNameEntry.SetPlaceHolder("파일명 (예: rules-v1_0_1.txt)")
+			fileNameEntry.SetText("")
 			browseBtn.Hide()
 			filePathLabel.Hide()
 		} else {
-			fileNameEntry.Disable()
+			isFileBrowseMode = true
+			selectedFileName = ""
+			fileNameEntry.SetPlaceHolder("파일을 선택해주세요")
 			fileNameEntry.SetText("")
 			browseBtn.Show()
 			filePathLabel.Show()
@@ -467,16 +482,6 @@ func (t *FirewallTab) showFileDialog(file *model.FirewallFile) {
 			popup.Hide()
 			t.fileTable.ClearChecked()
 			t.loadFiles()
-
-			// 생성된 파일의 편집 탭 열기
-			loadedFile, err := t.fileStore.GetFile(fileName)
-			if err != nil {
-				dialog.ShowError(err, t.window)
-				return
-			}
-			if t.mainUI != nil {
-				t.mainUI.OpenFirewallEditTab(loadedFile)
-			}
 		}
 	}
 
@@ -534,7 +539,9 @@ func (t *FirewallTab) showFileDialog(file *model.FirewallFile) {
 					if len(parts) == 0 {
 						parts = strings.Split(filePath, "\\")
 					}
-					fileNameEntry.SetText(parts[len(parts)-1])
+					// 파일명 설정 및 수정 방지를 위한 값 저장
+					selectedFileName = parts[len(parts)-1]
+					fileNameEntry.SetText(selectedFileName)
 					reader.Close()
 				}
 				popup.Show()
