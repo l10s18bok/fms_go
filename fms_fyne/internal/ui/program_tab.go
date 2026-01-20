@@ -19,7 +19,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// ProgramTab 프로그램 관리 탭
+// ProgramTab 패키지 관리 탭
 type ProgramTab struct {
 	window  fyne.Window
 	store   *storage.JSONStore

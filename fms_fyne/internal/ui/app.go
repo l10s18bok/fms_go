@@ -30,13 +30,13 @@ type MainUI struct {
 	templateTab *TemplateTab
 	deviceTab   *DeviceTab
 	historyTab  *HistoryTab
-	programTab  *ProgramTab // 프로그램 관리 탭
+	programTab  *ProgramTab // 패키지 관리 탭
 
 	// 탭 아이템 참조 (동적 추가/제거용)
 	templateTabItem *container.TabItem
 	deviceTabItem   *container.TabItem
 	historyTabItem  *container.TabItem
-	programTabItem  *container.TabItem // 프로그램 관리 탭 아이템
+	programTabItem  *container.TabItem // 패키지 관리 탭 아이템
 
 }
 
@@ -61,7 +61,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 	ui.templateTabItem = container.NewTabItemWithIcon("방화벽 관리", theme.DocumentIcon(), ui.templateTab.Content())
 	ui.deviceTabItem = container.NewTabItemWithIcon("장비 관리", theme.ComputerIcon(), ui.deviceTab.Content())
 	ui.historyTabItem = container.NewTabItemWithIcon("배포 이력", theme.HistoryIcon(), ui.historyTab.Content())
-	ui.programTabItem = container.NewTabItemWithIcon("프로그램 관리", theme.FolderOpenIcon(), ui.programTab.Content())
+	ui.programTabItem = container.NewTabItemWithIcon("패키지 관리", theme.FolderOpenIcon(), ui.programTab.Content())
 
 	// DocTabs 컨테이너 생성 (닫기 버튼 지원)
 	ui.tabs = container.NewDocTabs()
@@ -108,8 +108,8 @@ func (m *MainUI) createLeftMenu() {
 		m.openTab(m.historyTabItem)
 	}, 4, 4, 0, 0)
 
-	// 프로그램 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
-	programBtn := component.NewCustomButton("프로그램 관리", nil, nil, nil, func() {
+	// 패키지 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
+	programBtn := component.NewCustomButton("패키지 관리", nil, nil, nil, func() {
 		m.openTab(m.programTabItem)
 	}, 4, 4, 0, 0)
 
