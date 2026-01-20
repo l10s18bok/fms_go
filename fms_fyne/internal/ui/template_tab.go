@@ -16,7 +16,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// 방화벽 룰 관리 탭을 구현합니다.
+// 방화벽 관리 탭을 구현합니다.
 type TemplateTab struct {
 	window  fyne.Window
 	store   *storage.JSONStore
@@ -35,7 +35,7 @@ type TemplateTab struct {
 	selectedVersion string
 }
 
-// 새로운 방화벽 룰 관리 탭을 생성합니다.
+// 새로운 방화벽 관리 탭을 생성합니다.
 func NewTemplateTab(window fyne.Window, store *storage.JSONStore) *TemplateTab {
 	tab := &TemplateTab{
 		window:    window,

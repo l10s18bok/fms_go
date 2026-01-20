@@ -25,12 +25,12 @@ import (
 type MainUI struct {
 	window      fyne.Window
 	store       *storage.JSONStore
-	tabs        *container.DocTabs  // 닫기 버튼이 있는 탭
-	leftMenu    *fyne.Container     // 왼쪽 메뉴
+	tabs        *container.DocTabs // 닫기 버튼이 있는 탭
+	leftMenu    *fyne.Container    // 왼쪽 메뉴
 	templateTab *TemplateTab
 	deviceTab   *DeviceTab
 	historyTab  *HistoryTab
-	programTab  *ProgramTab         // 프로그램 관리 탭
+	programTab  *ProgramTab // 프로그램 관리 탭
 
 	// 탭 아이템 참조 (동적 추가/제거용)
 	templateTabItem *container.TabItem
@@ -58,7 +58,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 	ui.historyTab.SetDeviceTab(ui.deviceTab)
 
 	// 탭 아이템 생성 (동적 추가/제거용)
-	ui.templateTabItem = container.NewTabItemWithIcon("방화벽 룰 관리", theme.DocumentIcon(), ui.templateTab.Content())
+	ui.templateTabItem = container.NewTabItemWithIcon("방화벽 관리", theme.DocumentIcon(), ui.templateTab.Content())
 	ui.deviceTabItem = container.NewTabItemWithIcon("장비 관리", theme.ComputerIcon(), ui.deviceTab.Content())
 	ui.historyTabItem = container.NewTabItemWithIcon("배포 이력", theme.HistoryIcon(), ui.historyTab.Content())
 	ui.programTabItem = container.NewTabItemWithIcon("프로그램 관리", theme.FolderOpenIcon(), ui.programTab.Content())
@@ -85,7 +85,7 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 	// 네이티브 메뉴바 설정
 	ui.setupMainMenu()
 
-	// 초기 탭 열기: 방화벽 룰 관리
+	// 초기 탭 열기: 방화벽 관리
 	ui.openTab(ui.templateTabItem)
 
 	return ui
@@ -93,8 +93,8 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore) *MainUI {
 
 // 왼쪽 메뉴를 생성합니다.
 func (m *MainUI) createLeftMenu() {
-	// 방화벽 룰 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
-	ruleBtn := component.NewCustomButton("방화벽 룰 관리", nil, nil, nil, func() {
+	// 방화벽 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
+	ruleBtn := component.NewCustomButton("방화벽 관리", nil, nil, nil, func() {
 		m.openTab(m.templateTabItem)
 	}, 4, 4, 0, 0)
 
