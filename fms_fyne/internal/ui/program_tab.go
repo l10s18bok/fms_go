@@ -88,10 +88,10 @@ func (t *ProgramTab) createUI() {
 	topBar := container.New(layout.NewCustomPaddedLayout(10, 10, 10, 10), topBarLine)
 
 	// 테이블 설정
-	t.programTable = component.NewPagedTable(component.PagedTableConfig{
+	t.programTable = component.NewPagedTableWithWindow(component.PagedTableConfig{
 		Columns: []component.ColumnDef{
 			{Header: "선택", Width: 50},
-			{Header: "이름", Width: 150},
+			{Header: "패키지명", Width: 150},
 			{Header: "버전", Width: 100},
 			{Header: "업로드 경로", Width: 225},
 			{Header: "로컬파일 경로", Width: 375},
@@ -104,7 +104,84 @@ func (t *ProgramTab) createUI() {
 		OnRowDoubleClick: func(row int) {
 			t.onRowDoubleClick(row)
 		},
-	})
+		// 패키지명(1), 버전(2), 업로드 경로(3) 컬럼 인라인 편집 설정
+		EditableColumns: map[int]component.EditColumnConfig{
+			1: { // 패키지명 컬럼
+				Type: component.EditTypeEntry,
+				GetValue: func(row int) string {
+					if row >= 0 && row < len(t.filteredPrograms) {
+						return t.filteredPrograms[row].ProcessName
+					}
+					return ""
+				},
+				OnEdit: func(row int, oldValue, newValue string) bool {
+					if row >= 0 && row < len(t.filteredPrograms) {
+						if newValue == "" {
+							dialog.ShowError(fmt.Errorf("패키지명을 입력해주세요"), t.window)
+							return false
+						}
+						p := t.filteredPrograms[row]
+						p.ProcessName = newValue
+						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
+						if err := t.store.SaveProgram(p); err != nil {
+							dialog.ShowError(err, t.window)
+							return false
+						}
+						return true
+					}
+					return false
+				},
+			},
+			2: { // 버전 컬럼
+				Type: component.EditTypeEntry,
+				GetValue: func(row int) string {
+					if row >= 0 && row < len(t.filteredPrograms) {
+						return t.filteredPrograms[row].ProcessVersion
+					}
+					return ""
+				},
+				OnEdit: func(row int, oldValue, newValue string) bool {
+					if row >= 0 && row < len(t.filteredPrograms) {
+						if newValue == "" {
+							dialog.ShowError(fmt.Errorf("버전을 입력해주세요"), t.window)
+							return false
+						}
+						p := t.filteredPrograms[row]
+						p.ProcessVersion = newValue
+						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
+						if err := t.store.SaveProgram(p); err != nil {
+							dialog.ShowError(err, t.window)
+							return false
+						}
+						return true
+					}
+					return false
+				},
+			},
+			3: { // 업로드 경로 컬럼
+				Type: component.EditTypeEntry,
+				GetValue: func(row int) string {
+					if row >= 0 && row < len(t.filteredPrograms) {
+						return t.filteredPrograms[row].ProcessUploadPath
+					}
+					return ""
+				},
+				OnEdit: func(row int, oldValue, newValue string) bool {
+					if row >= 0 && row < len(t.filteredPrograms) {
+						p := t.filteredPrograms[row]
+						p.ProcessUploadPath = newValue
+						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
+						if err := t.store.SaveProgram(p); err != nil {
+							dialog.ShowError(err, t.window)
+							return false
+						}
+						return true
+					}
+					return false
+				},
+			},
+		},
+	}, t.window)
 
 	// 메인 컨텐츠
 	t.content = container.NewBorder(
@@ -267,7 +344,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 
 	// 입력 필드 생성
 	nameEntry := widget.NewEntry()
-	nameEntry.SetPlaceHolder("패키지 이름")
+	nameEntry.SetPlaceHolder("패키지명")
 
 	versionEntry := widget.NewEntry()
 	versionEntry.SetPlaceHolder("버전 (예: v1.0.0)")
@@ -304,9 +381,9 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 
 	// 폼 컨텐츠 (라인 간격 2배)
 	formContent := container.NewVBox(
-		// 이름
+		// 패키지명
 		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("이름:")),
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("패키지명:")),
 			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), nameEntry),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
@@ -337,7 +414,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	onSave := func() {
 		// 유효성 검사
 		if nameEntry.Text == "" {
-			dialog.ShowError(fmt.Errorf("패키지 이름을 입력해주세요"), t.window)
+			dialog.ShowError(fmt.Errorf("패키지명을 입력해주세요"), t.window)
 			return
 		}
 		if versionEntry.Text == "" {

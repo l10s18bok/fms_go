@@ -178,7 +178,7 @@ func (d *DeviceTab) updateStatusSummary() {
 // 장비 테이블 패널을 생성합니다. (PRD 3.3.3 기준)
 func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 	// PRD 테이블 컬럼: 선택, 장비명, 서버 IP, 서버상태, 보고시간, 접속방식
-	d.deviceTable = component.NewPagedTable(component.PagedTableConfig{
+	d.deviceTable = component.NewPagedTableWithWindow(component.PagedTableConfig{
 		Columns: []component.ColumnDef{
 			{Header: "선택", Width: 50},
 			{Header: "장비명", Width: 240},
@@ -200,7 +200,68 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 				d.showDetailDialog(d.filteredFirewalls[row])
 			}
 		},
-	})
+		// 장비명(1)과 서버 IP(2) 컬럼 인라인 편집 설정
+		EditableColumns: map[int]component.EditColumnConfig{
+			1: { // 장비명 컬럼
+				Type: component.EditTypeEntry,
+				GetValue: func(row int) string {
+					if row >= 0 && row < len(d.filteredFirewalls) {
+						fw := d.filteredFirewalls[row]
+						if fw.DeviceName != "" && fw.DeviceName != fw.DeviceIP {
+							return fw.DeviceName
+						}
+					}
+					return ""
+				},
+				OnEdit: func(row int, oldValue, newValue string) bool {
+					if row >= 0 && row < len(d.filteredFirewalls) {
+						fw := d.filteredFirewalls[row]
+						fw.DeviceName = newValue
+						// DeviceName이 비어있으면 IP 사용
+						if fw.DeviceName == "" {
+							fw.DeviceName = fw.DeviceIP
+						}
+						if err := d.store.SaveFirewall(fw); err != nil {
+							dialog.ShowError(err, d.window)
+							return false
+						}
+						return true
+					}
+					return false
+				},
+			},
+			2: { // 서버 IP 컬럼
+				Type: component.EditTypeEntry,
+				GetValue: func(row int) string {
+					if row >= 0 && row < len(d.filteredFirewalls) {
+						fw := d.filteredFirewalls[row]
+						if fw.DeviceIP != "" {
+							return fw.DeviceIP
+						}
+						return fw.DeviceName
+					}
+					return ""
+				},
+				OnEdit: func(row int, oldValue, newValue string) bool {
+					if row >= 0 && row < len(d.filteredFirewalls) {
+						// IP 형식 유효성 검사
+						if newValue != "" && !isValidIPOrHostPort(newValue) {
+							dialog.ShowError(fmt.Errorf("올바른 IP 주소 형식이 아닙니다"), d.window)
+							return false
+						}
+						fw := d.filteredFirewalls[row]
+						fw.DeviceIP = newValue
+						if err := d.store.SaveFirewall(fw); err != nil {
+							dialog.ShowError(err, d.window)
+							return false
+						}
+						return true
+					}
+					return false
+				},
+			},
+		},
+	}, d.window)
 
 	return d.deviceTable.Content()
 }
