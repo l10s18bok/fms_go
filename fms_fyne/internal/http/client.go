@@ -103,11 +103,11 @@ func (c *Client) CheckHealthDirect(deviceIP string) (bool, error) {
 	return success, nil
 }
 
-// Agent 서버를 통해 템플릿을 배포합니다.
+// Agent 서버를 통해 방화벽 룰을 배포합니다.
 func (c *Client) DeployViaAgent(deviceIP string, template string) (*model.DeployResult, error) {
 	url := fmt.Sprintf("%s/agent/req-deploy", strings.TrimSuffix(c.config.AgentServerURL, "/"))
 
-	// 요청 데이터 생성 (index.html과 동일한 형식)
+	// 요청 데이터 생성
 	reqData := map[string]interface{}{
 		"template": template,
 		"ipAddrs":  []string{deviceIP},
@@ -151,7 +151,7 @@ func (c *Client) DeployViaAgent(deviceIP string, template string) (*model.Deploy
 	return nil, fmt.Errorf("장비 %s의 배포 결과를 찾을 수 없습니다", deviceIP)
 }
 
-// 직접 연결로 템플릿을 배포합니다.
+// 직접 연결로 방화벽 룰을 배포합니다.
 func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployResult, error) {
 	url := fmt.Sprintf("http://%s/agent/firewall-deploy", deviceIP)
 	log.Printf("[DEBUG] DeployDirect: URL=%s", url)
@@ -243,7 +243,7 @@ func (c *Client) CheckHealth(fw *model.Firewall) (string, error) {
 	return model.ServerStatusStop, nil
 }
 
-// 템플릿을 배포합니다. (설정에 따라 Agent 또는 Direct)
+// 방화벽 룰을 배포합니다. (설정에 따라 Agent 또는 Direct)
 func (c *Client) DeployTemplate(fw *model.Firewall, template string) (*model.DeployResult, error) {
 	// DeviceIP 사용 (DeviceIP가 없으면 DeviceName 사용 - 하위 호환)
 	ip := fw.DeviceIP

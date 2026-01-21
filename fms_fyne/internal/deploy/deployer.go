@@ -32,7 +32,7 @@ type DeployResult struct {
 	ErrorMsg string
 }
 
-// 단일 장비에 템플릿을 배포합니다.
+// 단일 장비에 방화벽 룰을 배포합니다.
 func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployResult {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -42,7 +42,7 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 		History:  model.NewDeployHistory(fw.DeviceName, fw.DeviceIP, template.Version),
 	}
 
-	// 템플릿 전체를 배포
+	// 방화벽 룰 전체를 배포
 	deployResult, err := d.client.DeployTemplate(fw, template.Contents)
 	if err != nil {
 		result.Success = false
@@ -107,7 +107,7 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 	return result
 }
 
-// 여러 장비에 템플릿을 배포합니다.
+// 여러 장비에 방화벽 룰을 배포합니다.
 func (d *Deployer) DeployToMultiple(firewalls []*model.Firewall, template *model.Template, progressCb func(int, int, string)) []*DeployResult {
 	results := make([]*DeployResult, 0, len(firewalls))
 	total := len(firewalls)
