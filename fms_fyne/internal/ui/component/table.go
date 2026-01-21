@@ -121,6 +121,7 @@ func (t *PagedTable) createUI() {
 
 			// 일반 라벨 (Truncation 설정으로 텍스트가 컬럼 너비를 초과하지 않도록 함)
 			label := widget.NewLabel("")
+			label.Wrapping = fyne.TextWrapOff
 			label.Truncation = fyne.TextTruncateEllipsis
 
 			// 커스텀 셀용 컨테이너
@@ -145,6 +146,10 @@ func (t *PagedTable) createUI() {
 			t.table.SetColumnWidth(i, col.Width)
 		}
 	}
+
+	// 행 높이 고정 (텍스트 오버랩 방지)
+	t.table.SetRowHeight(0, 30) // 헤더 행
+	// 데이터 행 높이는 UpdateCell에서 동적으로 설정
 
 	// 셀 선택 이벤트 (클릭/Enter 키/방향키)
 	t.table.OnSelected = func(id widget.TableCellID) {
@@ -280,6 +285,9 @@ func (t *PagedTable) updateCell(id widget.TableCellID, cell fyne.CanvasObject) {
 		background.Refresh()
 		return
 	}
+
+	// 데이터 행 높이 고정 (텍스트 오버랩 방지)
+	t.table.SetRowHeight(id.Row, 30)
 
 	// 더블탭 콜백 설정 (OnRowDoubleClick이 설정된 경우)
 	if t.config.OnRowDoubleClick != nil {
@@ -494,14 +502,25 @@ func (t *PagedTable) SetData(totalItems int) {
 	t.currentPage = 0
 	t.selectedRow = -1
 	t.allSelected = false
+	t.applyColumnWidths()
 	t.table.Refresh()
 	t.updatePaginationUI()
 }
 
 // Refresh 테이블 새로고침
 func (t *PagedTable) Refresh() {
+	t.applyColumnWidths()
 	t.table.Refresh()
 	t.updatePaginationUI()
+}
+
+// applyColumnWidths 컬럼 너비 적용
+func (t *PagedTable) applyColumnWidths() {
+	for i, col := range t.config.Columns {
+		if col.Width > 0 {
+			t.table.SetColumnWidth(i, col.Width)
+		}
+	}
 }
 
 // NextPage 다음 페이지로 이동

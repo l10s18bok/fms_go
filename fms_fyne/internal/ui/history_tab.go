@@ -56,17 +56,22 @@ func (h *HistoryTab) createUI() {
 }
 
 // 이력 테이블 패널을 생성합니다. (PRD 3.3.4 기준)
-// 컬럼: 선택, 시간, 장비명, 장비 IP, 유형, 버전, 결과
+// 컬럼: 선택, 시간, 장비명, 장비 IP, 유형, 버전, 결과, 메시지
 func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
+	// 메시지 컬럼 너비: 긴 텍스트를 표시할 수 있도록 충분히 넓게 설정
+	// 다른 컬럼 합계: 50+150+120+150+80+80+60 = 690
+	messageColumnWidth := float32(600) // 충분히 넓은 기본값
+
 	h.historyTable = component.NewPagedTable(component.PagedTableConfig{
 		Columns: []component.ColumnDef{
 			{Header: "선택", Width: 50},
 			{Header: "시간", Width: 150},
-			{Header: "장비명", Width: 150},
-			{Header: "장비 IP", Width: 225},
-			{Header: "유형", Width: 100},
+			{Header: "장비명", Width: 120},
+			{Header: "장비 IP", Width: 150},
+			{Header: "유형", Width: 80},
 			{Header: "버전", Width: 80},
 			{Header: "결과", Width: 60},
+			{Header: "메시지", Width: messageColumnWidth},
 		},
 		PageSize: 15,
 		OnCellUpdate: func(row int, col int, cell fyne.CanvasObject) {
@@ -146,6 +151,17 @@ func (h *HistoryTab) updateHistoryCell(row int, col int, cell fyne.CanvasObject)
 		}
 	case 6: // 결과
 		label.SetText(model.GetDeployStatusText(history.Status))
+	case 7: // 메시지
+		if history.Message != "" {
+			// 첫 번째 줄만 표시 (줄바꿈 이전까지)
+			msg := history.Message
+			if idx := strings.Index(msg, "\n"); idx != -1 {
+				msg = msg[:idx]
+			}
+			label.SetText(msg)
+		} else {
+			label.SetText("-")
+		}
 	}
 }
 
