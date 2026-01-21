@@ -270,6 +270,11 @@ func (d *DeviceTab) applyFilter() {
 				filtered = append(filtered, fw)
 			}
 		}
+		// 검색 결과가 없으면 이전 상태 유지
+		if len(filtered) == 0 {
+			dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", d.window)
+			return
+		}
 		d.filteredFirewalls = filtered
 	}
 

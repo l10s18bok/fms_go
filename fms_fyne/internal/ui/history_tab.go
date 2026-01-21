@@ -150,12 +150,23 @@ func (h *HistoryTab) updateHistoryCell(row int, col int, cell fyne.CanvasObject)
 
 // 검색을 실행합니다. (PRD 3.3.4 검색 기능)
 func (h *HistoryTab) onSearch() {
-	h.searchKeyword = strings.TrimSpace(h.searchBox.GetText())
+	keyword := strings.TrimSpace(h.searchBox.GetText())
+
+	// 이전 키워드와 필터된 목록 저장
+	prevKeyword := h.searchKeyword
+	prevFiltered := h.filteredHistories
+
+	h.searchKeyword = keyword
 	h.applyFilter()
 
-	// 검색 결과가 없으면 다이얼로그 표시
-	if len(h.filteredHistories) == 0 && h.searchKeyword != "" {
+	// 검색 결과가 없으면 이전 상태 유지
+	if len(h.filteredHistories) == 0 && keyword != "" {
 		dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", h.window)
+		h.searchKeyword = prevKeyword
+		h.filteredHistories = prevFiltered
+		if h.historyTable != nil {
+			h.historyTable.SetData(len(h.filteredHistories))
+		}
 	}
 }
 

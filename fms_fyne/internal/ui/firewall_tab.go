@@ -158,10 +158,12 @@ func (t *FirewallTab) filterFiles(query string) {
 				filtered = append(filtered, f)
 			}
 		}
-		t.filteredFiles = filtered
+		// 검색 결과가 없으면 이전 상태 유지
 		if len(filtered) == 0 {
 			dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", t.window)
+			return
 		}
+		t.filteredFiles = filtered
 	}
 	t.fileTable.SetData(len(t.filteredFiles))
 }

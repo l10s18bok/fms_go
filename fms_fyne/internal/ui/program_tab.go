@@ -152,10 +152,12 @@ func (t *ProgramTab) filterPrograms(query string) {
 				filtered = append(filtered, p)
 			}
 		}
-		t.filteredPrograms = filtered
+		// 검색 결과가 없으면 이전 상태 유지
 		if len(filtered) == 0 {
 			dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", t.window)
+			return
 		}
+		t.filteredPrograms = filtered
 	}
 	t.programTable.SetData(len(t.filteredPrograms))
 }
