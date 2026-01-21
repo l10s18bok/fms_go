@@ -2,8 +2,6 @@ package model
 
 import (
 	"time"
-
-	"fms/internal/domain"
 )
 
 // ProcessInfo 업데이트 패키지 정보
@@ -22,7 +20,7 @@ func NewProcessInfo(name, version string) *ProcessInfo {
 		ID:                -1, // 새 패키지은 -1로 시작, 저장 시 ID 할당
 		ProcessName:       name,
 		ProcessVersion:    version,
-		ProcessUploadPath: domain.DefaultRemotePath, // 기본 업로드 경로
+		ProcessUploadPath: DefaultRemotePath, // 기본 업로드 경로
 		ProcessCreatedAt:  time.Now().Format("2006-01-02 15:04:05"),
 	}
 }

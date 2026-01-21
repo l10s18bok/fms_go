@@ -64,6 +64,52 @@ func NewFirewall(deviceName string) *Firewall {
 	}
 }
 
+// 장비명과 IP로 새로운 장비를 생성합니다.
+func NewFirewallWithIP(deviceName, deviceIP string) *Firewall {
+	fw := NewFirewall(deviceName)
+	fw.DeviceIP = deviceIP
+	return fw
+}
+
+// 인증 방식을 반환합니다.
+func (f *Firewall) GetAuthType() AuthType {
+	if f.DevicePPK != "" {
+		return AuthTypePPK
+	}
+	if f.DevicePW != "" {
+		return AuthTypePassword
+	}
+	return AuthTypeNone
+}
+
+// SSH 인증 정보가 설정되어 있는지 확인합니다.
+func (f *Firewall) HasSSHCredentials() bool {
+	return f.DeviceID != "" && (f.DevicePW != "" || f.DevicePPK != "")
+}
+
+// 특정 패키지의 버전을 반환합니다.
+func (f *Firewall) GetProcessVersion(processName string) string {
+	if f.ProgramVersions == nil {
+		return "-"
+	}
+	if version, ok := f.ProgramVersions[processName]; ok {
+		return version
+	}
+	return "-"
+}
+
+// 인증 타입을 표시 텍스트로 변환합니다.
+func GetAuthTypeText(authType AuthType) string {
+	switch authType {
+	case AuthTypePassword:
+		return "비밀번호"
+	case AuthTypePPK:
+		return "PPK"
+	default:
+		return "-"
+	}
+}
+
 // 장비 정보가 유효한지 검사합니다.
 func (f *Firewall) IsValid() bool {
 	return f.DeviceName != ""

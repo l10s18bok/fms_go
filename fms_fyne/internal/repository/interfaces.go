@@ -1,18 +1,18 @@
 // Package repository는 데이터 접근 추상화 계층을 정의합니다.
 package repository
 
-import "fms/internal/domain"
+import "fms/internal/model"
 
 // FirewallRepository 장비 저장소 인터페이스
 type FirewallRepository interface {
 	// GetAll 모든 장비를 조회합니다.
-	GetAll() ([]*domain.Firewall, error)
+	GetAll() ([]*model.Firewall, error)
 	// GetByIndex 인덱스로 장비를 조회합니다.
-	GetByIndex(index int) (*domain.Firewall, error)
+	GetByIndex(index int) (*model.Firewall, error)
 	// GetByIP IP 주소로 장비를 조회합니다.
-	GetByIP(ip string) (*domain.Firewall, error)
+	GetByIP(ip string) (*model.Firewall, error)
 	// Save 장비를 저장합니다. (신규 생성 또는 업데이트)
-	Save(fw *domain.Firewall) error
+	Save(fw *model.Firewall) error
 	// Delete 장비를 삭제합니다.
 	Delete(index int) error
 	// Clear 모든 장비를 삭제합니다.
@@ -24,13 +24,13 @@ type FirewallRepository interface {
 // ProgramRepository 패키지 저장소 인터페이스 (신규)
 type ProgramRepository interface {
 	// GetAll 모든 패키지을 조회합니다.
-	GetAll() ([]*domain.ProcessInfo, error)
+	GetAll() ([]*model.ProcessInfo, error)
 	// GetByID ID로 패키지을 조회합니다.
-	GetByID(id int) (*domain.ProcessInfo, error)
+	GetByID(id int) (*model.ProcessInfo, error)
 	// GetByName 이름으로 패키지을 조회합니다.
-	GetByName(name string) (*domain.ProcessInfo, error)
+	GetByName(name string) (*model.ProcessInfo, error)
 	// Save 패키지을 저장합니다. (신규 생성 또는 업데이트)
-	Save(p *domain.ProcessInfo) error
+	Save(p *model.ProcessInfo) error
 	// Delete 패키지을 삭제합니다.
 	Delete(id int) error
 	// Clear 모든 패키지을 삭제합니다.
@@ -42,13 +42,13 @@ type ProgramRepository interface {
 // HistoryRepository 배포 이력 저장소 인터페이스
 type HistoryRepository interface {
 	// GetAll 모든 이력을 조회합니다.
-	GetAll() ([]*domain.DeployHistory, error)
+	GetAll() ([]*model.DeployHistory, error)
 	// GetByID ID로 이력을 조회합니다.
-	GetByID(id int) (*domain.DeployHistory, error)
+	GetByID(id int) (*model.DeployHistory, error)
 	// GetByType 이력 유형으로 조회합니다.
-	GetByType(historyType string) ([]*domain.DeployHistory, error)
+	GetByType(historyType string) ([]*model.DeployHistory, error)
 	// Save 이력을 저장합니다.
-	Save(h *domain.DeployHistory) error
+	Save(h *model.DeployHistory) error
 	// Delete 이력을 삭제합니다.
 	Delete(id int) error
 	// Clear 모든 이력을 삭제합니다.
@@ -60,11 +60,11 @@ type HistoryRepository interface {
 // TemplateRepository 템플릿 저장소 인터페이스
 type TemplateRepository interface {
 	// GetAll 모든 템플릿을 조회합니다.
-	GetAll() ([]*domain.Template, error)
+	GetAll() ([]*model.Template, error)
 	// GetByVersion 버전으로 템플릿을 조회합니다.
-	GetByVersion(version string) (*domain.Template, error)
+	GetByVersion(version string) (*model.Template, error)
 	// Save 템플릿을 저장합니다. (신규 생성 또는 업데이트)
-	Save(t *domain.Template) error
+	Save(t *model.Template) error
 	// Delete 템플릿을 삭제합니다.
 	Delete(version string) error
 	// Clear 모든 템플릿을 삭제합니다.
@@ -76,7 +76,7 @@ type TemplateRepository interface {
 // ConfigRepository 설정 저장소 인터페이스
 type ConfigRepository interface {
 	// Get 설정을 조회합니다.
-	Get() (*domain.Config, error)
+	Get() (*model.Config, error)
 	// Save 설정을 저장합니다.
-	Save(c *domain.Config) error
+	Save(c *model.Config) error
 }

@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fms/internal/domain"
 	"fms/internal/model"
 	"fms/internal/storage"
 )
@@ -17,42 +16,23 @@ func NewJSONProgramRepository(store *storage.JSONStore) ProgramRepository {
 }
 
 // GetAll 모든 패키지을 조회합니다.
-func (r *JSONProgramRepository) GetAll() ([]*domain.ProcessInfo, error) {
-	programs, err := r.store.GetAllPrograms()
-	if err != nil {
-		return nil, err
-	}
-	return r.toDomainList(programs), nil
+func (r *JSONProgramRepository) GetAll() ([]*model.ProcessInfo, error) {
+	return r.store.GetAllPrograms()
 }
 
 // GetByID ID로 패키지을 조회합니다.
-func (r *JSONProgramRepository) GetByID(id int) (*domain.ProcessInfo, error) {
-	p, err := r.store.GetProgram(id)
-	if err != nil {
-		return nil, err
-	}
-	return r.toDomain(p), nil
+func (r *JSONProgramRepository) GetByID(id int) (*model.ProcessInfo, error) {
+	return r.store.GetProgram(id)
 }
 
 // GetByName 이름으로 패키지을 조회합니다.
-func (r *JSONProgramRepository) GetByName(name string) (*domain.ProcessInfo, error) {
-	p, err := r.store.GetProgramByName(name)
-	if err != nil {
-		return nil, err
-	}
-	return r.toDomain(p), nil
+func (r *JSONProgramRepository) GetByName(name string) (*model.ProcessInfo, error) {
+	return r.store.GetProgramByName(name)
 }
 
 // Save 패키지을 저장합니다.
-func (r *JSONProgramRepository) Save(p *domain.ProcessInfo) error {
-	modelP := r.toModel(p)
-	err := r.store.SaveProgram(modelP)
-	if err != nil {
-		return err
-	}
-	// ID 업데이트 (새로 생성된 경우)
-	p.ID = modelP.ID
-	return nil
+func (r *JSONProgramRepository) Save(p *model.ProcessInfo) error {
+	return r.store.SaveProgram(p)
 }
 
 // Delete 패키지을 삭제합니다.
@@ -68,43 +48,4 @@ func (r *JSONProgramRepository) Clear() error {
 // Count 패키지 수를 반환합니다.
 func (r *JSONProgramRepository) Count() int {
 	return r.store.CountPrograms()
-}
-
-// toDomain model.ProcessInfo를 domain.ProcessInfo로 변환합니다.
-func (r *JSONProgramRepository) toDomain(p *model.ProcessInfo) *domain.ProcessInfo {
-	if p == nil {
-		return nil
-	}
-	return &domain.ProcessInfo{
-		ID:                p.ID,
-		ProcessName:       p.ProcessName,
-		ProcessFilePath:   p.ProcessFilePath,
-		ProcessUploadPath: p.ProcessUploadPath,
-		ProcessVersion:    p.ProcessVersion,
-		ProcessCreatedAt:  p.ProcessCreatedAt,
-	}
-}
-
-// toDomainList model.ProcessInfo 슬라이스를 domain.ProcessInfo 슬라이스로 변환합니다.
-func (r *JSONProgramRepository) toDomainList(programs []*model.ProcessInfo) []*domain.ProcessInfo {
-	result := make([]*domain.ProcessInfo, len(programs))
-	for i, p := range programs {
-		result[i] = r.toDomain(p)
-	}
-	return result
-}
-
-// toModel domain.ProcessInfo를 model.ProcessInfo로 변환합니다.
-func (r *JSONProgramRepository) toModel(p *domain.ProcessInfo) *model.ProcessInfo {
-	if p == nil {
-		return nil
-	}
-	return &model.ProcessInfo{
-		ID:                p.ID,
-		ProcessName:       p.ProcessName,
-		ProcessFilePath:   p.ProcessFilePath,
-		ProcessUploadPath: p.ProcessUploadPath,
-		ProcessVersion:    p.ProcessVersion,
-		ProcessCreatedAt:  p.ProcessCreatedAt,
-	}
 }

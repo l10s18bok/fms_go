@@ -8,7 +8,25 @@ const (
 )
 
 // 기본 타임아웃 (초)
-const DefaultTimeoutSeconds = 5
+const DefaultTimeoutSeconds = 30
+
+// 기본 SSH 포트
+const DefaultSSHPort = 22
+
+// 기본 HTTP 포트
+const DefaultHTTPPort = 8080
+
+// 기본 원격 업로드 경로
+const DefaultRemotePath = "/download/"
+
+// 인증 타입 상수
+type AuthType string
+
+const (
+	AuthTypeNone     AuthType = "none"     // 인증 정보 없음
+	AuthTypePassword AuthType = "password" // 비밀번호 인증
+	AuthTypePPK      AuthType = "ppk"      // PPK 키 인증
+)
 
 // 테마 상수
 const (
