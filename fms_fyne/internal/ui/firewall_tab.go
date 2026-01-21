@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -61,13 +62,13 @@ func (t *FirewallTab) createUI() {
 		},
 	})
 
-	// 삭제 버튼
-	deleteBtn := component.NewCustomButton("선택삭제", nil, themes.Colors["red"], nil, func() {
+	// 삭제 버튼 (휴지통 아이콘 + 삭제, 빨간 배경, 흰색 텍스트)
+	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
 		t.onDeleteSelected()
 	})
 
 	// 파일추가/수정 버튼
-	addEditBtn := component.NewCustomButton("파일추가/수정", nil, nil, themes.Colors["blue"], func() {
+	addEditBtn := component.NewCustomButton("+파일추가/수정", nil, nil, themes.Colors["blue"], func() {
 		t.onAddOrEdit()
 	})
 

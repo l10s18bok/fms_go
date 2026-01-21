@@ -122,8 +122,8 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 		d.refreshBtn,
 	)
 
-	// 삭제 버튼 (투명 배경, 빨간 텍스트)
-	deleteBtn := component.NewCustomButton("삭제", nil, themes.Colors["red"], nil, func() {
+	// 삭제 버튼 (빨간 배경, 흰색 텍스트)
+	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
 		d.onDeleteDevices()
 	})
 
@@ -133,7 +133,7 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 	})
 
 	// 추가/수정 버튼
-	addEditBtn := component.NewCustomButton("추가/수정", nil, nil, themes.Colors["blue"], func() {
+	addEditBtn := component.NewCustomButton("+추가/수정", nil, nil, themes.Colors["blue"], func() {
 		d.showAddEditDialog()
 	})
 

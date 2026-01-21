@@ -135,7 +135,7 @@ func NewRedTextButton(text string, onTap func()) fyne.CanvasObject {
 
 // 전천후 커스텀 버튼을 생성합니다.
 // - icon: nil이면 텍스트만 표시
-// - iconColor: 아이콘/텍스트 색상 (nil이면 테마 foreground 색상 사용)
+// - iconColor: 아이콘/텍스트 색상 (nil이면 테마 foreground 색상 사용, bgColor가 있으면 흰색 사용)
 // - bgColor: nil이면 투명 배경 (텍스트 버튼)
 // - margin: 외부 여백 (상, 하, 좌, 우 순서, 생략 시 0)
 func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.Color, onTap func(), margin ...float32) fyne.CanvasObject {
@@ -159,9 +159,7 @@ func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.
 
 	if icon != nil && label != "" {
 		// 아이콘 + 텍스트
-		iconImg := canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
-		iconImg.SetMinSize(fyne.NewSize(16, 16))
-		iconImg.FillMode = canvas.ImageFillContain
+		iconImg := createIconImage(icon, iconColor, bgColor)
 		if useThemeColor {
 			lbl := widget.NewLabelWithStyle(label, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 			content = container.NewHBox(iconImg, lbl)
@@ -170,9 +168,7 @@ func NewCustomButton(label string, icon fyne.Resource, iconColor, bgColor color.
 		}
 	} else if icon != nil {
 		// 아이콘만
-		iconImg := canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
-		iconImg.SetMinSize(fyne.NewSize(16, 16))
-		iconImg.FillMode = canvas.ImageFillContain
+		iconImg := createIconImage(icon, iconColor, bgColor)
 		content = iconImg
 	} else if bgColor != nil && isTransparent(bgColor) {
 		// 테두리 + 텍스트 (bgColor가 투명색인 경우)
@@ -241,4 +237,41 @@ func isTransparent(c color.Color) bool {
 	// RGBA 값으로 알파가 0인지 확인
 	_, _, _, a := c.RGBA()
 	return a == 0
+}
+
+// 아이콘 이미지를 생성합니다.
+// - iconColor가 지정되면 해당 색상으로 아이콘 표시
+// - bgColor가 있고 iconColor가 nil이면 흰색 아이콘 사용
+// - 둘 다 nil이면 테마 색상 사용
+func createIconImage(icon fyne.Resource, iconColor, bgColor color.Color) *canvas.Image {
+	var iconImg *canvas.Image
+
+	if iconColor != nil {
+		// 지정된 색상으로 아이콘 표시
+		iconImg = canvas.NewImageFromResource(&coloredResource{resource: icon, color: iconColor})
+	} else if bgColor != nil {
+		// 배경색이 있으면 흰색 아이콘 사용
+		iconImg = canvas.NewImageFromResource(theme.NewInvertedThemedResource(icon))
+	} else {
+		// 테마 색상 사용
+		iconImg = canvas.NewImageFromResource(theme.NewThemedResource(icon))
+	}
+
+	iconImg.SetMinSize(fyne.NewSize(16, 16))
+	iconImg.FillMode = canvas.ImageFillContain
+	return iconImg
+}
+
+// coloredResource는 특정 색상으로 아이콘을 렌더링하는 리소스입니다.
+type coloredResource struct {
+	resource fyne.Resource
+	color    color.Color
+}
+
+func (c *coloredResource) Name() string {
+	return c.resource.Name()
+}
+
+func (c *coloredResource) Content() []byte {
+	return c.resource.Content()
 }

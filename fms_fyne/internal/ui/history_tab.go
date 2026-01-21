@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -90,8 +91,8 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 		},
 	})
 
-	// 선택 삭제 버튼
-	deleteBtn := component.NewCustomButton("선택삭제", nil, themes.Colors["red"], nil, func() {
+	// 삭제 버튼 (휴지통 아이콘 + 삭제, 빨간 배경, 흰색 텍스트)
+	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
 		h.onDeleteHistory()
 	})
 

@@ -118,6 +118,11 @@ func (m *MainUI) createLeftMenu() {
 		m.openTab(m.firewallTabItem)
 	}, 4, 4, 0, 0)
 
+	// 패키지 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
+	programBtn := component.NewCustomButton("패키지 관리", nil, nil, nil, func() {
+		m.openTab(m.programTabItem)
+	}, 4, 4, 0, 0)
+
 	// 장비 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
 	deviceBtn := component.NewCustomButton("장비 관리", nil, nil, nil, func() {
 		m.openTab(m.deviceTabItem)
@@ -128,17 +133,12 @@ func (m *MainUI) createLeftMenu() {
 		m.openTab(m.historyTabItem)
 	}, 4, 4, 0, 0)
 
-	// 패키지 관리 버튼 (텍스트만, 위아래 간격 4, 테마 반응형)
-	programBtn := component.NewCustomButton("패키지 관리", nil, nil, nil, func() {
-		m.openTab(m.programTabItem)
-	}, 4, 4, 0, 0)
-
-	// 왼쪽 메뉴 레이아웃
+	// 왼쪽 메뉴 레이아웃: 방화벽 관리 → 패키지 관리 → 장비 관리 → 배포 이력
 	m.leftMenu = container.NewVBox(
 		ruleBtn,
+		programBtn,
 		deviceBtn,
 		historyBtn,
-		programBtn,
 	)
 }
 
