@@ -733,42 +733,28 @@ func (t *PagedTable) cancelEditing() {
 	t.table.Refresh()
 }
 
-// editableEntry ESC 키 및 포커스 잃음 처리가 가능한 Entry 확장
+// editableEntry ESC 키 처리가 가능한 Entry 확장
 type editableEntry struct {
 	widget.Entry
-	onCancel  func()
-	submitted bool // 제출 완료 여부 (FocusLost에서 중복 취소 방지)
+	onCancel func()
 }
 
 func newEditableEntry(text string, onSubmit func(string), onCancel func()) *editableEntry {
 	e := &editableEntry{
-		onCancel:  onCancel,
-		submitted: false,
+		onCancel: onCancel,
 	}
 	e.ExtendBaseWidget(e)
 	e.SetText(text)
-	e.OnSubmitted = func(text string) {
-		e.submitted = true
-		onSubmit(text)
-	}
+	e.OnSubmitted = onSubmit
 	return e
 }
 
 func (e *editableEntry) TypedKey(key *fyne.KeyEvent) {
 	if key.Name == fyne.KeyEscape {
-		e.submitted = true // ESC도 의도적 종료로 처리
 		if e.onCancel != nil {
 			e.onCancel()
 		}
 		return
 	}
 	e.Entry.TypedKey(key)
-}
-
-func (e *editableEntry) FocusLost() {
-	e.Entry.FocusLost()
-	// 제출되지 않은 상태에서 포커스를 잃으면 편집 취소
-	if !e.submitted && e.onCancel != nil {
-		e.onCancel()
-	}
 }

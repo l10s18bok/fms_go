@@ -9,6 +9,7 @@ exe/
 # 설정 디렉토리 (민감 정보 포함 가능)
 config/
 config2/
+data/
 
 # 커널 모듈 소스 (참조용, 별도 관리)
 smartfw_hs/
