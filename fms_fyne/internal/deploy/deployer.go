@@ -2,6 +2,7 @@
 package deploy
 
 import (
+	"log"
 	"sync"
 
 	"fms/internal/http"
@@ -157,6 +158,7 @@ func (d *Deployer) HealthCheckBatch(firewalls []*model.Firewall) error {
 
 	// Agent 모드가 아니면 병렬로 개별 호출 처리
 	if !d.config.IsAgentMode() {
+		log.Printf("[DEBUG] HealthCheckBatch: Direct 모드 - %d개 장비 병렬 처리 시작", len(firewalls))
 		var wg sync.WaitGroup
 		for _, fw := range firewalls {
 			wg.Add(1)
@@ -166,6 +168,7 @@ func (d *Deployer) HealthCheckBatch(firewalls []*model.Firewall) error {
 			}(fw)
 		}
 		wg.Wait()
+		log.Printf("[DEBUG] HealthCheckBatch: Direct 모드 - 병렬 처리 완료")
 		return nil
 	}
 

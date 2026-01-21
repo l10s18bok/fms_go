@@ -923,7 +923,7 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName 
 	progressLabel := widget.NewLabel("배포 준비 중...")
 	progressBar := widget.NewProgressBar()
 	progressContent := container.NewVBox(progressLabel, progressBar)
-	progressDialog := dialog.NewCustomWithoutButtons("배포 진행 중", progressContent, d.window)
+	progressDialog := dialog.NewCustomWithoutButtons("배포 중", progressContent, d.window)
 	progressDialog.Show()
 
 	go func() {
@@ -940,19 +940,58 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName 
 		total := len(firewalls)
 		successCount := 0
 		failCount := 0
+		timeoutSeconds := config.GetTimeoutSeconds()
 
 		for i, fw := range firewalls {
-			idx := i
+			ip := fw.DeviceIP
+			if ip == "" {
+				ip = fw.DeviceName
+			}
+
+			// 레이블 설정: 단일 장비면 카운트 생략
+			var labelText string
+			if total == 1 {
+				labelText = fmt.Sprintf("배포 중: %s", ip)
+			} else {
+				labelText = fmt.Sprintf("배포 중: %s (%d/%d)", ip, i+1, total)
+			}
+
 			fyne.Do(func() {
-				ip := fw.DeviceIP
-				if ip == "" {
-					ip = fw.DeviceName
-				}
-				progressLabel.SetText(fmt.Sprintf("배포 중: %s (%d/%d)", ip, idx+1, total))
-				progressBar.SetValue(float64(idx+1) / float64(total))
+				progressLabel.SetText(labelText)
+				progressBar.SetValue(0)
 			})
 
+			// 타임아웃 기준 진행률 표시를 위한 타이머
+			done := make(chan bool)
+			go func() {
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+				elapsed := 0
+				for {
+					select {
+					case <-done:
+						return
+					case <-ticker.C:
+						elapsed++
+						progress := float64(elapsed) / float64(timeoutSeconds*2) // 0.5초 단위
+						if progress > 0.95 {
+							progress = 0.95 // 최대 95%까지만 표시
+						}
+						fyne.Do(func() {
+							progressBar.SetValue(progress)
+						})
+					}
+				}
+			}()
+
 			result := deployer.Deploy(fw, template)
+			done <- true // 타이머 종료
+
+			// 100% 표시 후 잠시 대기
+			fyne.Do(func() {
+				progressBar.SetValue(1.0)
+			})
+			time.Sleep(1 * time.Second)
 
 			if result.Success {
 				successCount++
@@ -976,8 +1015,20 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName 
 				d.historyTab.loadHistory()
 			}
 
-			resultMsg := fmt.Sprintf("배포 완료\n\n템플릿: %s\n성공: %d개\n실패: %d개", template.Version, successCount, failCount)
-			dialog.ShowInformation("배포 결과", resultMsg, d.window)
+			// 결과 메시지 생성
+			var resultTitle string
+			var resultMsg string
+			if failCount == 0 {
+				resultTitle = "배포 완료"
+				resultMsg = fmt.Sprintf("템플릿: %s\n성공: %d개", template.Version, successCount)
+			} else if successCount == 0 {
+				resultTitle = "배포 실패"
+				resultMsg = fmt.Sprintf("템플릿: %s\n실패: %d개", template.Version, failCount)
+			} else {
+				resultTitle = "배포 일부 실패"
+				resultMsg = fmt.Sprintf("템플릿: %s\n성공: %d개\n실패: %d개", template.Version, successCount, failCount)
+			}
+			dialog.ShowInformation(resultTitle, resultMsg, d.window)
 		})
 	}()
 }
@@ -1008,27 +1059,71 @@ func (d *DeviceTab) executeProgramUpdate(devices []*model.Firewall, program *mod
 	progressLabel := widget.NewLabel("업데이트 준비 중...")
 	progressBar := widget.NewProgressBar()
 	progressContent := container.NewVBox(progressLabel, progressBar)
-	progressDialog := dialog.NewCustomWithoutButtons("패키지 업데이트 중", progressContent, d.window)
+	progressDialog := dialog.NewCustomWithoutButtons("업데이트 중", progressContent, d.window)
 	progressDialog.Show()
 
 	go func() {
-		updateUC := usecase.NewUpdateUseCase()
+		config, _ := d.store.GetConfig()
+		timeoutSeconds := 30 // 기본값
+		if config != nil {
+			timeoutSeconds = config.GetTimeoutSeconds()
+		}
+
+		updateUC := usecase.NewUpdateUseCase(config)
 		total := len(devices)
 		successCount := 0
 		failCount := 0
 
 		for i, device := range devices {
-			idx := i
+			ip := device.DeviceIP
+			if ip == "" {
+				ip = device.DeviceName
+			}
+
+			// 레이블 설정: 단일 장비면 카운트 생략
+			var labelText string
+			if total == 1 {
+				labelText = fmt.Sprintf("업데이트 중: %s", ip)
+			} else {
+				labelText = fmt.Sprintf("업데이트 중: %s (%d/%d)", ip, i+1, total)
+			}
+
 			fyne.Do(func() {
-				ip := device.DeviceIP
-				if ip == "" {
-					ip = device.DeviceName
-				}
-				progressLabel.SetText(fmt.Sprintf("업데이트 중: %s (%d/%d)", ip, idx+1, total))
-				progressBar.SetValue(float64(idx+1) / float64(total))
+				progressLabel.SetText(labelText)
+				progressBar.SetValue(0)
 			})
 
+			// 타임아웃 기준 진행률 표시를 위한 타이머
+			done := make(chan bool)
+			go func() {
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+				elapsed := 0
+				for {
+					select {
+					case <-done:
+						return
+					case <-ticker.C:
+						elapsed++
+						progress := float64(elapsed) / float64(timeoutSeconds*2)
+						if progress > 0.95 {
+							progress = 0.95
+						}
+						fyne.Do(func() {
+							progressBar.SetValue(progress)
+						})
+					}
+				}
+			}()
+
 			result := updateUC.UpdateProgram(device, program)
+			done <- true
+
+			// 100% 표시 후 잠시 대기
+			fyne.Do(func() {
+				progressBar.SetValue(1.0)
+			})
+			time.Sleep(1 * time.Second)
 
 			if result.Success {
 				successCount++
@@ -1051,9 +1146,20 @@ func (d *DeviceTab) executeProgramUpdate(devices []*model.Firewall, program *mod
 				d.historyTab.loadHistory()
 			}
 
-			resultMsg := fmt.Sprintf("패키지 업데이트 완료\n\n패키지: %s %s\n성공: %d개\n실패: %d개",
-				program.ProcessName, program.ProcessVersion, successCount, failCount)
-			dialog.ShowInformation("업데이트 결과", resultMsg, d.window)
+			// 결과 메시지 생성
+			var resultTitle string
+			var resultMsg string
+			if failCount == 0 {
+				resultTitle = "업데이트 완료"
+				resultMsg = fmt.Sprintf("패키지: %s\n버전: %s\n성공: %d개", program.ProcessName, program.ProcessVersion, successCount)
+			} else if successCount == 0 {
+				resultTitle = "업데이트 실패"
+				resultMsg = fmt.Sprintf("패키지: %s\n버전: %s\n실패: %d개", program.ProcessName, program.ProcessVersion, failCount)
+			} else {
+				resultTitle = "업데이트 일부 실패"
+				resultMsg = fmt.Sprintf("패키지: %s\n버전: %s\n성공: %d개\n실패: %d개", program.ProcessName, program.ProcessVersion, successCount, failCount)
+			}
+			dialog.ShowInformation(resultTitle, resultMsg, d.window)
 		})
 	}()
 }
