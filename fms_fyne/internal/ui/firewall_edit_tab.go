@@ -86,8 +86,29 @@ func (t *FirewallEditTab) createUI() {
 	// NAT 규칙 빌더
 	t.natBuilder = NewNATBuilder(t.window, nil)
 
-	// 텍스트 편집 탭
-	textEditTab := container.NewTabItem("목록보기", t.textEditor)
+	// 예시 텍스트 (선택하여 복사 가능)
+	exampleText := `agent -m=insert -c=INPUT -p=any -a=DROP --sip=203.248.252.2
+agent -m=insert -c=INPUT -p=any -a=DROP --black
+agent -m=insert -t=nat --nat-type=dnat -p=tcp --match-port=6060 -s=203.248.252.2 --to-dest=192.168.3.1:8080`
+
+	exampleEntry := widget.NewMultiLineEntry()
+	exampleEntry.SetText(exampleText)
+	exampleEntry.Wrapping = fyne.TextWrapOff
+
+	exampleLabel := widget.NewLabel("예시:")
+	exampleContainer := container.NewVBox(
+		exampleLabel,
+		exampleEntry,
+	)
+
+	// 텍스트 편집 탭 (편집기 + 예시)
+	textEditContent := container.NewBorder(
+		nil,
+		exampleContainer,
+		nil, nil,
+		t.textEditor,
+	)
+	textEditTab := container.NewTabItem("목록보기", textEditContent)
 
 	// 룰 빌더 탭
 	ruleBuilderTab := container.NewTabItem("Firewall", t.ruleBuilder.Content())
