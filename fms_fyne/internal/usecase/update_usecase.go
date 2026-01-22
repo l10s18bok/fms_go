@@ -125,11 +125,8 @@ func (u *UpdateUseCase) UpdateProgram(
 	}
 	log.Printf("[UpdateProgram] SFTP 연결 성공 - %s", sshHost)
 
-	// 원격 경로 결정
-	remotePath := program.ProcessUploadPath
-	if remotePath == "" {
-		remotePath = model.DefaultRemotePath
-	}
+	// 원격 경로 결정 (기본 업로드 경로 사용)
+	remotePath := model.DefaultRemotePath
 	// 파일명 추가
 	remoteFilePath := filepath.Join(remotePath, filepath.Base(program.ProcessFilePath))
 	// Linux 경로로 변환

@@ -94,8 +94,7 @@ func (t *ProgramTab) createUI() {
 			{Header: "선택", Width: 50},
 			{Header: "패키지명", Width: 150},
 			{Header: "버전", Width: 100},
-			{Header: "업로드 경로", Width: 225},
-			{Header: "로컬파일 경로", Width: 375},
+			{Header: "로컬파일 경로", Width: 500},
 			{Header: "추가(수정)시간", Width: 150},
 		},
 		PageSize: 10,
@@ -105,7 +104,7 @@ func (t *ProgramTab) createUI() {
 		OnRowDoubleClick: func(row int) {
 			t.onRowDoubleClick(row)
 		},
-		// 패키지명(1), 버전(2), 업로드 경로(3) 컬럼 인라인 편집 설정
+		// 패키지명(1), 버전(2) 컬럼 인라인 편집 설정
 		EditableColumns: map[int]component.EditColumnConfig{
 			1: { // 패키지명 컬럼
 				Type: component.EditTypeEntry,
@@ -149,28 +148,6 @@ func (t *ProgramTab) createUI() {
 						}
 						p := t.filteredPrograms[row]
 						p.ProcessVersion = newValue
-						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
-						if err := t.store.SaveProgram(p); err != nil {
-							dialog.ShowError(err, t.window)
-							return false
-						}
-						return true
-					}
-					return false
-				},
-			},
-			3: { // 업로드 경로 컬럼
-				Type: component.EditTypeEntry,
-				GetValue: func(row int) string {
-					if row >= 0 && row < len(t.filteredPrograms) {
-						return t.filteredPrograms[row].ProcessUploadPath
-					}
-					return ""
-				},
-				OnEdit: func(row int, oldValue, newValue string) bool {
-					if row >= 0 && row < len(t.filteredPrograms) {
-						p := t.filteredPrograms[row]
-						p.ProcessUploadPath = newValue
 						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
 						if err := t.store.SaveProgram(p); err != nil {
 							dialog.ShowError(err, t.window)
@@ -225,7 +202,6 @@ func (t *ProgramTab) filterPrograms(query string) {
 		for _, p := range t.programs {
 			if strings.Contains(strings.ToLower(p.ProcessName), query) ||
 				strings.Contains(strings.ToLower(p.ProcessVersion), query) ||
-				strings.Contains(strings.ToLower(p.ProcessUploadPath), query) ||
 				strings.Contains(strings.ToLower(p.ProcessFilePath), query) {
 				filtered = append(filtered, p)
 			}
@@ -258,15 +234,11 @@ func (t *ProgramTab) updateCell(row int, col int, cell fyne.CanvasObject) {
 		if label, ok := cell.(*widget.Label); ok {
 			label.SetText(p.ProcessVersion)
 		}
-	case 3: // 업로드 경로
-		if label, ok := cell.(*widget.Label); ok {
-			label.SetText(p.ProcessUploadPath)
-		}
-	case 4: // 로컬파일 경로
+	case 3: // 로컬파일 경로
 		if label, ok := cell.(*widget.Label); ok {
 			label.SetText(p.ProcessFilePath)
 		}
-	case 5: // 추가(수정)시간
+	case 4: // 추가(수정)시간
 		if label, ok := cell.(*widget.Label); ok {
 			label.SetText(p.ProcessCreatedAt)
 		}
@@ -350,10 +322,6 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	versionEntry := widget.NewEntry()
 	versionEntry.SetPlaceHolder("버전 (예: v1.0.0)")
 
-	uploadPathEntry := widget.NewEntry()
-	uploadPathEntry.SetPlaceHolder("download")
-	uploadPathEntry.SetText("")
-
 	filePathLabel := widget.NewLabel("파일을 선택해주세요")
 	filePathLabel.Truncation = fyne.TextTruncateEllipsis
 	filePath := ""
@@ -362,7 +330,6 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 	if isEdit {
 		nameEntry.SetText(program.ProcessName)
 		versionEntry.SetText(program.ProcessVersion)
-		uploadPathEntry.SetText(program.ProcessUploadPath)
 		filePath = program.ProcessFilePath
 		filePathLabel.SetText(filePath)
 	}
@@ -392,12 +359,6 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("버전:")),
 			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), versionEntry),
-		),
-		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
-		// 업로드 경로
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("업로드 경로:")),
-			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), uploadPathEntry),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격 2배
 		widget.NewSeparator(),
@@ -436,7 +397,6 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 		}
 		p.ProcessName = nameEntry.Text
 		p.ProcessVersion = versionEntry.Text
-		p.ProcessUploadPath = uploadPathEntry.Text
 		p.ProcessFilePath = filePath
 		p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
 
@@ -479,9 +439,9 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 		container.NewGridWrap(fyne.NewSize(1, 20), layout.NewSpacer()), // 하단 여백
 	)
 
-	// 고정 크기 컨테이너 (크기 1.5배: 450x600)
+	// 고정 크기 컨테이너
 	paddedContent := container.New(layout.NewCustomPaddedLayout(20, 20, 20, 20), content)
-	sizedContent := container.NewGridWrap(fyne.NewSize(450, 550), paddedContent)
+	sizedContent := container.NewGridWrap(fyne.NewSize(450, 400), paddedContent)
 
 	// 팝업 생성
 	popup = widget.NewModalPopUp(sizedContent, t.window.Canvas())
