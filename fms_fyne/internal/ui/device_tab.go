@@ -150,8 +150,8 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 		d.onDeleteDevices()
 	})
 
-	// 배포 버튼
-	deployBtn := component.NewCustomButton("배포", nil, nil, themes.Colors["darkgray"], func() {
+	// 배포 버튼 (종이비행기 아이콘)
+	deployBtn := component.NewCustomButton("배포", theme.MailSendIcon(), nil, themes.Colors["darkgray"], func() {
 		d.onDeploy()
 	})
 
