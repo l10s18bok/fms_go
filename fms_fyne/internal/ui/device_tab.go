@@ -50,6 +50,13 @@ type DeviceTab struct {
 	// 새로고침 상태
 	isRefreshing bool
 	refreshBtn   *widget.Button
+
+	// 자동 상태 체크
+	autoCheckEnabled  bool
+	autoCheckInterval int
+	autoCheckTicker   *time.Ticker
+	stopAutoCheck     chan struct{}
+	statusBorder      *canvas.Rectangle // 상태 박스 테두리
 }
 
 // 새로운 장비 관리 탭을 생성합니다.
@@ -120,17 +127,17 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 
 	// 라운드 테두리 배경
 	borderColor := color.RGBA{R: 200, G: 200, B: 200, A: 255}
-	statusBorder := canvas.NewRectangle(borderColor)
-	statusBorder.StrokeWidth = 1
-	statusBorder.StrokeColor = borderColor
-	statusBorder.FillColor = color.Transparent
-	statusBorder.CornerRadius = 8
+	d.statusBorder = canvas.NewRectangle(borderColor)
+	d.statusBorder.StrokeWidth = 1
+	d.statusBorder.StrokeColor = borderColor
+	d.statusBorder.FillColor = color.Transparent
+	d.statusBorder.CornerRadius = 8
 
 	// 패딩을 위한 컨테이너 (상하 0, 좌우 10)
 	paddedStatus := container.New(layout.NewCustomPaddedLayout(0, 0, 10, 10), statusContent)
 
 	// 테두리와 내용을 스택으로 결합
-	statusBox := container.NewStack(statusBorder, paddedStatus)
+	statusBox := container.NewStack(d.statusBorder, paddedStatus)
 
 	// 상태 요약 컨테이너 (새로고침 버튼 포함)
 	statusSummary := container.NewHBox(
@@ -1359,4 +1366,98 @@ func isValidIPOrHostPort(address string) bool {
 		return net.ParseIP(host) != nil
 	}
 	return net.ParseIP(address) != nil
+}
+
+// SetAutoStatusCheck 자동 상태 체크 기능을 설정합니다.
+func (d *DeviceTab) SetAutoStatusCheck(enabled bool, intervalSeconds int) {
+	// 기존 타이머 중지
+	d.stopAutoStatusCheck()
+
+	d.autoCheckEnabled = enabled
+	d.autoCheckInterval = intervalSeconds
+
+	// 상태 박스 테두리 색상 변경
+	if d.statusBorder != nil {
+		if enabled {
+			// ON: orange 색상
+			orangeColor := themes.Colors["orange"]
+			d.statusBorder.StrokeColor = orangeColor
+		} else {
+			// OFF: 기본 회색
+			grayColor := color.RGBA{R: 200, G: 200, B: 200, A: 255}
+			d.statusBorder.StrokeColor = grayColor
+		}
+		d.statusBorder.Refresh()
+	}
+
+	if enabled && intervalSeconds > 0 {
+		d.startAutoStatusCheck()
+	}
+}
+
+// 자동 상태 체크를 시작합니다.
+func (d *DeviceTab) startAutoStatusCheck() {
+	d.stopAutoCheck = make(chan struct{})
+	d.autoCheckTicker = time.NewTicker(time.Duration(d.autoCheckInterval) * time.Second)
+
+	go func() {
+		for {
+			select {
+			case <-d.stopAutoCheck:
+				return
+			case <-d.autoCheckTicker.C:
+				d.performAutoStatusCheck()
+			}
+		}
+	}()
+}
+
+// 자동 상태 체크를 중지합니다.
+func (d *DeviceTab) stopAutoStatusCheck() {
+	if d.autoCheckTicker != nil {
+		d.autoCheckTicker.Stop()
+		d.autoCheckTicker = nil
+	}
+	if d.stopAutoCheck != nil {
+		close(d.stopAutoCheck)
+		d.stopAutoCheck = nil
+	}
+}
+
+// 모든 장비의 상태를 자동으로 체크합니다.
+func (d *DeviceTab) performAutoStatusCheck() {
+	if d.isRefreshing {
+		return
+	}
+
+	// 모든 장비를 대상으로 상태 체크
+	if len(d.firewalls) == 0 {
+		return
+	}
+
+	d.isRefreshing = true
+
+	go func() {
+		config, err := d.store.GetConfig()
+		if err != nil {
+			d.isRefreshing = false
+			return
+		}
+
+		deployer := deploy.NewDeployer(config)
+		deployer.HealthCheckBatch(d.firewalls)
+
+		// 상태 확인 시간 업데이트
+		now := time.Now().Format("2006-01-02 15:04:05")
+		for _, fw := range d.firewalls {
+			fw.LastCheckedAt = now
+			d.store.SaveFirewall(fw)
+		}
+
+		fyne.Do(func() {
+			d.applyFilter()
+			d.updateStatusSummary()
+			d.isRefreshing = false
+		})
+	}()
 }

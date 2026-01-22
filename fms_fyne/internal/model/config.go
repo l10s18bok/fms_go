@@ -34,22 +34,40 @@ const (
 	ThemeDark  = "dark"
 )
 
+// 기본 상태 체크 주기 (초)
+const DefaultStatusCheckInterval = 60
+
 // 애플리케이션 설정을 나타냅니다.
 type Config struct {
-	ConnectionMode string `json:"connectionMode"` // 연결 모드: "agent" 또는 "direct"
-	AgentServerURL string `json:"agentServerURL"` // 에이전트 서버 URL (예: http://172.24.10.6:8080)
-	TimeoutSeconds int    `json:"timeoutSeconds"` // HTTP 타임아웃 (초)
-	Theme          string `json:"theme"`          // 테마: "light" 또는 "dark"
+	ConnectionMode      string `json:"connectionMode"`      // 연결 모드: "agent" 또는 "direct"
+	AgentServerURL      string `json:"agentServerURL"`      // 에이전트 서버 URL (예: http://172.24.10.6:8080)
+	TimeoutSeconds      int    `json:"timeoutSeconds"`      // HTTP 타임아웃 (초)
+	Theme               string `json:"theme"`               // 테마: "light" 또는 "dark"
+	AutoStatusCheck     bool   `json:"autoStatusCheck"`     // 자동 상태 체크 활성화 여부
+	StatusCheckInterval int    `json:"statusCheckInterval"` // 상태 체크 주기 (초)
 }
 
 // 기본 설정을 반환합니다.
 func DefaultConfig() *Config {
 	return &Config{
-		ConnectionMode: ConnectionModeDirect,
-		AgentServerURL: "http://172.24.10.6:8080",
-		TimeoutSeconds: DefaultTimeoutSeconds,
-		Theme:          ThemeLight,
+		ConnectionMode:      ConnectionModeDirect,
+		AgentServerURL:      "http://172.24.10.6:8080",
+		TimeoutSeconds:      DefaultTimeoutSeconds,
+		Theme:               ThemeLight,
+		AutoStatusCheck:     false,
+		StatusCheckInterval: DefaultStatusCheckInterval,
 	}
+}
+
+// 상태 체크 주기를 반환합니다 (최소 10초, 최대 300초)
+func (c *Config) GetStatusCheckInterval() int {
+	if c.StatusCheckInterval < 10 {
+		return 10
+	}
+	if c.StatusCheckInterval > 300 {
+		return 300
+	}
+	return c.StatusCheckInterval
 }
 
 // 타임아웃 값을 반환합니다 (최소 5초, 최대 120초)

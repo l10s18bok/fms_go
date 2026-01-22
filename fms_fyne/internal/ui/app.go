@@ -108,6 +108,9 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.
 	// 초기 탭 열기: 방화벽 관리
 	ui.openTab(ui.firewallTabItem)
 
+	// 저장된 설정에서 자동 상태 체크 활성화
+	ui.initAutoStatusCheck()
+
 	return ui
 }
 
@@ -259,6 +262,17 @@ func (m *MainUI) setupMainMenu() {
 	m.window.SetMainMenu(mainMenu)
 }
 
+// 앱 시작 시 저장된 설정에서 자동 상태 체크를 초기화합니다.
+func (m *MainUI) initAutoStatusCheck() {
+	config, err := m.store.GetConfig()
+	if err != nil {
+		return
+	}
+	if config.AutoStatusCheck {
+		m.deviceTab.SetAutoStatusCheck(true, config.GetStatusCheckInterval())
+	}
+}
+
 // 설정 다이얼로그를 표시합니다.
 func (m *MainUI) showSettingsDialog() {
 	// 현재 설정 로드
@@ -284,6 +298,27 @@ func (m *MainUI) showSettingsDialog() {
 	timeoutEntry.SetText(strconv.Itoa(config.GetTimeoutSeconds()))
 	timeoutEntry.SetPlaceHolder("10")
 
+	// 상태 체크 ON/OFF 버튼
+	autoStatusCheckBtn := widget.NewButton("상태체크 OFF", nil)
+	autoStatusCheckEnabled := config.AutoStatusCheck
+	updateStatusCheckBtn := func() {
+		if autoStatusCheckEnabled {
+			autoStatusCheckBtn.SetText("상태체크 ON")
+		} else {
+			autoStatusCheckBtn.SetText("상태체크 OFF")
+		}
+	}
+	updateStatusCheckBtn()
+	autoStatusCheckBtn.OnTapped = func() {
+		autoStatusCheckEnabled = !autoStatusCheckEnabled
+		updateStatusCheckBtn()
+	}
+
+	// 상태 체크 주기 입력 필드
+	statusCheckIntervalEntry := widget.NewEntry()
+	statusCheckIntervalEntry.SetText(strconv.Itoa(config.GetStatusCheckInterval()))
+	statusCheckIntervalEntry.SetPlaceHolder("60")
+
 	// 연결 모드에 따라 URL 입력 필드 활성화/비활성화
 	updateURLEntryState := func() {
 		if connectionMode.Selected == "Agent Server" {
@@ -306,6 +341,9 @@ func (m *MainUI) showSettingsDialog() {
 		widget.NewFormItem("Connection", connectionMode),
 		widget.NewFormItem("Agent Server URL", agentURLEntry),
 		widget.NewFormItem("Timeout (초)", timeoutEntry),
+		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
+		widget.NewFormItem("자동 상태체크", autoStatusCheckBtn),
+		widget.NewFormItem("체크 주기 (초)", statusCheckIntervalEntry),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
 		widget.NewFormItem("설정 저장 경로", configPathLabel),
 	}
@@ -337,17 +375,30 @@ func (m *MainUI) showSettingsDialog() {
 			return
 		}
 
+		// 상태 체크 주기 값 파싱
+		statusCheckInterval, err := strconv.Atoi(statusCheckIntervalEntry.Text)
+		if err != nil || statusCheckInterval < 10 || statusCheckInterval > 300 {
+			dialog.ShowError(fmt.Errorf("상태 체크 주기는 10~300 사이의 숫자를 입력해주세요"), m.window)
+			return
+		}
+
 		// 설정 저장
 		newConfig := &model.Config{
-			ConnectionMode: newConnectionMode,
-			AgentServerURL: agentURLEntry.Text,
-			TimeoutSeconds: timeoutSeconds,
+			ConnectionMode:      newConnectionMode,
+			AgentServerURL:      agentURLEntry.Text,
+			TimeoutSeconds:      timeoutSeconds,
+			Theme:               config.Theme,
+			AutoStatusCheck:     autoStatusCheckEnabled,
+			StatusCheckInterval: statusCheckInterval,
 		}
 
 		if err := m.store.SaveConfig(newConfig); err != nil {
 			dialog.ShowError(err, m.window)
 			return
 		}
+
+		// DeviceTab에 자동 상태 체크 설정 적용
+		m.deviceTab.SetAutoStatusCheck(autoStatusCheckEnabled, statusCheckInterval)
 
 		dialog.ShowInformation("성공", "설정이 저장되었습니다.", m.window)
 	}, m.window)
