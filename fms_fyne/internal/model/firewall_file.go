@@ -2,7 +2,6 @@ package model
 
 import (
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -31,34 +30,24 @@ func NewFirewallFile(fileName string) *FirewallFile {
 
 // ExtractVersion 파일명에서 버전을 추출합니다.
 // 예: rules-v1_0_1.txt -> v1.0.1
-// 예: firewall-v2_3.txt -> v2.3
-// 예: test-v1.txt -> v1
-// 예: rules-1_0_1.txt -> 1.0.1 (v 접두사 없이도 가능)
+// 예: newRule-r2-5-9.txt -> r2.5.9
+// 예: test-1_0_1.txt -> 1.0.1
 // 형식이 맞지 않으면 "-" 반환
 func ExtractVersion(fileName string) string {
 	// 확장자 제거
 	name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 
-	// "-" 또는 "_" 구분자로 분리하여 마지막 부분 추출
-	parts := strings.FieldsFunc(name, func(r rune) bool {
-		return r == '-' || r == '_'
-	})
-	if len(parts) < 2 {
+	// 첫 번째 "-" 이후 부분을 버전으로 추출
+	idx := strings.Index(name, "-")
+	if idx == -1 || idx == len(name)-1 {
 		return "-"
 	}
 
-	// 마지막 부분이 버전 패턴인지 확인
-	versionPart := parts[len(parts)-1]
+	versionPart := name[idx+1:]
 
-	// v1_0_1 또는 v1-0-1 -> v1.0.1 변환
+	// "-" 또는 "_" 를 "." 으로 변환
 	version := strings.ReplaceAll(versionPart, "_", ".")
 	version = strings.ReplaceAll(version, "-", ".")
-
-	// 버전 형식 검증 (v숫자 또는 숫자로 시작하는 버전 패턴)
-	versionPattern := regexp.MustCompile(`^v?\d+(\.\d+)*$`)
-	if !versionPattern.MatchString(version) {
-		return "-"
-	}
 
 	return version
 }

@@ -67,9 +67,14 @@ func (t *FirewallTab) createUI() {
 		t.onDeleteSelected()
 	})
 
-	// 파일추가/수정 버튼
-	addEditBtn := component.NewCustomButton("+파일추가/수정", nil, nil, themes.Colors["blue"], func() {
+	// 파일추가/수정 버튼 (플로피디스크 아이콘 + 추가/수정)
+	addEditBtn := component.NewCustomButton("추가/수정", theme.DocumentSaveIcon(), nil, themes.Colors["blue"], func() {
 		t.onAddOrEdit()
+	})
+
+	// 도움말 버튼
+	helpBtn := widget.NewButtonWithIcon("", theme.QuestionIcon(), func() {
+		component.ShowHelpPopup("방화벽 관리 도움말", component.FirewallFileHelpText, t.content)
 	})
 
 	// 상단 영역 (버튼 간격 추가)
@@ -80,6 +85,7 @@ func (t *FirewallTab) createUI() {
 			deleteBtn,
 			widget.NewLabel("  "), // 버튼 간격
 			addEditBtn,
+			helpBtn,
 		),
 		nil,
 	)

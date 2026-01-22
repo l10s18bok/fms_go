@@ -38,6 +38,7 @@ type PagedTableConfig struct {
 	Columns          []ColumnDef                                    // 컬럼 정의 (첫 번째는 체크박스 컬럼)
 	PageSize         int                                            // 페이지당 항목 수
 	OnCellUpdate     func(row int, col int, cell fyne.CanvasObject) // 셀 업데이트 콜백
+	OnCustomCell     func(row int, col int, container *fyne.Container) bool // 커스텀 셀 콜백 (true 반환 시 라벨 숨김)
 	OnRowSelected    func(row int)                                  // 행 선택 콜백 (단일 클릭/Enter)
 	OnRowDoubleClick func(row int)                                  // 행 더블클릭 콜백
 	OnCheckChange    func(row int, checked bool)                    // 체크 변경 콜백
@@ -364,8 +365,18 @@ func (t *PagedTable) updateCell(id widget.TableCellID, cell fyne.CanvasObject) {
 			customContainer.Show()
 			label.Hide()
 		} else {
-			// 일반 모드: 라벨 표시
-			if t.config.OnCellUpdate != nil {
+			// 일반 모드: 커스텀 셀 또는 라벨 표시
+			useCustomCell := false
+			if t.config.OnCustomCell != nil {
+				customContainer.Objects = nil
+				useCustomCell = t.config.OnCustomCell(dataIndex, id.Col, customContainer)
+				if useCustomCell {
+					customContainer.Show()
+					label.Hide()
+				}
+			}
+
+			if !useCustomCell && t.config.OnCellUpdate != nil {
 				t.config.OnCellUpdate(dataIndex, id.Col, label)
 				label.Show()
 			}

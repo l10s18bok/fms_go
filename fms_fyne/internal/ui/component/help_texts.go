@@ -46,8 +46,6 @@ func ShowHelpPopup(title string, content string, parent fyne.CanvasObject) {
 // AppHelpText 애플리케이션 전체 도움말
 const AppHelpText = `FMS - Firewall Management System
 
-버전: 1.1.0
-
 [템플릿 관리]
 • 방화벽 규칙 템플릿을 생성/수정/삭제합니다
 
@@ -347,3 +345,30 @@ const SNATHelpText = `소스 NAT (SNAT) 도움말:
 인터페이스 지정:
   Match_IP=192.168.1.0/24, Trans_IP=1.2.3.4, Out_Face=eth0
   → 192.168.1.x가 eth0으로 나갈 때 1.2.3.4로 변환`
+
+// FirewallFileHelpText 방화벽 룰 관리 도움말
+const FirewallFileHelpText = `
+[파일 추가]
+• 드래그 앤 드롭으로 파일을 테이블에 끌어다 놓으면
+  자동으로 추가됩니다.
+• 또한, "추가/수정" 버튼을 클릭하여 추가할 수도 
+  있습니다.
+
+[파일 편집]
+• 테이블 행(Row)을 더블클릭하면 방화벽 상세보기에서
+  규칙을 작성하고 수정할 수 있습니다.
+
+[파일명 변경]
+• 파일이름 셀을 클릭하면 직접 파일명을 수정할
+  수 있습니다.(Enter 저장, ESC 취소)
+• 변경된 파일명은 즉시 저장됩니다.
+
+[날짜 정보]
+• 만든 날짜: 파일이 처음 추가된 날짜입니다.
+• 수정한 날짜: 파일 내용이 변경되면 자동으로
+  업데이트됩니다.
+
+[버전 정보]
+• 파일명에서 첫번째 "-" 을 기준으로 버전 정보를 
+  자동으로 추출합니다.  
+• 예: rules-v1_0_1.txt → v1.0.1`

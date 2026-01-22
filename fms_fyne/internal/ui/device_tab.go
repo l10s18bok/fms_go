@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"net"
 	"sort"
 	"strings"
@@ -98,27 +99,42 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 	d.statusYellowLabel = widget.NewLabel("0")
 	d.statusRedLabel = widget.NewLabel("0")
 
-	// 색상이 있는 상태 표시
-	greenDot := canvas.NewText("●", themes.Colors["green"])
-	greenDot.TextSize = 21
-	yellowDot := canvas.NewText("●", themes.Colors["yellow"])
-	yellowDot.TextSize = 21
-	redDot := canvas.NewText("●", themes.Colors["red"])
-	redDot.TextSize = 21
+	// 색상 원 (widget.Label 사용하여 수직 정렬 일치)
+	greenDot := widget.NewLabelWithStyle("●", fyne.TextAlignCenter, fyne.TextStyle{})
+	greenDot.Importance = widget.SuccessImportance
+	yellowDot := widget.NewLabelWithStyle("●", fyne.TextAlignCenter, fyne.TextStyle{})
+	yellowDot.Importance = widget.WarningImportance
+	redDot := widget.NewLabelWithStyle("●", fyne.TextAlignCenter, fyne.TextStyle{})
+	redDot.Importance = widget.DangerImportance
 
 	// 새로고침 버튼 (🔄)
 	d.refreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
 		d.onRefreshAll()
 	})
 
+	statusContent := container.NewHBox(
+		greenDot, widget.NewLabel("연결:"), d.statusGreenLabel,
+		yellowDot, widget.NewLabel("알수없음:"), d.statusYellowLabel,
+		redDot, widget.NewLabel("연결안됨:"), d.statusRedLabel,
+	)
+
+	// 라운드 테두리 배경
+	borderColor := color.RGBA{R: 200, G: 200, B: 200, A: 255}
+	statusBorder := canvas.NewRectangle(borderColor)
+	statusBorder.StrokeWidth = 1
+	statusBorder.StrokeColor = borderColor
+	statusBorder.FillColor = color.Transparent
+	statusBorder.CornerRadius = 8
+
+	// 패딩을 위한 컨테이너 (상하 0, 좌우 10)
+	paddedStatus := container.New(layout.NewCustomPaddedLayout(0, 0, 10, 10), statusContent)
+
+	// 테두리와 내용을 스택으로 결합
+	statusBox := container.NewStack(statusBorder, paddedStatus)
+
 	// 상태 요약 컨테이너 (새로고침 버튼 포함)
 	statusSummary := container.NewHBox(
-		greenDot, widget.NewLabel("연결:"), d.statusGreenLabel,
-		widget.NewLabel(" "),
-		yellowDot, widget.NewLabel("알수없음:"), d.statusYellowLabel,
-		widget.NewLabel(" "),
-		redDot, widget.NewLabel("연결안됨:"), d.statusRedLabel,
-		widget.NewLabel("  "), // 새로고침 버튼 앞 간격
+		statusBox,
 		d.refreshBtn,
 	)
 
@@ -190,6 +206,9 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 		PageSize: 15,
 		OnCellUpdate: func(row int, col int, cell fyne.CanvasObject) {
 			d.updateDeviceCell(row, col, cell)
+		},
+		OnCustomCell: func(row int, col int, container *fyne.Container) bool {
+			return d.updateCustomCell(row, col, container)
 		},
 		OnRowSelected: func(row int) {
 			// 단일 클릭 - 선택 (현재 미사용)
@@ -290,15 +309,8 @@ func (d *DeviceTab) updateDeviceCell(row int, col int, cell fyne.CanvasObject) {
 		} else {
 			label.SetText(fw.DeviceName)
 		}
-	case 3: // 서버상태
-		switch fw.ServerStatus {
-		case model.ServerStatusRunning:
-			label.SetText("정상")
-		case model.ServerStatusStop:
-			label.SetText("연결안됨")
-		default:
-			label.SetText("-")
-		}
+	case 3: // 서버상태 - OnCustomCell에서 처리
+		// 커스텀 셀에서 처리하므로 여기서는 아무것도 하지 않음
 	case 4: // 보고시간
 		if fw.LastCheckedAt != "" {
 			label.SetText(fw.LastCheckedAt)
@@ -314,6 +326,36 @@ func (d *DeviceTab) updateDeviceCell(row int, col int, cell fyne.CanvasObject) {
 			label.SetText("-")
 		}
 	}
+}
+
+// 커스텀 셀을 업데이트합니다. (서버상태 컬럼에 색상 원 표시)
+func (d *DeviceTab) updateCustomCell(row int, col int, cont *fyne.Container) bool {
+	// 서버상태 컬럼(3)만 커스텀 처리
+	if col != 3 {
+		return false
+	}
+
+	if row >= len(d.filteredFirewalls) {
+		return false
+	}
+
+	fw := d.filteredFirewalls[row]
+
+	// 색상 원 생성
+	var dotColor = themes.Colors["yellow"] // 기본: 알수없음
+	switch fw.ServerStatus {
+	case model.ServerStatusRunning:
+		dotColor = themes.Colors["green"]
+	case model.ServerStatusStop:
+		dotColor = themes.Colors["red"]
+	}
+
+	dot := canvas.NewText("●", dotColor)
+	dot.TextSize = 18
+	dot.Alignment = fyne.TextAlignCenter
+
+	cont.Objects = append(cont.Objects, container.NewCenter(dot))
+	return true
 }
 
 // 검색 필터를 적용합니다.
