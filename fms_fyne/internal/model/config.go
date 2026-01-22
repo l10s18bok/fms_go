@@ -1,12 +1,6 @@
 // Package model은 FMS 애플리케이션의 데이터 모델을 정의합니다.
 package model
 
-// 연결 모드 상수
-const (
-	ConnectionModeAgent  = "agent"  // 에이전트 서버를 통한 연결
-	ConnectionModeDirect = "direct" // 직접 연결
-)
-
 // 기본 타임아웃 (초)
 const DefaultTimeoutSeconds = 30
 
@@ -34,32 +28,52 @@ const (
 	ThemeDark  = "dark"
 )
 
-// 기본 상태 체크 주기 (초)
+// 기본 장비 체크 주기 (초)
 const DefaultStatusCheckInterval = 60
+
+// 기본 API 경로
+const (
+	DefaultProgramUpdatePath  = "/program-update"
+	DefaultFirewallDeployPath = "/agent/req-deploy"
+	DefaultDeviceReportPath   = "/device-report"
+)
+
+// 기본 API 포트
+const DefaultAPIPort = 8080
 
 // 애플리케이션 설정을 나타냅니다.
 type Config struct {
-	ConnectionMode      string `json:"connectionMode"`      // 연결 모드: "agent" 또는 "direct"
-	AgentServerURL      string `json:"agentServerURL"`      // 에이전트 서버 URL (예: http://172.24.10.6:8080)
 	TimeoutSeconds      int    `json:"timeoutSeconds"`      // HTTP 타임아웃 (초)
 	Theme               string `json:"theme"`               // 테마: "light" 또는 "dark"
 	AutoStatusCheck     bool   `json:"autoStatusCheck"`     // 자동 상태 체크 활성화 여부
-	StatusCheckInterval int    `json:"statusCheckInterval"` // 상태 체크 주기 (초)
+	StatusCheckInterval int    `json:"statusCheckInterval"` // 장비 체크 주기 (초)
+
+	// API 경로 설정
+	ProgramUpdatePath  string `json:"programUpdatePath"`  // 패키지 업데이트 요청 경로
+	ProgramUpdatePort  int    `json:"programUpdatePort"`  // 패키지 업데이트 요청 포트
+	FirewallDeployPath string `json:"firewallDeployPath"` // 방화벽 규칙 배포 경로
+	FirewallDeployPort int    `json:"firewallDeployPort"` // 방화벽 규칙 배포 포트
+	DeviceReportPath   string `json:"deviceReportPath"`   // 서버 상태 체크 경로
+	DeviceReportPort   int    `json:"deviceReportPort"`   // 서버 상태 체크 포트
 }
 
 // 기본 설정을 반환합니다.
 func DefaultConfig() *Config {
 	return &Config{
-		ConnectionMode:      ConnectionModeDirect,
-		AgentServerURL:      "http://172.24.10.6:8080",
 		TimeoutSeconds:      DefaultTimeoutSeconds,
 		Theme:               ThemeLight,
 		AutoStatusCheck:     false,
 		StatusCheckInterval: DefaultStatusCheckInterval,
+		ProgramUpdatePath:   DefaultProgramUpdatePath,
+		ProgramUpdatePort:   DefaultAPIPort,
+		FirewallDeployPath:  DefaultFirewallDeployPath,
+		FirewallDeployPort:  DefaultAPIPort,
+		DeviceReportPath:    DefaultDeviceReportPath,
+		DeviceReportPort:    DefaultAPIPort,
 	}
 }
 
-// 상태 체크 주기를 반환합니다 (최소 10초, 최대 300초)
+// 장비 체크 주기를 반환합니다 (최소 10초, 최대 300초)
 func (c *Config) GetStatusCheckInterval() int {
 	if c.StatusCheckInterval < 10 {
 		return 10
@@ -79,14 +93,4 @@ func (c *Config) GetTimeoutSeconds() int {
 		return 120
 	}
 	return c.TimeoutSeconds
-}
-
-// 연결 모드가 에이전트 모드인지 확인합니다.
-func (c *Config) IsAgentMode() bool {
-	return c.ConnectionMode == ConnectionModeAgent
-}
-
-// 연결 모드가 직접 연결 모드인지 확인합니다.
-func (c *Config) IsDirectMode() bool {
-	return c.ConnectionMode == ConnectionModeDirect
 }

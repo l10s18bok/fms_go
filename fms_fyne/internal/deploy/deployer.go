@@ -131,7 +131,7 @@ func (d *Deployer) HealthCheck(fw *model.Firewall) error {
 	return err
 }
 
-// 여러 장비의 연결 상태를 확인합니다. (Direct 모드용 - 개별 호출)
+// 여러 장비의 연결 상태를 확인합니다. (개별 호출)
 func (d *Deployer) HealthCheckMultiple(firewalls []*model.Firewall, progressCb func(int, int, string)) map[int]error {
 	errors := make(map[int]error)
 	total := len(firewalls)
@@ -150,52 +150,23 @@ func (d *Deployer) HealthCheckMultiple(firewalls []*model.Firewall, progressCb f
 	return errors
 }
 
-// 여러 장비의 연결 상태를 한번에 확인합니다. (Agent 모드용 - 배치 호출, Direct 모드는 병렬 처리)
+// 여러 장비의 연결 상태를 한번에 확인합니다. (병렬 처리)
 func (d *Deployer) HealthCheckBatch(firewalls []*model.Firewall) error {
 	if len(firewalls) == 0 {
 		return nil
 	}
 
-	// Agent 모드가 아니면 병렬로 개별 호출 처리
-	if !d.config.IsAgentMode() {
-		log.Printf("[DEBUG] HealthCheckBatch: Direct 모드 - %d개 장비 병렬 처리 시작", len(firewalls))
-		var wg sync.WaitGroup
-		for _, fw := range firewalls {
-			wg.Add(1)
-			go func(f *model.Firewall) {
-				defer wg.Done()
-				d.HealthCheck(f)
-			}(fw)
-		}
-		wg.Wait()
-		log.Printf("[DEBUG] HealthCheckBatch: Direct 모드 - 병렬 처리 완료")
-		return nil
-	}
-
-	// 모든 장비의 IP 주소 수집
-	ipAddrs := make([]string, len(firewalls))
-	for i, fw := range firewalls {
-		ipAddrs[i] = fw.DeviceName
-	}
-
-	// Agent 서버에 한번에 요청
-	results, err := d.client.CheckHealthViaAgent(ipAddrs)
-	if err != nil {
-		// 에러 시 모든 장비를 stop 상태로 설정
-		for _, fw := range firewalls {
-			fw.ServerStatus = model.ServerStatusStop
-		}
-		return err
-	}
-
-	// 결과를 각 장비에 적용
+	// 병렬로 개별 호출 처리
+	log.Printf("[DEBUG] HealthCheckBatch: %d개 장비 병렬 처리 시작", len(firewalls))
+	var wg sync.WaitGroup
 	for _, fw := range firewalls {
-		if isRunning, ok := results[fw.DeviceName]; ok && isRunning {
-			fw.ServerStatus = model.ServerStatusRunning
-		} else {
-			fw.ServerStatus = model.ServerStatusStop
-		}
+		wg.Add(1)
+		go func(f *model.Firewall) {
+			defer wg.Done()
+			d.HealthCheck(f)
+		}(fw)
 	}
-
+	wg.Wait()
+	log.Printf("[DEBUG] HealthCheckBatch: 병렬 처리 완료")
 	return nil
 }

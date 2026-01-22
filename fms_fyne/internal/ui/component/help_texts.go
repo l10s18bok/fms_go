@@ -60,11 +60,8 @@ const AppHelpText = `FMS - Firewall Management System
 [Import/Export]
 • 현재 탭의 데이터를 JSON 파일로 내보내거나 가져옵니다
 
-[연결 모드] (설정에서 변경)
-• Agent Server: Agent 서버(예: http://172.24.10.6:8080)를 통해 연결
-  - 상태확인: POST /agent/req-respCheck
-  - 배포: POST /agent/req-deploy
-• Direct: 각 장비에 직접 HTTP 연결 (포트 80)
+[통신 방식]
+• 각 장비에 HTTP 연결
   - 상태확인: GET http://{장비IP}/respCheck
   - 배포: POST http://{장비IP}/deploy
 

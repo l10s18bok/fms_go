@@ -48,44 +48,6 @@ func NewClient(config *model.Config) *Client {
 	}
 }
 
-// Agent 서버를 통해 장비 상태를 확인합니다.
-func (c *Client) CheckHealthViaAgent(ipAddrs []string) (map[string]bool, error) {
-	url := fmt.Sprintf("%s/agent/req-respCheck", strings.TrimSuffix(c.config.AgentServerURL, "/"))
-
-	// 요청 데이터 생성
-	reqData := map[string][]string{
-		"ipAddrs": ipAddrs,
-	}
-	jsonData, err := json.Marshal(reqData)
-	if err != nil {
-		return nil, fmt.Errorf("JSON 변환 실패: %v", err)
-	}
-
-	// POST 요청
-	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("Agent 서버 연결 실패: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Agent 서버 응답 오류: %d", resp.StatusCode)
-	}
-
-	// 응답 파싱
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
-	}
-
-	var result map[string]bool
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
-	}
-
-	return result, nil
-}
-
 // 직접 연결로 장비 상태를 확인합니다.
 func (c *Client) CheckHealthDirect(deviceIP string) (bool, error) {
 	url := fmt.Sprintf("http://%s/agent/respCheck", deviceIP)
@@ -101,54 +63,6 @@ func (c *Client) CheckHealthDirect(deviceIP string) (bool, error) {
 	success := resp.StatusCode == http.StatusOK
 	log.Printf("[DEBUG] CheckHealthDirect: IP=%s, StatusCode=%d, 성공=%v", deviceIP, resp.StatusCode, success)
 	return success, nil
-}
-
-// Agent 서버를 통해 방화벽 룰을 배포합니다.
-func (c *Client) DeployViaAgent(deviceIP string, template string) (*model.DeployResult, error) {
-	url := fmt.Sprintf("%s/agent/req-deploy", strings.TrimSuffix(c.config.AgentServerURL, "/"))
-
-	// 요청 데이터 생성
-	reqData := map[string]interface{}{
-		"template": template,
-		"ipAddrs":  []string{deviceIP},
-	}
-	jsonData, err := json.Marshal(reqData)
-	if err != nil {
-		return nil, fmt.Errorf("JSON 변환 실패: %v", err)
-	}
-
-	// POST 요청
-	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("Agent 서버 연결 실패: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Agent 서버 응답 오류: %d", resp.StatusCode)
-	}
-
-	// 응답 파싱
-	var response struct {
-		Data []model.DeployResult `json:"data"`
-	}
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
-	}
-
-	// 해당 장비의 결과 찾기
-	for _, result := range response.Data {
-		if result.IP == deviceIP {
-			return &result, nil
-		}
-	}
-
-	return nil, fmt.Errorf("장비 %s의 배포 결과를 찾을 수 없습니다", deviceIP)
 }
 
 // 직접 연결로 방화벽 룰을 배포합니다.
@@ -213,28 +127,17 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 	return nil, fmt.Errorf("장비 %s의 배포 결과를 찾을 수 없습니다", deviceIP)
 }
 
-// 장비 상태를 확인합니다. (설정에 따라 Agent 또는 Direct)
+// 장비 상태를 확인합니다.
 func (c *Client) CheckHealth(fw *model.Firewall) (string, error) {
-	var isRunning bool
-	var err error
-
 	// DeviceIP 사용 (DeviceIP가 없으면 DeviceName 사용 - 하위 호환)
 	ip := fw.DeviceIP
 	if ip == "" {
 		ip = fw.DeviceName
 	}
 
-	if c.config.IsAgentMode() {
-		result, err := c.CheckHealthViaAgent([]string{ip})
-		if err != nil {
-			return model.ServerStatusStop, err
-		}
-		isRunning = result[ip]
-	} else {
-		isRunning, err = c.CheckHealthDirect(ip)
-		if err != nil {
-			return model.ServerStatusStop, err
-		}
+	isRunning, err := c.CheckHealthDirect(ip)
+	if err != nil {
+		return model.ServerStatusStop, err
 	}
 
 	if isRunning {
@@ -243,7 +146,7 @@ func (c *Client) CheckHealth(fw *model.Firewall) (string, error) {
 	return model.ServerStatusStop, nil
 }
 
-// 방화벽 룰을 배포합니다. (설정에 따라 Agent 또는 Direct)
+// 방화벽 룰을 배포합니다.
 func (c *Client) DeployTemplate(fw *model.Firewall, template string) (*model.DeployResult, error) {
 	// DeviceIP 사용 (DeviceIP가 없으면 DeviceName 사용 - 하위 호환)
 	ip := fw.DeviceIP
@@ -251,9 +154,6 @@ func (c *Client) DeployTemplate(fw *model.Firewall, template string) (*model.Dep
 		ip = fw.DeviceName
 	}
 
-	if c.config.IsAgentMode() {
-		return c.DeployViaAgent(ip, template)
-	}
 	return c.DeployDirect(ip, template)
 }
 
@@ -275,7 +175,7 @@ type ProcessInfo struct {
 	Version string `json:"version"`
 }
 
-// GetDeviceReportDirect 직접 연결로 장비 정보를 조회합니다.
+// GetDeviceReportDirect 장비 정보를 조회합니다.
 func (c *Client) GetDeviceReportDirect(deviceIP string) (*DeviceReportResponse, error) {
 	url := fmt.Sprintf("http://%s/device-report", deviceIP)
 	log.Printf("[DEBUG] GetDeviceReportDirect: URL=%s", url)
@@ -308,7 +208,7 @@ func (c *Client) GetDeviceReportDirect(deviceIP string) (*DeviceReportResponse, 
 	return &report, nil
 }
 
-// ProgramUpdateDirect 직접 연결로 패키지 업데이트를 요청합니다.
+// ProgramUpdateDirect 패키지 업데이트를 요청합니다.
 func (c *Client) ProgramUpdateDirect(deviceIP string, req *ProgramUpdateRequest) error {
 	url := fmt.Sprintf("http://%s/program-update", deviceIP)
 	log.Printf("[DEBUG] ProgramUpdateDirect: URL=%s", url)

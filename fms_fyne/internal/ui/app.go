@@ -282,68 +282,60 @@ func (m *MainUI) showSettingsDialog() {
 		return
 	}
 
-	// 연결 모드 라디오 그룹 (Agent Server는 임시로 비활성화)
-	connectionMode := widget.NewRadioGroup([]string{"Agent Server (준비중)", "Direct"}, nil)
-	connectionMode.SetSelected("Direct")
-	connectionMode.Disable() // Agent 모드 임시 비활성화
-
-	// Agent Server URL 입력 필드 (Agent 모드 비활성화로 인해 항상 비활성화)
-	agentURLEntry := widget.NewEntry()
-	agentURLEntry.SetText(config.AgentServerURL)
-	agentURLEntry.SetPlaceHolder("http://172.24.10.6:8080")
-	agentURLEntry.Disable() // Agent 모드 임시 비활성화
-
 	// 타임아웃 입력 필드
 	timeoutEntry := widget.NewEntry()
 	timeoutEntry.SetText(strconv.Itoa(config.GetTimeoutSeconds()))
 	timeoutEntry.SetPlaceHolder("10")
 
-	// 상태 체크 ON/OFF 버튼
-	autoStatusCheckBtn := widget.NewButton("상태체크 OFF", nil)
-	autoStatusCheckEnabled := config.AutoStatusCheck
-	updateStatusCheckBtn := func() {
-		if autoStatusCheckEnabled {
-			autoStatusCheckBtn.SetText("상태체크 ON")
-		} else {
-			autoStatusCheckBtn.SetText("상태체크 OFF")
-		}
-	}
-	updateStatusCheckBtn()
-	autoStatusCheckBtn.OnTapped = func() {
-		autoStatusCheckEnabled = !autoStatusCheckEnabled
-		updateStatusCheckBtn()
-	}
+	// 패키지 업데이트 요청 경로/포트
+	programUpdatePathEntry := widget.NewEntry()
+	programUpdatePathEntry.SetText(config.ProgramUpdatePath)
+	programUpdatePathEntry.SetPlaceHolder(model.DefaultProgramUpdatePath)
+	programUpdatePortEntry := widget.NewEntry()
+	programUpdatePortEntry.SetText(strconv.Itoa(config.ProgramUpdatePort))
+	programUpdatePortEntry.SetPlaceHolder(strconv.Itoa(model.DefaultAPIPort))
 
-	// 상태 체크 주기 입력 필드
+	// 방화벽 규칙 배포 경로/포트
+	firewallDeployPathEntry := widget.NewEntry()
+	firewallDeployPathEntry.SetText(config.FirewallDeployPath)
+	firewallDeployPathEntry.SetPlaceHolder(model.DefaultFirewallDeployPath)
+	firewallDeployPortEntry := widget.NewEntry()
+	firewallDeployPortEntry.SetText(strconv.Itoa(config.FirewallDeployPort))
+	firewallDeployPortEntry.SetPlaceHolder(strconv.Itoa(model.DefaultAPIPort))
+
+	// 서버 상태 체크 경로/포트
+	deviceReportPathEntry := widget.NewEntry()
+	deviceReportPathEntry.SetText(config.DeviceReportPath)
+	deviceReportPathEntry.SetPlaceHolder(model.DefaultDeviceReportPath)
+	deviceReportPortEntry := widget.NewEntry()
+	deviceReportPortEntry.SetText(strconv.Itoa(config.DeviceReportPort))
+	deviceReportPortEntry.SetPlaceHolder(strconv.Itoa(model.DefaultAPIPort))
+
+	// 장비 체크 주기 입력 필드
 	statusCheckIntervalEntry := widget.NewEntry()
 	statusCheckIntervalEntry.SetText(strconv.Itoa(config.GetStatusCheckInterval()))
 	statusCheckIntervalEntry.SetPlaceHolder("60")
 
-	// 연결 모드에 따라 URL 입력 필드 활성화/비활성화
-	updateURLEntryState := func() {
-		if connectionMode.Selected == "Agent Server" {
-			agentURLEntry.Enable()
-		} else {
-			agentURLEntry.Disable()
-		}
-	}
-	updateURLEntryState()
-
-	connectionMode.OnChanged = func(selected string) {
-		updateURLEntryState()
-	}
-
 	// 설정 경로 표시 (읽기 전용)
 	configPathLabel := widget.NewLabel(m.store.GetConfigDir())
 
+	// 경로+포트 컨테이너 생성 함수
+	makePathPortRow := func(pathEntry, portEntry *widget.Entry) fyne.CanvasObject {
+		return container.NewBorder(nil, nil, nil,
+			container.NewHBox(widget.NewLabel("PORT:"), container.NewGridWrap(fyne.NewSize(60, 36), portEntry)),
+			pathEntry,
+		)
+	}
+
 	// 폼 생성
 	formItems := []*widget.FormItem{
-		widget.NewFormItem("Connection", connectionMode),
-		widget.NewFormItem("Agent Server URL", agentURLEntry),
-		widget.NewFormItem("Timeout (초)", timeoutEntry),
+		widget.NewFormItem("HTTP 응답대기 (초)", timeoutEntry),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
-		widget.NewFormItem("자동 상태체크", autoStatusCheckBtn),
-		widget.NewFormItem("체크 주기 (초)", statusCheckIntervalEntry),
+		widget.NewFormItem("패키지 업데이트 요청", makePathPortRow(programUpdatePathEntry, programUpdatePortEntry)),
+		widget.NewFormItem("방화벽 규칙 배포", makePathPortRow(firewallDeployPathEntry, firewallDeployPortEntry)),
+		widget.NewFormItem("서버 상태 체크", makePathPortRow(deviceReportPathEntry, deviceReportPortEntry)),
+		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
+		widget.NewFormItem("장비 체크 주기 (초)", statusCheckIntervalEntry),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
 		widget.NewFormItem("설정 저장 경로", configPathLabel),
 	}
@@ -354,20 +346,6 @@ func (m *MainUI) showSettingsDialog() {
 			return
 		}
 
-		// 연결 모드 설정
-		var newConnectionMode string
-		if connectionMode.Selected == "Agent Server" {
-			newConnectionMode = model.ConnectionModeAgent
-		} else {
-			newConnectionMode = model.ConnectionModeDirect
-		}
-
-		// Agent Server URL 검증 (Agent 모드일 경우)
-		if newConnectionMode == model.ConnectionModeAgent && agentURLEntry.Text == "" {
-			dialog.ShowError(fmt.Errorf("Agent Server URL을 입력해주세요"), m.window)
-			return
-		}
-
 		// 타임아웃 값 파싱
 		timeoutSeconds, err := strconv.Atoi(timeoutEntry.Text)
 		if err != nil || timeoutSeconds < 5 || timeoutSeconds > 120 {
@@ -375,21 +353,42 @@ func (m *MainUI) showSettingsDialog() {
 			return
 		}
 
-		// 상태 체크 주기 값 파싱
+		// 포트 값 파싱
+		programUpdatePort, err := strconv.Atoi(programUpdatePortEntry.Text)
+		if err != nil || programUpdatePort < 1 || programUpdatePort > 65535 {
+			dialog.ShowError(fmt.Errorf("패키지 업데이트 포트는 1~65535 사이의 숫자를 입력해주세요"), m.window)
+			return
+		}
+		firewallDeployPort, err := strconv.Atoi(firewallDeployPortEntry.Text)
+		if err != nil || firewallDeployPort < 1 || firewallDeployPort > 65535 {
+			dialog.ShowError(fmt.Errorf("방화벽 배포 포트는 1~65535 사이의 숫자를 입력해주세요"), m.window)
+			return
+		}
+		deviceReportPort, err := strconv.Atoi(deviceReportPortEntry.Text)
+		if err != nil || deviceReportPort < 1 || deviceReportPort > 65535 {
+			dialog.ShowError(fmt.Errorf("서버 상태 체크 포트는 1~65535 사이의 숫자를 입력해주세요"), m.window)
+			return
+		}
+
+		// 장비 체크 주기 값 파싱
 		statusCheckInterval, err := strconv.Atoi(statusCheckIntervalEntry.Text)
 		if err != nil || statusCheckInterval < 10 || statusCheckInterval > 300 {
-			dialog.ShowError(fmt.Errorf("상태 체크 주기는 10~300 사이의 숫자를 입력해주세요"), m.window)
+			dialog.ShowError(fmt.Errorf("장비 체크 주기는 10~300 사이의 숫자를 입력해주세요"), m.window)
 			return
 		}
 
 		// 설정 저장
 		newConfig := &model.Config{
-			ConnectionMode:      newConnectionMode,
-			AgentServerURL:      agentURLEntry.Text,
 			TimeoutSeconds:      timeoutSeconds,
 			Theme:               config.Theme,
-			AutoStatusCheck:     autoStatusCheckEnabled,
+			AutoStatusCheck:     config.AutoStatusCheck,
 			StatusCheckInterval: statusCheckInterval,
+			ProgramUpdatePath:   programUpdatePathEntry.Text,
+			ProgramUpdatePort:   programUpdatePort,
+			FirewallDeployPath:  firewallDeployPathEntry.Text,
+			FirewallDeployPort:  firewallDeployPort,
+			DeviceReportPath:    deviceReportPathEntry.Text,
+			DeviceReportPort:    deviceReportPort,
 		}
 
 		if err := m.store.SaveConfig(newConfig); err != nil {
@@ -397,8 +396,8 @@ func (m *MainUI) showSettingsDialog() {
 			return
 		}
 
-		// DeviceTab에 자동 상태 체크 설정 적용
-		m.deviceTab.SetAutoStatusCheck(autoStatusCheckEnabled, statusCheckInterval)
+		// DeviceTab에 장비 체크 주기 설정 적용
+		m.deviceTab.SetAutoStatusCheck(config.AutoStatusCheck, statusCheckInterval)
 
 		dialog.ShowInformation("성공", "설정이 저장되었습니다.", m.window)
 	}, m.window)

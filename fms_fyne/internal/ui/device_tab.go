@@ -56,7 +56,8 @@ type DeviceTab struct {
 	autoCheckInterval int
 	autoCheckTicker   *time.Ticker
 	stopAutoCheck     chan struct{}
-	statusBorder      *canvas.Rectangle // 상태 박스 테두리
+	statusBorder *canvas.Rectangle // 상태 박스 테두리
+	autoCheckBtn *widget.Button    // 자동 상태 체크 토글 버튼
 }
 
 // 새로운 장비 관리 탭을 생성합니다.
@@ -70,6 +71,10 @@ func NewDeviceTab(window fyne.Window, store *storage.JSONStore, firewallTab *Fir
 	}
 	tab.createUI()
 	tab.loadFirewalls()
+
+	// config에서 자동 상태 체크 설정 동기화
+	tab.SyncAutoCheckFromConfig()
+
 	return tab
 }
 
@@ -114,6 +119,11 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 	redDot := widget.NewLabelWithStyle("●", fyne.TextAlignCenter, fyne.TextStyle{})
 	redDot.Importance = widget.DangerImportance
 
+	// 자동 상태 체크 토글 버튼 (초기: Play 아이콘)
+	d.autoCheckBtn = widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
+		d.onToggleAutoCheck()
+	})
+
 	// 새로고침 버튼 (🔄)
 	d.refreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
 		d.onRefreshAll()
@@ -139,9 +149,10 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 	// 테두리와 내용을 스택으로 결합
 	statusBox := container.NewStack(d.statusBorder, paddedStatus)
 
-	// 상태 요약 컨테이너 (새로고침 버튼 포함)
+	// 상태 요약 컨테이너 (토글 버튼 + 새로고침 버튼 포함)
 	statusSummary := container.NewHBox(
 		statusBox,
+		d.autoCheckBtn,
 		d.refreshBtn,
 	)
 
@@ -1460,4 +1471,60 @@ func (d *DeviceTab) performAutoStatusCheck() {
 			d.isRefreshing = false
 		})
 	}()
+}
+
+// 자동 상태 체크 토글 버튼 클릭 핸들러
+func (d *DeviceTab) onToggleAutoCheck() {
+	config, err := d.store.GetConfig()
+	if err != nil {
+		dialog.ShowError(err, d.window)
+		return
+	}
+
+	// 현재 상태 토글
+	newEnabled := !config.AutoStatusCheck
+	config.AutoStatusCheck = newEnabled
+
+	// config 저장
+	if err := d.store.SaveConfig(config); err != nil {
+		dialog.ShowError(err, d.window)
+		return
+	}
+
+	// 버튼 아이콘 및 자동 체크 상태 업데이트
+	d.updateAutoCheckButton(newEnabled)
+	d.SetAutoStatusCheck(newEnabled, config.GetStatusCheckInterval())
+
+	// 토스트 메시지
+	if newEnabled {
+		component.ShowSuccessToast(d.window, "자동 상태 체크 활성화")
+	} else {
+		component.ShowSuccessToast(d.window, "자동 상태 체크 비활성화")
+	}
+}
+
+// 자동 상태 체크 버튼 아이콘을 업데이트합니다.
+func (d *DeviceTab) updateAutoCheckButton(enabled bool) {
+	if d.autoCheckBtn == nil {
+		return
+	}
+
+	if enabled {
+		// ON 상태: Pause 아이콘 (||)
+		d.autoCheckBtn.SetIcon(theme.MediaPauseIcon())
+	} else {
+		// OFF 상태: Play 아이콘
+		d.autoCheckBtn.SetIcon(theme.MediaPlayIcon())
+	}
+}
+
+// 설정에서 자동 상태 체크 상태를 동기화합니다.
+func (d *DeviceTab) SyncAutoCheckFromConfig() {
+	config, err := d.store.GetConfig()
+	if err != nil {
+		return
+	}
+
+	d.updateAutoCheckButton(config.AutoStatusCheck)
+	d.SetAutoStatusCheck(config.AutoStatusCheck, config.GetStatusCheckInterval())
 }
