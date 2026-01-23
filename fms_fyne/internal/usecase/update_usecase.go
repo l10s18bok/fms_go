@@ -152,7 +152,7 @@ func (u *UpdateUseCase) UpdateProgram(
 	}
 
 	log.Printf("[UpdateProgram] 업데이트 요청 시도 - %s", deviceIP)
-	if err := httpClient.ProgramUpdateDirect(deviceIP, updateReq); err != nil {
+	if err := httpClient.ProgramUpdateDirect(device, updateReq); err != nil {
 		result.Message = fmt.Sprintf("업데이트 요청 실패: %v", err)
 		result.History.Status = model.DeployStatusFail
 		result.History.Message = result.Message
@@ -160,25 +160,6 @@ func (u *UpdateUseCase) UpdateProgram(
 		return result
 	}
 	log.Printf("[UpdateProgram] 업데이트 요청 성공 - %s", deviceIP)
-
-	// 장비 정보 조회로 업데이트 확인
-	log.Printf("[UpdateProgram] 장비 정보 조회 시도 - %s", deviceIP)
-	report, err := httpClient.GetDeviceReportDirect(deviceIP)
-	if err != nil {
-		// 장비 정보 조회 실패해도 업데이트는 성공으로 처리 (경고만 출력)
-		log.Printf("[UpdateProgram] 경고 - %s: 장비 정보 조회 실패: %v", deviceIP, err)
-	} else {
-		// 장비에서 반환한 버전 확인
-		for _, proc := range report.Processes {
-			if proc.Name == program.ProcessName {
-				log.Printf("[UpdateProgram] 장비 버전 확인 - %s: %s=%s", deviceIP, proc.Name, proc.Version)
-				if proc.Version != program.ProcessVersion {
-					log.Printf("[UpdateProgram] 경고 - %s: 버전 불일치 (요청: %s, 실제: %s)", deviceIP, program.ProcessVersion, proc.Version)
-				}
-				break
-			}
-		}
-	}
 
 	// 장비의 패키지 버전 업데이트
 	if device.ProgramVersions == nil {
@@ -188,7 +169,7 @@ func (u *UpdateUseCase) UpdateProgram(
 
 	// 성공
 	result.Success = true
-	result.Message = fmt.Sprintf("패키지 업데이트 완료: %s → %s", remoteFilePath, program.ProcessVersion)
+	result.Message = fmt.Sprintf("패키지 업데이트 요청 완료: %s → %s", remoteFilePath, program.ProcessVersion)
 	result.History.Status = model.DeployStatusSuccess
 	result.History.Message = result.Message
 	result.History.Timestamp = utils.Now()
