@@ -27,8 +27,10 @@ type Firewall struct {
 	ProgramUpdatePort  int    `json:"programUpdatePort,omitempty"`  // 패키지 업데이트 요청 포트
 	FirewallDeployPath string `json:"firewallDeployPath,omitempty"` // 방화벽 규칙 배포 경로
 	FirewallDeployPort int    `json:"firewallDeployPort,omitempty"` // 방화벽 규칙 배포 포트
-	DeviceReportPath   string `json:"deviceReportPath,omitempty"`   // 서버 상태 체크 경로
-	DeviceReportPort   int    `json:"deviceReportPort,omitempty"`   // 서버 상태 체크 포트
+	HealthCheckPath    string `json:"healthCheckPath,omitempty"`    // 장비 상태 체크 경로
+	HealthCheckPort    int    `json:"healthCheckPort,omitempty"`    // 장비 상태 체크 포트
+	DeviceInfoPath     string `json:"deviceInfoPath,omitempty"`     // 장비 상세보기 경로
+	DeviceInfoPort     int    `json:"deviceInfoPort,omitempty"`     // 장비 상세보기 포트
 }
 
 // 배포 결과를 나타냅니다.
@@ -142,8 +144,10 @@ func (f *Firewall) Clone() *Firewall {
 		ProgramUpdatePort:  f.ProgramUpdatePort,
 		FirewallDeployPath: f.FirewallDeployPath,
 		FirewallDeployPort: f.FirewallDeployPort,
-		DeviceReportPath:   f.DeviceReportPath,
-		DeviceReportPort:   f.DeviceReportPort,
+		HealthCheckPath:    f.HealthCheckPath,
+		HealthCheckPort:    f.HealthCheckPort,
+		DeviceInfoPath:     f.DeviceInfoPath,
+		DeviceInfoPort:     f.DeviceInfoPort,
 	}
 
 	// DeployResult 복사

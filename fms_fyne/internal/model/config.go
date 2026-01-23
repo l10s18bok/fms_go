@@ -33,9 +33,10 @@ const DefaultStatusCheckInterval = 60
 
 // 기본 API 경로
 const (
-	DefaultProgramUpdatePath  = "/program-update"
+	DefaultProgramUpdatePath = "/program-update"
 	DefaultFirewallDeployPath = "/agent/req-deploy"
-	DefaultDeviceReportPath   = "/device-report"
+	DefaultHealthCheckPath   = "/agent/respCheck" // 장비 상태 체크 경로
+	DefaultDeviceInfoPath    = "/device-report"   // 장비 상세보기 경로
 )
 
 // 기본 API 포트
@@ -53,8 +54,10 @@ type Config struct {
 	ProgramUpdatePort  int    `json:"programUpdatePort"`  // 패키지 업데이트 요청 포트
 	FirewallDeployPath string `json:"firewallDeployPath"` // 방화벽 규칙 배포 경로
 	FirewallDeployPort int    `json:"firewallDeployPort"` // 방화벽 규칙 배포 포트
-	DeviceReportPath   string `json:"deviceReportPath"`   // 서버 상태 체크 경로
-	DeviceReportPort   int    `json:"deviceReportPort"`   // 서버 상태 체크 포트
+	HealthCheckPath    string `json:"healthCheckPath"`    // 장비 상태 체크 경로
+	HealthCheckPort    int    `json:"healthCheckPort"`    // 장비 상태 체크 포트
+	DeviceInfoPath     string `json:"deviceInfoPath"`     // 장비 상세보기 경로
+	DeviceInfoPort     int    `json:"deviceInfoPort"`     // 장비 상세보기 포트
 }
 
 // 기본 설정을 반환합니다.
@@ -68,8 +71,10 @@ func DefaultConfig() *Config {
 		ProgramUpdatePort:   DefaultAPIPort,
 		FirewallDeployPath:  DefaultFirewallDeployPath,
 		FirewallDeployPort:  DefaultAPIPort,
-		DeviceReportPath:    DefaultDeviceReportPath,
-		DeviceReportPort:    DefaultAPIPort,
+		HealthCheckPath:     DefaultHealthCheckPath,
+		HealthCheckPort:     DefaultAPIPort,
+		DeviceInfoPath:      DefaultDeviceInfoPath,
+		DeviceInfoPort:      DefaultAPIPort,
 	}
 }
 

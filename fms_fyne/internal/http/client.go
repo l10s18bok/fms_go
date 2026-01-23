@@ -49,30 +49,78 @@ func NewClient(config *model.Config) *Client {
 }
 
 // 직접 연결로 장비 상태를 확인합니다.
-func (c *Client) CheckHealthDirect(deviceIP string) (bool, error) {
-	url := fmt.Sprintf("http://%s/agent/respCheck", deviceIP)
+func (c *Client) CheckHealthDirect(fw *model.Firewall) (bool, error) {
+	// IP 결정
+	ip := fw.DeviceIP
+	if ip == "" {
+		ip = fw.DeviceName
+	}
+
+	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
+	port := fw.HealthCheckPort
+	if port == 0 {
+		port = c.config.HealthCheckPort
+	}
+	if port == 0 {
+		port = model.DefaultAPIPort
+	}
+
+	// 경로 결정 (장비별 설정 > 전역 설정 > 기본값)
+	path := fw.HealthCheckPath
+	if path == "" {
+		path = c.config.HealthCheckPath
+	}
+	if path == "" {
+		path = model.DefaultHealthCheckPath
+	}
+
+	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
 	log.Printf("[DEBUG] CheckHealthDirect: URL=%s", url)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
-		log.Printf("[ERROR] CheckHealthDirect: 장비 연결 실패 - IP=%s, err=%v", deviceIP, err)
+		log.Printf("[ERROR] CheckHealthDirect: 장비 연결 실패 - IP=%s, err=%v", ip, err)
 		return false, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
 
 	success := resp.StatusCode == http.StatusOK
-	log.Printf("[DEBUG] CheckHealthDirect: IP=%s, StatusCode=%d, 성공=%v", deviceIP, resp.StatusCode, success)
+	log.Printf("[DEBUG] CheckHealthDirect: IP=%s, StatusCode=%d, 성공=%v", ip, resp.StatusCode, success)
 	return success, nil
 }
 
 // 직접 연결로 방화벽 룰을 배포합니다.
-func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployResult, error) {
-	url := fmt.Sprintf("http://%s/agent/firewall-deploy", deviceIP)
+func (c *Client) DeployDirect(fw *model.Firewall, template string) (*model.DeployResult, error) {
+	// IP 결정
+	ip := fw.DeviceIP
+	if ip == "" {
+		ip = fw.DeviceName
+	}
+
+	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
+	port := fw.FirewallDeployPort
+	if port == 0 {
+		port = c.config.FirewallDeployPort
+	}
+	if port == 0 {
+		port = model.DefaultAPIPort
+	}
+
+	// 경로 결정 (장비별 설정 > 전역 설정 > 기본값)
+	path := fw.FirewallDeployPath
+	if path == "" {
+		path = c.config.FirewallDeployPath
+	}
+	if path == "" {
+		path = model.DefaultFirewallDeployPath
+	}
+
+	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
 	log.Printf("[DEBUG] DeployDirect: URL=%s", url)
 	log.Printf("[DEBUG] DeployDirect: template length=%d, content=\n%s", len(template), template)
 
 	// 요청 데이터 생성 (configInfo로 전송)
-	reqData := map[string]interface{}{
+	reqData := map[string]any{
 		"configInfo": template,
 	}
 	jsonData, err := json.Marshal(reqData)
@@ -84,7 +132,7 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 	// POST 요청
 	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("[ERROR] DeployDirect: 장비 연결 실패 - IP=%s, err=%v", deviceIP, err)
+		log.Printf("[ERROR] DeployDirect: 장비 연결 실패 - IP=%s, err=%v", ip, err)
 		return nil, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
@@ -96,7 +144,7 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[ERROR] DeployDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", deviceIP, resp.StatusCode, string(body))
+		log.Printf("[ERROR] DeployDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", ip, resp.StatusCode, string(body))
 		return nil, fmt.Errorf("장비 응답 오류: %d", resp.StatusCode)
 	}
 
@@ -111,31 +159,25 @@ func (c *Client) DeployDirect(deviceIP string, template string) (*model.DeployRe
 
 	// 해당 장비의 결과 찾기
 	for _, result := range response.Data {
-		if result.IP == deviceIP {
-			log.Printf("[DEBUG] DeployDirect: 성공 - IP=%s, Status=%s", deviceIP, result.Status)
+		if result.IP == ip {
+			log.Printf("[DEBUG] DeployDirect: 성공 - IP=%s, Status=%s", ip, result.Status)
 			return &result, nil
 		}
 	}
 
 	// 결과가 하나만 있으면 그것을 반환
 	if len(response.Data) == 1 {
-		log.Printf("[DEBUG] DeployDirect: 성공 (단일 결과) - IP=%s, Status=%s", deviceIP, response.Data[0].Status)
+		log.Printf("[DEBUG] DeployDirect: 성공 (단일 결과) - IP=%s, Status=%s", ip, response.Data[0].Status)
 		return &response.Data[0], nil
 	}
 
-	log.Printf("[ERROR] DeployDirect: 장비 결과 없음 - IP=%s", deviceIP)
-	return nil, fmt.Errorf("장비 %s의 배포 결과를 찾을 수 없습니다", deviceIP)
+	log.Printf("[ERROR] DeployDirect: 장비 결과 없음 - IP=%s", ip)
+	return nil, fmt.Errorf("장비 %s의 배포 결과를 찾을 수 없습니다", ip)
 }
 
 // 장비 상태를 확인합니다.
 func (c *Client) CheckHealth(fw *model.Firewall) (string, error) {
-	// DeviceIP 사용 (DeviceIP가 없으면 DeviceName 사용 - 하위 호환)
-	ip := fw.DeviceIP
-	if ip == "" {
-		ip = fw.DeviceName
-	}
-
-	isRunning, err := c.CheckHealthDirect(ip)
+	isRunning, err := c.CheckHealthDirect(fw)
 	if err != nil {
 		return model.ServerStatusStop, err
 	}
@@ -148,13 +190,7 @@ func (c *Client) CheckHealth(fw *model.Firewall) (string, error) {
 
 // 방화벽 룰을 배포합니다.
 func (c *Client) DeployTemplate(fw *model.Firewall, template string) (*model.DeployResult, error) {
-	// DeviceIP 사용 (DeviceIP가 없으면 DeviceName 사용 - 하위 호환)
-	ip := fw.DeviceIP
-	if ip == "" {
-		ip = fw.DeviceName
-	}
-
-	return c.DeployDirect(ip, template)
+	return c.DeployDirect(fw, template)
 }
 
 // ProgramUpdateRequest 패키지 업데이트 요청 구조체
@@ -175,42 +211,90 @@ type ProcessInfo struct {
 	Version string `json:"version"`
 }
 
-// GetDeviceReportDirect 장비 정보를 조회합니다.
-func (c *Client) GetDeviceReportDirect(deviceIP string) (*DeviceReportResponse, error) {
-	url := fmt.Sprintf("http://%s/device-report", deviceIP)
-	log.Printf("[DEBUG] GetDeviceReportDirect: URL=%s", url)
+// GetDeviceInfoDirect 장비 상세 정보를 조회합니다.
+func (c *Client) GetDeviceInfoDirect(fw *model.Firewall) (*DeviceReportResponse, error) {
+	// IP 결정
+	ip := fw.DeviceIP
+	if ip == "" {
+		ip = fw.DeviceName
+	}
+
+	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
+	port := fw.DeviceInfoPort
+	if port == 0 {
+		port = c.config.DeviceInfoPort
+	}
+	if port == 0 {
+		port = model.DefaultAPIPort
+	}
+
+	// 경로 결정 (장비별 설정 > 전역 설정 > 기본값)
+	path := fw.DeviceInfoPath
+	if path == "" {
+		path = c.config.DeviceInfoPath
+	}
+	if path == "" {
+		path = model.DefaultDeviceInfoPath
+	}
+
+	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
+	log.Printf("[DEBUG] GetDeviceInfoDirect: URL=%s", url)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
-		log.Printf("[ERROR] GetDeviceReportDirect: 장비 연결 실패 - IP=%s, err=%v", deviceIP, err)
+		log.Printf("[ERROR] GetDeviceInfoDirect: 장비 연결 실패 - IP=%s, err=%v", ip, err)
 		return nil, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("[ERROR] GetDeviceReportDirect: 응답 읽기 실패 - %v", err)
+		log.Printf("[ERROR] GetDeviceInfoDirect: 응답 읽기 실패 - %v", err)
 		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[ERROR] GetDeviceReportDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", deviceIP, resp.StatusCode, string(body))
+		log.Printf("[ERROR] GetDeviceInfoDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", ip, resp.StatusCode, string(body))
 		return nil, fmt.Errorf("장비 응답 오류: %d - %s", resp.StatusCode, string(body))
 	}
 
 	var report DeviceReportResponse
 	if err := json.Unmarshal(body, &report); err != nil {
-		log.Printf("[ERROR] GetDeviceReportDirect: 응답 파싱 실패 - %v, body=%s", err, string(body))
+		log.Printf("[ERROR] GetDeviceInfoDirect: 응답 파싱 실패 - %v, body=%s", err, string(body))
 		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
 	}
 
-	log.Printf("[DEBUG] GetDeviceReportDirect: 성공 - IP=%s, processes=%+v", deviceIP, report.Processes)
+	log.Printf("[DEBUG] GetDeviceInfoDirect: 성공 - IP=%s, processes=%+v", ip, report.Processes)
 	return &report, nil
 }
 
 // ProgramUpdateDirect 패키지 업데이트를 요청합니다.
-func (c *Client) ProgramUpdateDirect(deviceIP string, req *ProgramUpdateRequest) error {
-	url := fmt.Sprintf("http://%s/program-update", deviceIP)
+func (c *Client) ProgramUpdateDirect(fw *model.Firewall, req *ProgramUpdateRequest) error {
+	// IP 결정
+	ip := fw.DeviceIP
+	if ip == "" {
+		ip = fw.DeviceName
+	}
+
+	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
+	port := fw.ProgramUpdatePort
+	if port == 0 {
+		port = c.config.ProgramUpdatePort
+	}
+	if port == 0 {
+		port = model.DefaultAPIPort
+	}
+
+	// 경로 결정 (장비별 설정 > 전역 설정 > 기본값)
+	path := fw.ProgramUpdatePath
+	if path == "" {
+		path = c.config.ProgramUpdatePath
+	}
+	if path == "" {
+		path = model.DefaultProgramUpdatePath
+	}
+
+	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
 	log.Printf("[DEBUG] ProgramUpdateDirect: URL=%s", url)
 	log.Printf("[DEBUG] ProgramUpdateDirect: request=%+v", req)
 
@@ -223,7 +307,7 @@ func (c *Client) ProgramUpdateDirect(deviceIP string, req *ProgramUpdateRequest)
 
 	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("[ERROR] ProgramUpdateDirect: 장비 연결 실패 - IP=%s, err=%v", deviceIP, err)
+		log.Printf("[ERROR] ProgramUpdateDirect: 장비 연결 실패 - IP=%s, err=%v", ip, err)
 		return fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
@@ -235,10 +319,10 @@ func (c *Client) ProgramUpdateDirect(deviceIP string, req *ProgramUpdateRequest)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[ERROR] ProgramUpdateDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", deviceIP, resp.StatusCode, string(body))
+		log.Printf("[ERROR] ProgramUpdateDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", ip, resp.StatusCode, string(body))
 		return fmt.Errorf("장비 응답 오류: %d - %s", resp.StatusCode, string(body))
 	}
 
-	log.Printf("[DEBUG] ProgramUpdateDirect: 성공 - IP=%s, response=%s", deviceIP, string(body))
+	log.Printf("[DEBUG] ProgramUpdateDirect: 성공 - IP=%s, response=%s", ip, string(body))
 	return nil
 }
