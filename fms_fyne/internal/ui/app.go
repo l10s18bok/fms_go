@@ -329,19 +329,19 @@ func (m *MainUI) showSettingsDialog() {
 
 	// 폼 생성
 	formItems := []*widget.FormItem{
-		widget.NewFormItem("HTTP 응답대기 (초)", timeoutEntry),
+		widget.NewFormItem("장비 자동 체크 주기(초)", statusCheckIntervalEntry),
+		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
+		widget.NewFormItem("HTTP 응답대기(초)", timeoutEntry),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
 		widget.NewFormItem("패키지 업데이트 요청", makePathPortRow(programUpdatePathEntry, programUpdatePortEntry)),
 		widget.NewFormItem("방화벽 규칙 배포", makePathPortRow(firewallDeployPathEntry, firewallDeployPortEntry)),
 		widget.NewFormItem("서버 상태 체크", makePathPortRow(deviceReportPathEntry, deviceReportPortEntry)),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
-		widget.NewFormItem("장비 체크 주기 (초)", statusCheckIntervalEntry),
-		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
 		widget.NewFormItem("설정 저장 경로", configPathLabel),
 	}
 
 	// 다이얼로그 표시
-	dialog.ShowForm("설정", "저장", "취소", formItems, func(ok bool) {
+	dialog.ShowForm("⚙ 설정", "저장", "취소", formItems, func(ok bool) {
 		if !ok {
 			return
 		}

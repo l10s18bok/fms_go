@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"fms/internal/model"
@@ -11,6 +12,7 @@ import (
 	"fms/internal/ui/component"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
@@ -86,19 +88,44 @@ func (t *FirewallEditTab) createUI() {
 	// NAT 규칙 빌더
 	t.natBuilder = NewNATBuilder(t.window, nil)
 
-	// 예시 텍스트 (선택하여 복사 가능)
+	// 예시 텍스트 (읽기 전용, 복사 버튼으로 클립보드 복사)
 	exampleText := `agent -m=insert -c=INPUT -p=any -a=DROP --sip=203.248.252.2
 agent -m=insert -c=INPUT -p=any -a=DROP --black
 agent -m=insert -t=nat --nat-type=dnat -p=tcp --match-port=6060 -s=203.248.252.2 --to-dest=192.168.3.1:8080`
 
-	exampleEntry := widget.NewMultiLineEntry()
-	exampleEntry.SetText(exampleText)
-	exampleEntry.Wrapping = fyne.TextWrapOff
+	// 각 줄을 회색 텍스트로 생성
+	grayColor := color.RGBA{R: 128, G: 128, B: 128, A: 255}
+	lines := strings.Split(exampleText, "\n")
+	textObjects := make([]fyne.CanvasObject, len(lines))
+	for i, line := range lines {
+		text := canvas.NewText(line, grayColor)
+		text.TextStyle = fyne.TextStyle{Monospace: true}
+		textObjects[i] = text
+	}
 
+	// 텍스트를 패딩과 함께 배치
+	textContent := container.NewVBox(textObjects...)
+	paddedText := container.NewPadded(textContent)
+
+	// 테두리 박스 (회색, 라운드)
+	border := canvas.NewRectangle(color.Transparent)
+	border.StrokeColor = grayColor
+	border.StrokeWidth = 1
+	border.CornerRadius = 5
+
+	// 테두리와 텍스트 결합
+	textBox := container.NewStack(border, paddedText)
+
+	// 예시 헤더와 복사 버튼
 	exampleLabel := widget.NewLabel("예시:")
+	copyBtn := widget.NewButton("복사", func() {
+		fyne.CurrentApp().Clipboard().SetContent(exampleText)
+	})
+	exampleHeader := container.NewHBox(exampleLabel, copyBtn)
+
 	exampleContainer := container.NewVBox(
-		exampleLabel,
-		exampleEntry,
+		exampleHeader,
+		textBox,
 	)
 
 	// 텍스트 편집 탭 (편집기 + 예시)

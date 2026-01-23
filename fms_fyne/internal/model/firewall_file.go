@@ -30,7 +30,7 @@ func NewFirewallFile(fileName string) *FirewallFile {
 
 // ExtractVersion 파일명에서 버전을 추출합니다.
 // 예: rules-v1_0_1.txt -> v1.0.1
-// 예: newRule-r2-5-9.txt -> r2.5.9
+// 예: newRule-v2_5_9.txt -> v2.5.9
 // 예: test-1_0_1.txt -> 1.0.1
 // 형식이 맞지 않으면 "-" 반환
 func ExtractVersion(fileName string) string {

@@ -20,6 +20,15 @@ type Firewall struct {
 
 	// 상태 정보 (PRD: lastCheckedAt)
 	LastCheckedAt string `json:"lastCheckedAt,omitempty"` // 마지막 상태 확인 시간
+
+	// 장비별 API 경로 설정 (비어있으면 전역 설정 사용)
+	ProgramUploadPath  string `json:"programUploadPath,omitempty"`  // 패키지 업로드 경로 (SFTP)
+	ProgramUpdatePath  string `json:"programUpdatePath,omitempty"`  // 패키지 업데이트 요청 경로
+	ProgramUpdatePort  int    `json:"programUpdatePort,omitempty"`  // 패키지 업데이트 요청 포트
+	FirewallDeployPath string `json:"firewallDeployPath,omitempty"` // 방화벽 규칙 배포 경로
+	FirewallDeployPort int    `json:"firewallDeployPort,omitempty"` // 방화벽 규칙 배포 포트
+	DeviceReportPath   string `json:"deviceReportPath,omitempty"`   // 서버 상태 체크 경로
+	DeviceReportPort   int    `json:"deviceReportPort,omitempty"`   // 서버 상태 체크 포트
 }
 
 // 배포 결과를 나타냅니다.
@@ -118,16 +127,23 @@ func (f *Firewall) IsValid() bool {
 // 장비의 복사본을 반환합니다.
 func (f *Firewall) Clone() *Firewall {
 	clone := &Firewall{
-		Index:         f.Index,
-		DeviceName:    f.DeviceName,
-		DeviceIP:      f.DeviceIP,
-		ServerStatus:  f.ServerStatus,
-		DeployStatus:  f.DeployStatus,
-		Version:       f.Version,
-		DeviceID:      f.DeviceID,
-		DevicePW:      f.DevicePW,
-		DevicePPK:     f.DevicePPK,
-		LastCheckedAt: f.LastCheckedAt,
+		Index:              f.Index,
+		DeviceName:         f.DeviceName,
+		DeviceIP:           f.DeviceIP,
+		ServerStatus:       f.ServerStatus,
+		DeployStatus:       f.DeployStatus,
+		Version:            f.Version,
+		DeviceID:           f.DeviceID,
+		DevicePW:           f.DevicePW,
+		DevicePPK:          f.DevicePPK,
+		LastCheckedAt:      f.LastCheckedAt,
+		ProgramUploadPath:  f.ProgramUploadPath,
+		ProgramUpdatePath:  f.ProgramUpdatePath,
+		ProgramUpdatePort:  f.ProgramUpdatePort,
+		FirewallDeployPath: f.FirewallDeployPath,
+		FirewallDeployPort: f.FirewallDeployPort,
+		DeviceReportPath:   f.DeviceReportPath,
+		DeviceReportPort:   f.DeviceReportPort,
 	}
 
 	// DeployResult 복사
