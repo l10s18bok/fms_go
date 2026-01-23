@@ -49,7 +49,9 @@ func ShowToast(parent fyne.Window, message string, toastType ToastType, duration
 	// 일정 시간 후 숨김
 	go func() {
 		time.Sleep(duration)
-		popup.Hide()
+		fyne.Do(func() {
+			popup.Hide()
+		})
 	}()
 }
 
