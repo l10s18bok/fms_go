@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"fms/internal/deploy"
+	"fms/internal/http"
 	"fms/internal/model"
 	"fms/internal/storage"
 	"fms/internal/themes"
@@ -927,21 +928,17 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		ruleVersion = "-"
 	}
 
-	// 패키지 버전 정보
-	programInfo := ""
-	if len(fw.ProgramVersions) > 0 {
-		for name, ver := range fw.ProgramVersions {
-			if programInfo != "" {
-				programInfo += ", "
-			}
-			programInfo += fmt.Sprintf("%s: %s", name, ver)
+	// 프로세스 정보 조회 (API 호출)
+	var processes []http.ProcessInfo
+	if config != nil {
+		httpClient := http.NewClient(config)
+		report, err := httpClient.GetDeviceInfoDirect(fw)
+		if err != nil {
+			log.Printf("[DEBUG] showDetailDialog: 프로세스 정보 조회 실패 - %v", err)
+		} else if report != nil {
+			processes = report.Processes
+			log.Printf("[DEBUG] showDetailDialog: 프로세스 정보 조회 성공 - %d개", len(processes))
 		}
-	}
-
-	// 배포정보 표시 텍스트
-	deployInfoText := ruleVersion
-	if programInfo != "" {
-		deployInfoText = fmt.Sprintf("%s (%s)", ruleVersion, programInfo)
 	}
 
 	// 커스텀 팝업 생성
@@ -1019,13 +1016,51 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("배포정보:")),
 		),
-		// 방화벽 룰 버전(프로그램 버전)
+		// 방화벽 룰 버전
 		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), layout.NewSpacer()),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(deployInfoText)),
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("  룰 버전:")),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(ruleVersion)),
 		),
-		container.NewGridWrap(fyne.NewSize(1, 20), layout.NewSpacer()),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
 	)
+
+	// 프로세스 리스트 컨테이너 (API 호출 성공 시에만 표시)
+	var processListContainer fyne.CanvasObject
+	if len(processes) > 0 {
+		// 프로세스 리스트 생성
+		processList := widget.NewList(
+			func() int {
+				return len(processes)
+			},
+			func() fyne.CanvasObject {
+				return container.NewHBox(
+					widget.NewLabel("이름"),
+					layout.NewSpacer(),
+					widget.NewLabel("버전"),
+				)
+			},
+			func(id widget.ListItemID, obj fyne.CanvasObject) {
+				cont := obj.(*fyne.Container)
+				nameLabel := cont.Objects[0].(*widget.Label)
+				versionLabel := cont.Objects[2].(*widget.Label)
+				if id < len(processes) {
+					nameLabel.SetText(processes[id].Name)
+					versionLabel.SetText(processes[id].Version)
+				}
+			},
+		)
+		processList.Resize(fyne.NewSize(280, float32(len(processes)*35)))
+
+		processListContainer = container.NewVBox(
+			// 프로세스 정보 라벨
+			container.NewHBox(
+				container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("프로세스:")),
+			),
+			// 프로세스 리스트
+			container.NewGridWrap(fyne.NewSize(300, float32(len(processes)*35+10)), processList),
+			container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
+		)
+	}
 
 	// 확인 버튼
 	confirmBtn := component.NewCustomButton("확인", nil, nil, themes.Colors["blue"], func() {
@@ -1040,17 +1075,30 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 	)
 
 	// 전체 컨텐츠
-	content := container.NewVBox(
+	contentItems := []fyne.CanvasObject{
 		headerText,
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
 		formContent,
+	}
+	// 프로세스 리스트가 있으면 추가
+	if processListContainer != nil {
+		contentItems = append(contentItems, processListContainer)
+	}
+	contentItems = append(contentItems,
 		btnContainer,
 		container.NewGridWrap(fyne.NewSize(1, 15), layout.NewSpacer()),
 	)
+	content := container.NewVBox(contentItems...)
+
+	// 다이얼로그 높이 계산 (프로세스 리스트 유무에 따라)
+	dialogHeight := float32(640)
+	if len(processes) > 0 {
+		dialogHeight += float32(len(processes)*35 + 60)
+	}
 
 	// 고정 크기 컨테이너
 	paddedContent := container.New(layout.NewCustomPaddedLayout(15, 15, 15, 15), content)
-	sizedContent := container.NewGridWrap(fyne.NewSize(400, 640), paddedContent)
+	sizedContent := container.NewGridWrap(fyne.NewSize(400, dialogHeight), paddedContent)
 
 	// 팝업 생성
 	popup = widget.NewModalPopUp(sizedContent, d.window.Canvas())
