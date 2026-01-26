@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/theme"
+	fynetooltip "github.com/dweymouth/fyne-tooltip"
 )
 
 func main() {
@@ -69,7 +70,7 @@ func main() {
 
 	// 메인 UI 생성 및 설정
 	mainUI := ui.NewMainUI(w, store, fileStore)
-	w.SetContent(mainUI.Content())
+	w.SetContent(fynetooltip.AddWindowToolTipLayer(mainUI.Content(), w.Canvas()))
 
 	// 윈도우 표시 및 실행
 	w.ShowAndRun()

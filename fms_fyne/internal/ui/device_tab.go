@@ -26,6 +26,7 @@ import (
 	fynestorage "fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 )
 
 // 장비 관리 탭을 구현합니다. (PRD 3.3.3 기준)
@@ -52,15 +53,15 @@ type DeviceTab struct {
 
 	// 새로고침 상태
 	isRefreshing bool
-	refreshBtn   *widget.Button
+	refreshBtn   *ttwidget.Button
 
 	// 자동 상태 체크
 	autoCheckEnabled  bool
 	autoCheckInterval int
 	autoCheckTicker   *time.Ticker
 	stopAutoCheck     chan struct{}
-	statusBorder *canvas.Rectangle // 상태 박스 테두리
-	autoCheckBtn *widget.Button    // 자동 상태 체크 토글 버튼
+	statusBorder *canvas.Rectangle  // 상태 박스 테두리
+	autoCheckBtn *ttwidget.Button   // 자동 상태 체크 토글 버튼
 }
 
 // 새로운 장비 관리 탭을 생성합니다.
@@ -123,14 +124,16 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 	redDot.Importance = widget.DangerImportance
 
 	// 자동 상태 체크 토글 버튼 (초기: Play 아이콘)
-	d.autoCheckBtn = widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
+	d.autoCheckBtn = ttwidget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
 		d.onToggleAutoCheck()
 	})
+	d.autoCheckBtn.SetToolTip("전체장비체크")
 
 	// 새로고침 버튼 (🔄)
-	d.refreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+	d.refreshBtn = ttwidget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
 		d.onRefreshAll()
 	})
+	d.refreshBtn.SetToolTip("선택장비체크")
 
 	statusContent := container.NewHBox(
 		greenDot, widget.NewLabel("연결:"), d.statusGreenLabel,
