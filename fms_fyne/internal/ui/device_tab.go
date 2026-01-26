@@ -127,7 +127,7 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 	d.autoCheckBtn = ttwidget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
 		d.onToggleAutoCheck()
 	})
-	d.autoCheckBtn.SetToolTip("전체장비체크")
+	d.autoCheckBtn.SetToolTip("전체장비 자동체크")
 
 	// 새로고침 버튼 (🔄)
 	d.refreshBtn = ttwidget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
@@ -1827,7 +1827,7 @@ func (d *DeviceTab) onToggleAutoCheck() {
 	}
 }
 
-// 자동 상태 체크 버튼 아이콘을 업데이트합니다.
+// 자동 상태 체크 버튼 아이콘과 툴팁을 업데이트합니다.
 func (d *DeviceTab) updateAutoCheckButton(enabled bool) {
 	if d.autoCheckBtn == nil {
 		return
@@ -1836,9 +1836,11 @@ func (d *DeviceTab) updateAutoCheckButton(enabled bool) {
 	if enabled {
 		// ON 상태: Pause 아이콘 (||)
 		d.autoCheckBtn.SetIcon(theme.MediaPauseIcon())
+		d.autoCheckBtn.SetToolTip("자동체크중지")
 	} else {
 		// OFF 상태: Play 아이콘
 		d.autoCheckBtn.SetIcon(theme.MediaPlayIcon())
+		d.autoCheckBtn.SetToolTip("전체장비 자동체크")
 	}
 }
 
