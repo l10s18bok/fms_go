@@ -88,14 +88,13 @@ func (t *FirewallEditTab) createUI() {
 	// NAT 규칙 빌더
 	t.natBuilder = NewNATBuilder(t.window, nil)
 
-	// 예시 텍스트 (읽기 전용, 복사 버튼으로 클립보드 복사)
-	exampleText := `agent -m=insert -c=INPUT -p=any -a=DROP --sip=203.248.252.2
-agent -m=insert -c=INPUT -p=any -a=DROP --black
-agent -m=insert -t=nat --nat-type=dnat -p=tcp --match-port=6060 -s=203.248.252.2 --to-dest=192.168.3.1:8080`
-
-	// 각 줄을 회색 텍스트로 생성
+	// 각 줄을 회색 텍스트로 생성 (UI에는 최대 3줄만 표시, 복사는 전체)
 	grayColor := color.RGBA{R: 128, G: 128, B: 128, A: 255}
-	lines := strings.Split(exampleText, "\n")
+	allLines := strings.Split(component.FirewallEditExampleText, "\n")
+	lines := allLines
+	if len(allLines) > 3 {
+		lines = allLines[:3]
+	}
 	textObjects := make([]fyne.CanvasObject, len(lines))
 	for i, line := range lines {
 		text := canvas.NewText(line, grayColor)
@@ -119,7 +118,7 @@ agent -m=insert -t=nat --nat-type=dnat -p=tcp --match-port=6060 -s=203.248.252.2
 	// 예시 헤더와 복사 버튼
 	exampleLabel := widget.NewLabel("예시:")
 	copyBtn := widget.NewButton("복사", func() {
-		fyne.CurrentApp().Clipboard().SetContent(exampleText)
+		fyne.CurrentApp().Clipboard().SetContent(component.FirewallEditExampleText)
 	})
 	exampleHeader := container.NewHBox(exampleLabel, copyBtn)
 

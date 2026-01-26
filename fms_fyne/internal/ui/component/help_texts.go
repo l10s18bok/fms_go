@@ -343,6 +343,11 @@ const SNATHelpText = `소스 NAT (SNAT) 도움말:
   Match_IP=192.168.1.0/24, Trans_IP=1.2.3.4, Out_Face=eth0
   → 192.168.1.x가 eth0으로 나갈 때 1.2.3.4로 변환`
 
+// FirewallEditExampleText 방화벽 규칙 편집 예시 텍스트
+const FirewallEditExampleText = `agent -m=insert -c=INPUT -p=any -a=DROP --sip=203.248.252.2
+agent -m=insert -c=INPUT -p=any -a=DROP --black
+agent -m=insert -t=nat --nat-type=dnat -p=tcp --match-port=6060 -s=203.248.252.2 --to-dest=192.168.3.1:8080`
+
 // FirewallFileHelpText 방화벽 룰 관리 도움말
 const FirewallFileHelpText = `
 [파일 추가]
