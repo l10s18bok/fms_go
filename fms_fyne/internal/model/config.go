@@ -28,6 +28,12 @@ const (
 	ThemeDark  = "dark"
 )
 
+// 저장소 타입 상수
+const (
+	StorageTypeJSON   = "json"
+	StorageTypeSQLite = "sqlite"
+)
+
 // 기본 장비 체크 주기 (초)
 const DefaultStatusCheckInterval = 60
 
@@ -49,6 +55,9 @@ type Config struct {
 	AutoStatusCheck     bool   `json:"autoStatusCheck"`     // 자동 상태 체크 활성화 여부
 	StatusCheckInterval int    `json:"statusCheckInterval"` // 장비 체크 주기 (초)
 
+	// 저장소 설정
+	StorageType string `json:"storageType"` // 저장소 타입: "json" 또는 "sqlite"
+
 	// API 경로 설정
 	ProgramUpdatePath  string `json:"programUpdatePath"`  // 패키지 업데이트 요청 경로
 	ProgramUpdatePort  int    `json:"programUpdatePort"`  // 패키지 업데이트 요청 포트
@@ -67,6 +76,7 @@ func DefaultConfig() *Config {
 		Theme:               ThemeLight,
 		AutoStatusCheck:     false,
 		StatusCheckInterval: DefaultStatusCheckInterval,
+		StorageType:         StorageTypeSQLite, // 기본값: SQLite
 		ProgramUpdatePath:   DefaultProgramUpdatePath,
 		ProgramUpdatePort:   DefaultAPIPort,
 		FirewallDeployPath:  DefaultFirewallDeployPath,
