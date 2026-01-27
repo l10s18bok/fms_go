@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"fms/internal/model"
+	"fms/internal/repository"
 	"fms/internal/storage"
 	"fms/internal/ui/component"
 	"fms/internal/version"
@@ -23,11 +24,12 @@ import (
 
 // 메인 애플리케이션 UI를 관리합니다.
 type MainUI struct {
-	window    fyne.Window
-	store     *storage.JSONStore
-	fileStore *storage.FileStore // 파일 저장소 (data 디렉토리)
-	tabs      *container.DocTabs // 닫기 버튼이 있는 탭
-	leftMenu  *fyne.Container    // 왼쪽 메뉴
+	window      fyne.Window
+	store       *storage.JSONStore
+	fileStore   *storage.FileStore           // 파일 저장소 (data 디렉토리)
+	historyRepo repository.HistoryRepository // 배포 이력 저장소 (SQLite)
+	tabs        *container.DocTabs           // 닫기 버튼이 있는 탭
+	leftMenu    *fyne.Container              // 왼쪽 메뉴
 
 	// 탭
 	firewallTab *FirewallTab // 방화벽 관리 탭
@@ -49,18 +51,19 @@ type MainUI struct {
 }
 
 // 새로운 메인 UI 인스턴스를 생성합니다.
-func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.FileStore) *MainUI {
+func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.FileStore, historyRepo repository.HistoryRepository) *MainUI {
 	ui := &MainUI{
-		window:    window,
-		store:     store,
-		fileStore: fileStore,
-		editTabs:  make(map[string]*container.TabItem),
+		window:      window,
+		store:       store,
+		fileStore:   fileStore,
+		historyRepo: historyRepo,
+		editTabs:    make(map[string]*container.TabItem),
 	}
 
 	// 각 탭 생성
 	ui.firewallTab = NewFirewallTab(window, fileStore, ui)
 	ui.deviceTab = NewDeviceTab(window, store, ui.firewallTab)
-	ui.historyTab = NewHistoryTab(window, store)
+	ui.historyTab = NewHistoryTab(window, historyRepo)
 	ui.programTab = NewProgramTab(window, store)
 
 	// 탭 간 참조 설정
@@ -459,8 +462,14 @@ func (m *MainUI) showImportDialog() {
 		return
 	}
 
-	// 탭별 데이터 타입명 (방화벽 관리 제외)
-	tabNames := []string{"", "장비", "배포 이력", "패키지"}
+	// 배포 이력 탭은 Import 지원 안함 (SQLite DB)
+	if tabType == 2 {
+		dialog.ShowInformation("알림", "배포 이력 탭은 Import 기능을 지원하지 않습니다.", m.window)
+		return
+	}
+
+	// 탭별 데이터 타입명 (방화벽 관리, 배포 이력 제외)
+	tabNames := []string{"", "장비", "", "패키지"}
 	tabName := tabNames[tabType]
 
 	// 파일 선택 다이얼로그
@@ -522,37 +531,6 @@ func (m *MainUI) showImportDialog() {
 					}
 					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 장비 정보가 가져오기 되었습니다.", validCount), m.window)
 					m.deviceTab.ReloadDevices()
-				case 2: // 배포 이력 탭
-					var histories []*model.DeployHistory
-					if err := json.Unmarshal(data, &histories); err != nil {
-						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
-						return
-					}
-
-					// 기존 데이터 모두 삭제
-					if err := m.store.ClearHistory(); err != nil {
-						dialog.ShowError(err, m.window)
-						return
-					}
-
-					// 배포 이력 형식 검증: deviceIp와 templateVersion이 유효한지 확인
-					validCount := 0
-					for _, h := range histories {
-						if h.DeviceIP == "" || h.DeviceIP == "-" || h.TemplateVer == "" || h.TemplateVer == "-" {
-							continue // 유효하지 않은 이력은 건너뜀
-						}
-						if err := m.store.SaveHistory(h); err != nil {
-							dialog.ShowError(err, m.window)
-							return
-						}
-						validCount++
-					}
-					if validCount == 0 {
-						dialog.ShowError(fmt.Errorf("유효한 배포 이력 데이터가 없습니다. 배포 이력 형식의 JSON 파일을 선택해주세요."), m.window)
-						return
-					}
-					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 배포 이력이 가져오기 되었습니다.", validCount), m.window)
-					m.historyTab.RefreshHistory()
 				case 3: // 패키지 탭
 					var programs []*model.ProcessInfo
 					if err := json.Unmarshal(data, &programs); err != nil {
@@ -622,6 +600,12 @@ func (m *MainUI) showExportDialog() {
 		return
 	}
 
+	// 배포 이력 탭은 Export 지원 안함 (SQLite DB)
+	if tabType == 2 {
+		dialog.ShowInformation("알림", "배포 이력 탭은 Export 기능을 지원하지 않습니다.", m.window)
+		return
+	}
+
 	// 데이터 확인
 	switch tabType {
 	case 1: // 장비 관리 탭
@@ -632,16 +616,6 @@ func (m *MainUI) showExportDialog() {
 		}
 		if len(firewalls) == 0 {
 			dialog.ShowInformation("알림", "내보낼 장비 정보가 없습니다.", m.window)
-			return
-		}
-	case 2: // 배포 이력 탭
-		histories, err := m.store.GetAllHistory()
-		if err != nil {
-			dialog.ShowError(err, m.window)
-			return
-		}
-		if len(histories) == 0 {
-			dialog.ShowInformation("알림", "내보낼 배포 이력이 없습니다.", m.window)
 			return
 		}
 	case 3: // 패키지 탭
@@ -679,13 +653,6 @@ func (m *MainUI) showExportDialog() {
 				return
 			}
 			data, jsonErr = json.MarshalIndent(firewalls, "", "  ")
-		case 2: // 배포 이력 탭
-			histories, err := m.store.GetAllHistory()
-			if err != nil {
-				dialog.ShowError(err, m.window)
-				return
-			}
-			data, jsonErr = json.MarshalIndent(histories, "", "  ")
 		case 3: // 패키지 탭
 			programs, err := m.store.GetAllPrograms()
 			if err != nil {
@@ -712,8 +679,6 @@ func (m *MainUI) showExportDialog() {
 	switch tabType {
 	case 1:
 		saveDialog.SetFileName("firewallList.json")
-	case 2:
-		saveDialog.SetFileName("historyList.json")
 	case 3:
 		saveDialog.SetFileName("programList.json")
 	}
@@ -757,8 +722,8 @@ func (m *MainUI) showResetDialog() {
 				return
 			}
 
-			// 모든 배포이력 삭제
-			if err := m.store.ClearHistory(); err != nil {
+			// 모든 배포이력 삭제 (SQLite)
+			if err := m.historyRepo.Clear(); err != nil {
 				dialog.ShowError(err, m.window)
 				return
 			}

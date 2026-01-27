@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"fms/internal/model"
-	"fms/internal/storage"
+	"fms/internal/repository"
 	"fms/internal/themes"
 	"fms/internal/ui/component"
 
@@ -21,10 +21,10 @@ import (
 
 // 배포 이력 탭을 구현합니다. (PRD 3.3.4 기준)
 type HistoryTab struct {
-	window    fyne.Window
-	store     *storage.JSONStore
-	deviceTab *DeviceTab
-	content   fyne.CanvasObject
+	window      fyne.Window
+	historyRepo repository.HistoryRepository // SQLite 기반 배포 이력 저장소
+	deviceTab   *DeviceTab
+	content     fyne.CanvasObject
 
 	// UI 컴포넌트
 	historyTable *component.PagedTable // 이력 테이블 (공통 컴포넌트)
@@ -38,11 +38,11 @@ type HistoryTab struct {
 }
 
 // 새로운 배포 이력 탭을 생성합니다.
-func NewHistoryTab(window fyne.Window, store *storage.JSONStore) *HistoryTab {
+func NewHistoryTab(window fyne.Window, historyRepo repository.HistoryRepository) *HistoryTab {
 	tab := &HistoryTab{
-		window:    window,
-		store:     store,
-		histories: []*model.DeployHistory{},
+		window:      window,
+		historyRepo: historyRepo,
+		histories:   []*model.DeployHistory{},
 	}
 	tab.createUI()
 	tab.loadHistory()
@@ -89,8 +89,8 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 
 	// 검색 컴포넌트 (공통)
 	h.searchBox = component.NewSearchBox(component.SearchBoxConfig{
-		Placeholder: "시간, 장비명, IP, 버전 검색",
-		Width:       200,
+		Placeholder: "시간, 장비명, IP, 유형, 버전, 메시지 검색",
+		Width:       300,
 		OnSearch: func(text string) {
 			h.onSearch()
 		},
@@ -218,12 +218,15 @@ func (h *HistoryTab) applyFilter() {
 		keyword := strings.ToLower(h.searchKeyword)
 		h.filteredHistories = []*model.DeployHistory{}
 		for _, history := range typeFiltered {
-			// 검색 대상: 시간, 장비명, 장비 IP, 버전 (부분 일치)
+			// 검색 대상: 시간, 장비명, 장비 IP, 유형, 버전, 메시지 (부분 일치)
+			typeText := model.GetHistoryTypeText(history.Type)
 			if strings.Contains(strings.ToLower(history.GetTimestampString()), keyword) ||
 				strings.Contains(strings.ToLower(history.DeviceName), keyword) ||
 				strings.Contains(strings.ToLower(history.DeviceIP), keyword) ||
+				strings.Contains(strings.ToLower(typeText), keyword) ||
 				strings.Contains(strings.ToLower(history.TemplateVer), keyword) ||
-				strings.Contains(strings.ToLower(history.ProgramVer), keyword) {
+				strings.Contains(strings.ToLower(history.ProgramVer), keyword) ||
+				strings.Contains(strings.ToLower(history.Message), keyword) {
 				h.filteredHistories = append(h.filteredHistories, history)
 			}
 		}
@@ -241,7 +244,7 @@ func (h *HistoryTab) Content() fyne.CanvasObject {
 
 // 저장소에서 배포 이력을 로드합니다.
 func (h *HistoryTab) loadHistory() {
-	histories, err := h.store.GetAllHistory()
+	histories, err := h.historyRepo.GetAll()
 	if err != nil {
 		fyne.Do(func() {
 			dialog.ShowError(err, h.window)
@@ -302,7 +305,7 @@ func (h *HistoryTab) onDeleteHistory() {
 			if row < len(h.filteredHistories) {
 				history := h.filteredHistories[row]
 				deviceIPs[history.DeviceIP] = true
-				if err := h.store.DeleteHistory(history.ID); err != nil {
+				if err := h.historyRepo.Delete(history.ID); err != nil {
 					dialog.ShowError(err, h.window)
 					return
 				}
@@ -322,7 +325,7 @@ func (h *HistoryTab) onDeleteHistory() {
 
 // 새로운 배포 이력을 추가합니다.
 func (h *HistoryTab) AddHistory(history *model.DeployHistory) error {
-	if err := h.store.SaveHistory(history); err != nil {
+	if err := h.historyRepo.Save(history); err != nil {
 		return err
 	}
 	h.loadHistory()
@@ -341,7 +344,7 @@ func (h *HistoryTab) resetDeviceDeployStatusIfNoHistory(deviceIP string) {
 	}
 
 	// 해당 장비의 남은 이력이 있는지 확인
-	histories, err := h.store.GetAllHistory()
+	histories, err := h.historyRepo.GetAll()
 	if err != nil {
 		return
 	}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"fms/internal/model"
+	"fms/internal/repository"
 	"fms/internal/storage"
 	"fms/internal/ui"
 
@@ -30,11 +31,35 @@ func main() {
 	execDir := filepath.Dir(resolvedPath)
 	configDir := filepath.Join(execDir, "config")
 
-	// 저장소 초기화
-	store, err := storage.NewJSONStore(configDir)
+	// JSON 저장소 초기화 (기존 데이터용)
+	jsonStore, err := storage.NewJSONStore(configDir)
 	if err != nil {
-		log.Fatalf("저장소 초기화 실패: %v", err)
+		log.Fatalf("JSON 저장소 초기화 실패: %v", err)
 	}
+
+	// SQLite 저장소 초기화 (배포 이력용)
+	sqliteStore, err := storage.NewSQLiteStore(configDir)
+	if err != nil {
+		log.Fatalf("SQLite 저장소 초기화 실패: %v", err)
+	}
+	defer sqliteStore.Close()
+
+	// JSON → SQLite 마이그레이션 (필요한 경우)
+	if storage.NeedsMigration(configDir, jsonStore, sqliteStore) {
+		log.Println("기존 배포 이력 마이그레이션 시작...")
+		if err := storage.BackupHistoryJSON(configDir); err != nil {
+			log.Printf("백업 실패 (계속 진행): %v", err)
+		}
+		result, err := storage.MigrateHistoryToSQLite(jsonStore, sqliteStore)
+		if err != nil {
+			log.Printf("마이그레이션 실패: %v", err)
+		} else if result.Success {
+			log.Printf("마이그레이션 완료: %d개 이력 이전됨", result.MigratedCount)
+		}
+	}
+
+	// History Repository 생성 (SQLite 사용)
+	historyRepo := repository.NewSQLiteHistoryRepository(sqliteStore)
 
 	// 파일 저장소 초기화 (data 디렉토리)
 	fileStore, err := storage.NewFileStore(execDir)
@@ -46,7 +71,7 @@ func main() {
 	a := app.New()
 
 	// 저장된 테마 설정 로드 및 적용
-	config, err := store.GetConfig()
+	config, err := jsonStore.GetConfig()
 	if err == nil && config.Theme == model.ThemeDark {
 		a.Settings().SetTheme(theme.DarkTheme())
 	} else {
@@ -69,7 +94,7 @@ func main() {
 	}
 
 	// 메인 UI 생성 및 설정
-	mainUI := ui.NewMainUI(w, store, fileStore)
+	mainUI := ui.NewMainUI(w, jsonStore, fileStore, historyRepo)
 	w.SetContent(fynetooltip.AddWindowToolTipLayer(mainUI.Content(), w.Canvas()))
 
 	// 윈도우 표시 및 실행
