@@ -1288,8 +1288,8 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName 
 		return
 	}
 
-	// 배포용 Template 구조체 생성
-	template := &model.Template{
+	// 배포용 RuleFile 구조체 생성
+	ruleFile := &model.RuleFile{
 		Version:  fileName,
 		Contents: contents,
 	}
@@ -1359,7 +1359,7 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName 
 				}
 			}()
 
-			result := deployer.Deploy(fw, template)
+			result := deployer.Deploy(fw, ruleFile)
 			done <- true // 타이머 종료
 
 			// 100% 표시 후 잠시 대기
@@ -1395,13 +1395,13 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName 
 			var resultMsg string
 			if failCount == 0 {
 				resultTitle = "배포 완료"
-				resultMsg = fmt.Sprintf("템플릿: %s\n성공: %d개", template.Version, successCount)
+				resultMsg = fmt.Sprintf("규칙 파일: %s\n성공: %d개", ruleFile.Version, successCount)
 			} else if successCount == 0 {
 				resultTitle = "배포 실패"
-				resultMsg = fmt.Sprintf("템플릿: %s\n실패: %d개", template.Version, failCount)
+				resultMsg = fmt.Sprintf("규칙 파일: %s\n실패: %d개", ruleFile.Version, failCount)
 			} else {
 				resultTitle = "배포 일부 실패"
-				resultMsg = fmt.Sprintf("템플릿: %s\n성공: %d개\n실패: %d개", template.Version, successCount, failCount)
+				resultMsg = fmt.Sprintf("규칙 파일: %s\n성공: %d개\n실패: %d개", ruleFile.Version, successCount, failCount)
 			}
 			dialog.ShowInformation(resultTitle, resultMsg, d.window)
 		})

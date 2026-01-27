@@ -189,8 +189,8 @@ func (c *Client) CheckHealth(fw *model.Firewall) (string, error) {
 }
 
 // 방화벽 룰을 배포합니다.
-func (c *Client) DeployTemplate(fw *model.Firewall, template string) (*model.DeployResult, error) {
-	return c.DeployDirect(fw, template)
+func (c *Client) DeployRuleFile(fw *model.Firewall, ruleContents string) (*model.DeployResult, error) {
+	return c.DeployDirect(fw, ruleContents)
 }
 
 // ProgramUpdateRequest 패키지 업데이트 요청 구조체

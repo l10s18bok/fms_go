@@ -46,31 +46,23 @@ func ShowHelpPopup(title string, content string, parent fyne.CanvasObject) {
 // AppHelpText 애플리케이션 전체 도움말
 const AppHelpText = `FMS - Firewall Management System
 
-[템플릿 관리]
-• 방화벽 규칙 템플릿을 생성/수정/삭제합니다
+[규칙 파일 관리]
+• 방화벽 규칙 파일을 생성/수정/삭제합니다
 
 [장비 관리]
-• 관리할 방화벽 장비(IP)를 등록합니다
-• 서버 상태를 확인하고 템플릿을 배포합니다
+• 관리할 방화벽 장비(IP)를 추가/수정/삭제합니다
+• 장비 상태 확인: 수동(새로고침) 또는 자동(토글)
+• 장비 더블클릭: 상세 정보 및 프로세스 목록 확인
+• 배포 기능:
+  - 방화벽 룰 배포: 규칙 파일을 선택하여 배포
+  - 패키지 업데이트: 등록된 패키지를 장비에 배포
 
 [배포 이력]
 • 배포 결과를 확인할 수 있습니다
-• 규칙별 성공/실패 상태를 상세히 확인합니다
+• 규칙별 성공/실패 상태를 확인합니다
 
 [Import/Export]
-• 현재 탭의 데이터를 JSON 파일로 내보내거나 가져옵니다
-
-[통신 방식]
-• 각 장비에 HTTP 연결
-  - 상태확인: GET http://{장비IP}/respCheck
-  - 배포: POST http://{장비IP}/deploy
-
-[규칙 포맷]
-req|INSERT|{ID}|{CHAIN}|{ACTION}|{PROTOCOL}|{SRC}|{DST}|{옵션들}
-
-예시:
-req|INSERT|3813792919|INPUT|FLUSH|ANY|ANY|ANY|||
-req|INSERT|3813792919|INPUT|ACCEPT|TCP|192.168.1.0/24|ANY|80||`
+• 현재 탭의 데이터를 JSON 파일로 내보내거나 가져옵니다`
 
 // TCPFlagsHelpText TCP Flags 옵션 도움말
 const TCPFlagsHelpText = `TCP Flags 옵션 설명:

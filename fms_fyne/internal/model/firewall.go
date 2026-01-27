@@ -7,7 +7,7 @@ type Firewall struct {
 	DeviceIP     string        `json:"device_ip,omitempty"`    // 장비 IP (PRD: device_ip)
 	ServerStatus string        `json:"serverStatus"`           // 서버 상태 (running/stop/-)
 	DeployStatus string        `json:"deployStatus"`           // 배포 상태 (success/fail/error/-)
-	Version      string        `json:"version"`                // 배포된 템플릿 버전
+	Version      string        `json:"version"`                // 배포된 규칙 파일 버전
 	DeployResult *DeployResult `json:"deployResult,omitempty"` // 마지막 배포 결과
 
 	// SSH 인증 정보 (패키지 업데이트용)

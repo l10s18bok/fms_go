@@ -19,7 +19,7 @@ type DeployHistory struct {
 	Timestamp   utils.JSONTime `json:"timestamp"`                // 배포 시간
 	DeviceName  string         `json:"deviceName,omitempty"`     // 장비명 (PRD 3.3.4)
 	DeviceIP    string         `json:"deviceIp"`                 // 장비 IP
-	TemplateVer string         `json:"templateVersion"`          // 배포한 템플릿 버전 (방화벽 룰)
+	TemplateVer string         `json:"templateVersion"`          // 배포한 규칙 파일 버전 (방화벽 룰)
 	ProgramName string         `json:"programName,omitempty"`    // 패키지 이름 (패키지 업데이트)
 	ProgramVer  string         `json:"programVersion,omitempty"` // 패키지 버전 (패키지 업데이트)
 	Message     string         `json:"message,omitempty"`        // 결과 메시지

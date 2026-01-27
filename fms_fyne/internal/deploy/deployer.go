@@ -33,17 +33,17 @@ type DeployResult struct {
 }
 
 // 단일 장비에 방화벽 룰을 배포합니다.
-func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployResult {
+func (d *Deployer) Deploy(fw *model.Firewall, ruleFile *model.RuleFile) *DeployResult {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	result := &DeployResult{
 		Firewall: fw,
-		History:  model.NewDeployHistory(fw.DeviceName, fw.DeviceIP, template.Version),
+		History:  model.NewDeployHistory(fw.DeviceName, fw.DeviceIP, ruleFile.Version),
 	}
 
 	// 방화벽 룰 전체를 배포
-	deployResult, err := d.client.DeployTemplate(fw, template.Contents)
+	deployResult, err := d.client.DeployRuleFile(fw, ruleFile.Contents)
 	if err != nil {
 		result.Success = false
 		result.ErrorMsg = err.Error()
@@ -82,7 +82,7 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 		result.History.Status = model.DeployStatusSuccess
 		fw.DeployStatus = model.DeployStatusSuccess
 		fw.ServerStatus = model.ServerStatusRunning // 배포 성공 시 서버 상태도 running으로 변경
-		fw.Version = template.Version
+		fw.Version = ruleFile.Version
 		result.Success = true
 	} else {
 		// error 체크
@@ -108,7 +108,7 @@ func (d *Deployer) Deploy(fw *model.Firewall, template *model.Template) *DeployR
 }
 
 // 여러 장비에 방화벽 룰을 배포합니다.
-func (d *Deployer) DeployToMultiple(firewalls []*model.Firewall, template *model.Template, progressCb func(int, int, string)) []*DeployResult {
+func (d *Deployer) DeployToMultiple(firewalls []*model.Firewall, ruleFile *model.RuleFile, progressCb func(int, int, string)) []*DeployResult {
 	results := make([]*DeployResult, 0, len(firewalls))
 	total := len(firewalls)
 
@@ -117,7 +117,7 @@ func (d *Deployer) DeployToMultiple(firewalls []*model.Firewall, template *model
 			progressCb(i+1, total, fw.DeviceName)
 		}
 
-		result := d.Deploy(fw, template)
+		result := d.Deploy(fw, ruleFile)
 		results = append(results, result)
 	}
 

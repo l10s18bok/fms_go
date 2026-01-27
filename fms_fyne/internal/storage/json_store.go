@@ -16,7 +16,7 @@ type JSONStore struct {
 	mu        sync.RWMutex
 
 	// 캐시된 데이터
-	templates map[string]*model.Template
+	ruleFiles map[string]*model.RuleFile
 	firewalls map[int]*model.Firewall
 	history   map[int]*model.DeployHistory
 	programs  map[int]*model.ProcessInfo // 신규: 패키지 정보
@@ -29,7 +29,7 @@ type JSONStore struct {
 
 // 파일명 상수
 const (
-	templatesFile = "templates.json"
+	ruleFilesFile = "rule_files.json"
 	firewallsFile = "firewalls.json"
 	historyFile   = "history.json"
 	configFile    = "config.json"
@@ -40,7 +40,7 @@ const (
 func NewJSONStore(configDir string) (*JSONStore, error) {
 	store := &JSONStore{
 		configDir: configDir,
-		templates: make(map[string]*model.Template),
+		ruleFiles: make(map[string]*model.RuleFile),
 		firewalls: make(map[int]*model.Firewall),
 		history:   make(map[int]*model.DeployHistory),
 		programs:  make(map[int]*model.ProcessInfo), // 신규
@@ -61,7 +61,7 @@ func NewJSONStore(configDir string) (*JSONStore, error) {
 
 // 모든 데이터 파일을 로드합니다.
 func (s *JSONStore) loadAll() error {
-	if err := s.loadTemplates(); err != nil {
+	if err := s.loadRuleFiles(); err != nil {
 		return err
 	}
 	if err := s.loadFirewalls(); err != nil {
@@ -76,9 +76,9 @@ func (s *JSONStore) loadAll() error {
 	return nil
 }
 
-// 템플릿 데이터를 로드합니다.
-func (s *JSONStore) loadTemplates() error {
-	path := filepath.Join(s.configDir, templatesFile)
+// 규칙 파일 데이터를 로드합니다.
+func (s *JSONStore) loadRuleFiles() error {
+	path := filepath.Join(s.configDir, ruleFilesFile)
 
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -88,13 +88,13 @@ func (s *JSONStore) loadTemplates() error {
 		return err
 	}
 
-	var templates []*model.Template
-	if err := json.Unmarshal(data, &templates); err != nil {
+	var ruleFiles []*model.RuleFile
+	if err := json.Unmarshal(data, &ruleFiles); err != nil {
 		return err
 	}
 
-	for _, t := range templates {
-		s.templates[t.Version] = t
+	for _, r := range ruleFiles {
+		s.ruleFiles[r.Version] = r
 	}
 	return nil
 }
@@ -183,19 +183,19 @@ func (s *JSONStore) loadPrograms() error {
 	return nil
 }
 
-// 템플릿 데이터를 저장합니다.
-func (s *JSONStore) saveTemplates() error {
-	templates := make([]*model.Template, 0, len(s.templates))
-	for _, t := range s.templates {
-		templates = append(templates, t)
+// 규칙 파일 데이터를 저장합니다.
+func (s *JSONStore) saveRuleFiles() error {
+	ruleFiles := make([]*model.RuleFile, 0, len(s.ruleFiles))
+	for _, r := range s.ruleFiles {
+		ruleFiles = append(ruleFiles, r)
 	}
 
-	data, err := json.MarshalIndent(templates, "", "  ")
+	data, err := json.MarshalIndent(ruleFiles, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	path := filepath.Join(s.configDir, templatesFile)
+	path := filepath.Join(s.configDir, ruleFilesFile)
 	return os.WriteFile(path, data, 0644)
 }
 
@@ -247,61 +247,61 @@ func (s *JSONStore) savePrograms() error {
 	return os.WriteFile(path, data, 0644)
 }
 
-// ===== Template 메서드 =====
+// ===== RuleFile 메서드 =====
 
-// 모든 템플릿을 반환합니다.
-func (s *JSONStore) GetAllTemplates() ([]*model.Template, error) {
+// 모든 규칙 파일을 반환합니다.
+func (s *JSONStore) GetAllRuleFiles() ([]*model.RuleFile, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	templates := make([]*model.Template, 0, len(s.templates))
-	for _, t := range s.templates {
-		templates = append(templates, t.Clone())
+	ruleFiles := make([]*model.RuleFile, 0, len(s.ruleFiles))
+	for _, r := range s.ruleFiles {
+		ruleFiles = append(ruleFiles, r.Clone())
 	}
-	return templates, nil
+	return ruleFiles, nil
 }
 
-// 특정 버전의 템플릿을 반환합니다.
-func (s *JSONStore) GetTemplate(version string) (*model.Template, error) {
+// 특정 버전의 규칙 파일을 반환합니다.
+func (s *JSONStore) GetRuleFile(version string) (*model.RuleFile, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	t, ok := s.templates[version]
+	r, ok := s.ruleFiles[version]
 	if !ok {
-		return nil, fmt.Errorf("템플릿을 찾을 수 없습니다: %s", version)
+		return nil, fmt.Errorf("규칙 파일을 찾을 수 없습니다: %s", version)
 	}
-	return t.Clone(), nil
+	return r.Clone(), nil
 }
 
-// 템플릿을 저장합니다.
-func (s *JSONStore) SaveTemplate(template *model.Template) error {
+// 규칙 파일을 저장합니다.
+func (s *JSONStore) SaveRuleFile(ruleFile *model.RuleFile) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.templates[template.Version] = template.Clone()
-	return s.saveTemplates()
+	s.ruleFiles[ruleFile.Version] = ruleFile.Clone()
+	return s.saveRuleFiles()
 }
 
-// 템플릿을 삭제합니다.
-func (s *JSONStore) DeleteTemplate(version string) error {
+// 규칙 파일을 삭제합니다.
+func (s *JSONStore) DeleteRuleFile(version string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.templates[version]; !ok {
-		return fmt.Errorf("템플릿을 찾을 수 없습니다: %s", version)
+	if _, ok := s.ruleFiles[version]; !ok {
+		return fmt.Errorf("규칙 파일을 찾을 수 없습니다: %s", version)
 	}
 
-	delete(s.templates, version)
-	return s.saveTemplates()
+	delete(s.ruleFiles, version)
+	return s.saveRuleFiles()
 }
 
-// 모든 템플릿을 삭제합니다.
-func (s *JSONStore) ClearTemplates() error {
+// 모든 규칙 파일을 삭제합니다.
+func (s *JSONStore) ClearRuleFiles() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.templates = make(map[string]*model.Template)
-	return s.saveTemplates()
+	s.ruleFiles = make(map[string]*model.RuleFile)
+	return s.saveRuleFiles()
 }
 
 // ===== Firewall 메서드 =====
@@ -458,7 +458,7 @@ func (s *JSONStore) ClearHistory() error {
 
 // 모든 데이터를 반환합니다.
 func (s *JSONStore) ExportAll() (*ExportData, error) {
-	templates, err := s.GetAllTemplates()
+	ruleFiles, err := s.GetAllRuleFiles()
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (s *JSONStore) ExportAll() (*ExportData, error) {
 	}
 
 	return &ExportData{
-		Templates: templates,
+		RuleFiles: ruleFiles,
 		Firewalls: firewalls,
 		History:   history,
 	}, nil
@@ -485,9 +485,9 @@ func (s *JSONStore) ImportAll(data *ExportData) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 템플릿 가져오기
-	for _, t := range data.Templates {
-		s.templates[t.Version] = t.Clone()
+	// 규칙 파일 가져오기
+	for _, r := range data.RuleFiles {
+		s.ruleFiles[r.Version] = r.Clone()
 	}
 
 	// 장비 가져오기
@@ -520,7 +520,7 @@ func (s *JSONStore) ImportAll(data *ExportData) error {
 	}
 
 	// 모든 데이터 저장
-	if err := s.saveTemplates(); err != nil {
+	if err := s.saveRuleFiles(); err != nil {
 		return err
 	}
 	if err := s.saveFirewalls(); err != nil {
@@ -700,9 +700,9 @@ func (s *JSONStore) CountHistory() int {
 	return len(s.history)
 }
 
-// 템플릿 수를 반환합니다.
-func (s *JSONStore) CountTemplates() int {
+// 규칙 파일 수를 반환합니다.
+func (s *JSONStore) CountRuleFiles() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.templates)
+	return len(s.ruleFiles)
 }

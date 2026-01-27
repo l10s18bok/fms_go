@@ -7,12 +7,12 @@ import (
 
 // 데이터 저장소 인터페이스입니다.
 type Storage interface {
-	// Template 관련 메서드
-	GetAllTemplates() ([]*model.Template, error)
-	GetTemplate(version string) (*model.Template, error)
-	SaveTemplate(template *model.Template) error
-	DeleteTemplate(version string) error
-	ClearTemplates() error
+	// RuleFile 관련 메서드
+	GetAllRuleFiles() ([]*model.RuleFile, error)
+	GetRuleFile(version string) (*model.RuleFile, error)
+	SaveRuleFile(ruleFile *model.RuleFile) error
+	DeleteRuleFile(version string) error
+	ClearRuleFiles() error
 
 	// Firewall 관련 메서드
 	GetAllFirewalls() ([]*model.Firewall, error)
@@ -35,7 +35,7 @@ type Storage interface {
 
 // Export/Import용 데이터 구조체입니다.
 type ExportData struct {
-	Templates []*model.Template      `json:"templates"`
+	RuleFiles []*model.RuleFile      `json:"ruleFiles"`
 	Firewalls []*model.Firewall      `json:"firewalls"`
 	History   []*model.DeployHistory `json:"history"`
 }

@@ -57,19 +57,19 @@ type HistoryRepository interface {
 	Count() int
 }
 
-// TemplateRepository 템플릿 저장소 인터페이스
-type TemplateRepository interface {
-	// GetAll 모든 템플릿을 조회합니다.
-	GetAll() ([]*model.Template, error)
-	// GetByVersion 버전으로 템플릿을 조회합니다.
-	GetByVersion(version string) (*model.Template, error)
-	// Save 템플릿을 저장합니다. (신규 생성 또는 업데이트)
-	Save(t *model.Template) error
-	// Delete 템플릿을 삭제합니다.
+// RuleFileRepository 규칙 파일 저장소 인터페이스
+type RuleFileRepository interface {
+	// GetAll 모든 규칙 파일을 조회합니다.
+	GetAll() ([]*model.RuleFile, error)
+	// GetByVersion 버전으로 규칙 파일을 조회합니다.
+	GetByVersion(version string) (*model.RuleFile, error)
+	// Save 규칙 파일을 저장합니다. (신규 생성 또는 업데이트)
+	Save(r *model.RuleFile) error
+	// Delete 규칙 파일을 삭제합니다.
 	Delete(version string) error
-	// Clear 모든 템플릿을 삭제합니다.
+	// Clear 모든 규칙 파일을 삭제합니다.
 	Clear() error
-	// Count 템플릿 수를 반환합니다.
+	// Count 규칙 파일 수를 반환합니다.
 	Count() int
 }
 
