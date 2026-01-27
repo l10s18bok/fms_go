@@ -8,7 +8,7 @@ import (
 )
 
 // ParseNATLine NAT 규칙 라인을 파싱하여 NATRule로 변환
-// agent -m=insert -t=nat --nat-type=dnat -p=tcp --match-port=6080 --to-dest=192.168.30.180:8080
+// Smartfw 문서 형식: agent -m=insert -s=192.168.0.0/24 -p="ANY?SNAT" --dest=203.0.113.10 -a=NAT
 func ParseNATLine(line string) (*model.NATRule, error) {
 	line = strings.TrimSpace(line)
 
@@ -27,8 +27,8 @@ func ParseNATLine(line string) (*model.NATRule, error) {
 		return nil, fmt.Errorf("알 수 없는 형식: %s", line)
 	}
 
-	// -t=nat 확인
-	if !strings.Contains(line, "-t=nat") {
+	// NAT 규칙 확인 (-a=NAT)
+	if !strings.Contains(line, "-a=NAT") {
 		return nil, fmt.Errorf("NAT 규칙이 아닙니다: %s", line)
 	}
 
@@ -37,33 +37,32 @@ func ParseNATLine(line string) (*model.NATRule, error) {
 
 	for _, part := range parts {
 		switch {
-		case strings.HasPrefix(part, "--nat-type="):
-			rule.NATType = model.StringToNATType(part[11:])
 		case strings.HasPrefix(part, "-p="):
-			rule.Protocol = model.StringToProtocol(part[3:])
-		case strings.HasPrefix(part, "--match-port="):
-			rule.MatchPort = part[13:]
-		case strings.HasPrefix(part, "--match-ip="):
-			rule.MatchIP = part[11:]
+			// 문서 형식: -p="TCP?DNAT" 또는 -p="ANY?SNAT"
+			protoStr := strings.Trim(part[3:], "\"")
+			if idx := strings.Index(protoStr, "?"); idx != -1 {
+				rule.Protocol = model.StringToProtocol(protoStr[:idx])
+				rule.NATType = model.StringToNATType(protoStr[idx+1:])
+			} else {
+				rule.Protocol = model.StringToProtocol(protoStr)
+			}
+		case strings.HasPrefix(part, "--dport="):
+			rule.MatchPort = part[8:]
 		case strings.HasPrefix(part, "-s="):
 			rule.MatchIP = part[3:]
-		case strings.HasPrefix(part, "--to-dest="):
-			// 192.168.30.180:8080 형식 파싱
-			dest := part[10:]
+		case strings.HasPrefix(part, "--dest="):
+			// 문서 형식: --dest=IP 또는 --dest=IP:PORT
+			dest := part[7:]
 			if idx := strings.LastIndex(dest, ":"); idx != -1 {
 				rule.TranslateIP = dest[:idx]
 				rule.TranslatePort = dest[idx+1:]
 			} else {
 				rule.TranslateIP = dest
 			}
-		case strings.HasPrefix(part, "--to-source="):
-			rule.TranslateIP = part[12:]
 		case strings.HasPrefix(part, "-i="):
 			rule.InInterface = part[3:]
 		case strings.HasPrefix(part, "-o="):
 			rule.OutInterface = part[3:]
-		case strings.HasPrefix(part, "--desc="):
-			rule.Description = part[7:]
 		}
 	}
 
@@ -71,6 +70,7 @@ func ParseNATLine(line string) (*model.NATRule, error) {
 }
 
 // NATRuleToLine NATRule을 agent 명령어 형식으로 변환
+// 문서 형식: agent -m=insert -s=192.168.0.0/24 -p="ANY?SNAT" --dest=203.0.113.10 -a=NAT
 func NATRuleToLine(rule *model.NATRule) string {
 	if rule == nil {
 		return ""
@@ -79,25 +79,27 @@ func NATRuleToLine(rule *model.NATRule) string {
 	var parts []string
 	parts = append(parts, "agent")
 	parts = append(parts, "-m=insert")
-	parts = append(parts, "-t=nat")
-	parts = append(parts, fmt.Sprintf("--nat-type=%s", strings.ToLower(model.NATTypeToString(rule.NATType))))
-	parts = append(parts, fmt.Sprintf("-p=%s", model.ProtocolToString(rule.Protocol)))
+
+	// 프로토콜?NAT타입 형식: -p="TCP?DNAT" 또는 -p="ANY?SNAT"
+	protoStr := strings.ToUpper(model.ProtocolToString(rule.Protocol))
+	natTypeStr := model.NATTypeToString(rule.NATType)
+	parts = append(parts, fmt.Sprintf("-p=\"%s?%s\"", protoStr, natTypeStr))
 
 	switch rule.NATType {
 	case model.NATTypeDNAT:
-		if rule.MatchPort != "" {
-			parts = append(parts, fmt.Sprintf("--match-port=%s", rule.MatchPort))
-		}
 		if rule.MatchIP != "" && rule.MatchIP != "ANY" {
 			parts = append(parts, fmt.Sprintf("-s=%s", rule.MatchIP))
 		}
-		// --to-dest=IP:PORT
+		// --dest=IP:PORT
 		if rule.TranslateIP != "" {
 			dest := rule.TranslateIP
 			if rule.TranslatePort != "" {
 				dest += ":" + rule.TranslatePort
 			}
-			parts = append(parts, fmt.Sprintf("--to-dest=%s", dest))
+			parts = append(parts, fmt.Sprintf("--dest=%s", dest))
+		}
+		if rule.MatchPort != "" {
+			parts = append(parts, fmt.Sprintf("--dport=%s", rule.MatchPort))
 		}
 
 	case model.NATTypeSNAT:
@@ -105,10 +107,7 @@ func NATRuleToLine(rule *model.NATRule) string {
 			parts = append(parts, fmt.Sprintf("-s=%s", rule.MatchIP))
 		}
 		if rule.TranslateIP != "" {
-			parts = append(parts, fmt.Sprintf("--to-source=%s", rule.TranslateIP))
-		}
-		if rule.InInterface != "" {
-			parts = append(parts, fmt.Sprintf("-i=%s", rule.InInterface))
+			parts = append(parts, fmt.Sprintf("--dest=%s", rule.TranslateIP))
 		}
 		if rule.OutInterface != "" {
 			parts = append(parts, fmt.Sprintf("-o=%s", rule.OutInterface))
@@ -118,24 +117,20 @@ func NATRuleToLine(rule *model.NATRule) string {
 		if rule.MatchIP != "" {
 			parts = append(parts, fmt.Sprintf("-s=%s", rule.MatchIP))
 		}
-		if rule.InInterface != "" {
-			parts = append(parts, fmt.Sprintf("-i=%s", rule.InInterface))
-		}
 		if rule.OutInterface != "" {
 			parts = append(parts, fmt.Sprintf("-o=%s", rule.OutInterface))
 		}
 	}
 
-	if rule.Description != "" {
-		parts = append(parts, fmt.Sprintf("--desc=%s", rule.Description))
-	}
+	// 공통: Action=NAT
+	parts = append(parts, "-a=NAT")
 
 	return strings.Join(parts, " ")
 }
 
 // NATRuleToSmartfw NATRule을 smartfw 형식으로 변환
-// DNAT: req|INSERT|{ID}|ANY|NAT|{SRC}|{PROTOCOL}?DNAT|{DEST_IP}|{MATCH_PORT},{TRANSLATE_PORT}|{IN_IF}|{OUT_IF}
-// SNAT: req|INSERT|{ID}|ANY|NAT|{SRC}|{PROTOCOL}?SNAT|{DEST}|{PORTS}|{IN_IF}|{OUT_IF}
+// DNAT: req|INSERT|{ID}|ANY|NAT|{MatchIP}|{Proto}?DNAT|{TransIP}|{MatchPort},{TransPort}|{InIF}|{OutIF}
+// SNAT: req|INSERT|{ID}|ANY|NAT|{MatchIP}|{Proto}?SNAT|{TransIP}|{Ports}|{InIF}|{OutIF}
 func NATRuleToSmartfw(rule *model.NATRule, id string) string {
 	if rule == nil {
 		return ""
@@ -221,8 +216,8 @@ func ParseTextToNATRules(text string) ([]*model.NATRule, []string, []error) {
 			continue
 		}
 
-		// NAT 규칙만 파싱 (-t=nat 포함된 라인)
-		if !strings.Contains(line, "-t=nat") {
+		// NAT 규칙만 파싱 (IsNATLine 사용)
+		if !IsNATLine(line) {
 			continue
 		}
 
@@ -258,6 +253,10 @@ func NATRulesToText(rules []*model.NATRule, comments []string) string {
 }
 
 // IsNATLine 라인이 NAT 규칙인지 확인
+// Smartfw 문서 형식: -a=NAT 또는 -p="...?SNAT" / -p="...?DNAT" / -p="...?MASQUERADE"
 func IsNATLine(line string) bool {
-	return strings.Contains(line, "-t=nat")
+	return strings.Contains(line, "-a=NAT") ||
+		strings.Contains(line, "?SNAT") ||
+		strings.Contains(line, "?DNAT") ||
+		strings.Contains(line, "?MASQUERADE")
 }

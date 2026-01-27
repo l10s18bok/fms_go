@@ -8,9 +8,12 @@ import (
 )
 
 // ParseProtocolWithOptions 프로토콜 문자열을 파싱
-// 입력: "tcp?flags=syn/syn" 또는 "tcp"
+// 입력: "tcp?flags=syn/syn", "IPS?syn-flood&limit=50&seconds=1&enable=1"
 // 출력: Protocol, *ProtocolOptions, error
 func ParseProtocolWithOptions(s string) (model.Protocol, *model.ProtocolOptions, error) {
+	// 따옴표 제거
+	s = strings.Trim(s, "\"")
+
 	// "?" 기준으로 분리
 	parts := strings.SplitN(s, "?", 2)
 	protocol := model.StringToProtocol(parts[0])
@@ -23,6 +26,17 @@ func ParseProtocolWithOptions(s string) (model.Protocol, *model.ProtocolOptions,
 	// 쿼리 스트링 파싱
 	opts := &model.ProtocolOptions{}
 	params := strings.Split(parts[1], "&")
+
+	// IPS 프로토콜인 경우: IPS?syn-flood&limit=50&seconds=1&enable=1
+	// 첫 번째 파라미터가 key=value 형식이 아니면 IPSType으로 처리
+	if protocol == model.ProtocolIPS && len(params) > 0 {
+		firstParam := params[0]
+		if !strings.Contains(firstParam, "=") {
+			// 첫 번째 파라미터가 IPS 타입 (예: syn-flood)
+			opts.IPSType = parts[1] // 전체 옵션 문자열 저장 (syn-flood&limit=50&...)
+			return protocol, opts, nil
+		}
+	}
 
 	for _, param := range params {
 		kv := strings.SplitN(param, "=", 2)
@@ -46,11 +60,18 @@ func ParseProtocolWithOptions(s string) (model.Protocol, *model.ProtocolOptions,
 // FormatProtocolWithOptions 프로토콜과 옵션을 문자열로 변환
 // 입력: Protocol=TCP, Options={TCPFlags: "syn/syn"}
 // 출력: "tcp?flags=syn/syn"
+// 입력: Protocol=IPS, Options={IPSType: "syn-flood&limit=50&seconds=1&enable=1"}
+// 출력: "\"IPS?syn-flood&limit=50&seconds=1&enable=1\""
 func FormatProtocolWithOptions(p model.Protocol, opts *model.ProtocolOptions) string {
 	base := model.ProtocolToString(p)
 
 	if opts == nil || opts.IsEmpty() {
 		return base
+	}
+
+	// IPS 프로토콜인 경우 특수 처리
+	if p == model.ProtocolIPS && opts.IPSType != "" {
+		return fmt.Sprintf("\"%s?%s\"", base, opts.IPSType)
 	}
 
 	var params []string
@@ -83,6 +104,11 @@ func FormatProtocolWithOptions(p model.Protocol, opts *model.ProtocolOptions) st
 func FormatOptionsOnly(opts *model.ProtocolOptions) string {
 	if opts == nil || opts.IsEmpty() {
 		return ""
+	}
+
+	// IPS 옵션
+	if opts.IPSType != "" {
+		return opts.IPSType
 	}
 
 	var params []string
@@ -172,17 +198,26 @@ func ParseLine(line string) (*model.FirewallRule, error) {
 			rule.Protocol = proto
 			rule.Options = opts
 		case strings.HasPrefix(part, "-a="):
-			rule.Action = model.StringToAction(part[3:])
+			// ACL 처리: blocklist, whitelist
+			actionStr := part[3:]
+			switch actionStr {
+			case "blocklist":
+				rule.Black = true
+			case "whitelist":
+				rule.White = true
+			default:
+				rule.Action = model.StringToAction(actionStr)
+			}
 		case strings.HasPrefix(part, "--dport="):
 			rule.DPort = part[8:]
-		case strings.HasPrefix(part, "--sip="):
-			rule.SIP = part[6:]
-		case strings.HasPrefix(part, "--dip="):
-			rule.DIP = part[6:]
-		case part == "--black":
-			rule.Black = true
-		case part == "--white":
-			rule.White = true
+		case strings.HasPrefix(part, "-s="):
+			rule.SIP = part[3:]
+		case strings.HasPrefix(part, "--dest="):
+			rule.DIP = part[7:]
+		case strings.HasPrefix(part, "-i="):
+			rule.InInterface = part[3:]
+		case strings.HasPrefix(part, "-o="):
+			rule.OutInterface = part[3:]
 		}
 	}
 
@@ -198,6 +233,30 @@ func RuleToLine(rule *model.FirewallRule) string {
 	var parts []string
 	parts = append(parts, "agent")
 	parts = append(parts, "-m=insert")
+
+	// ACL 규칙 (blocklist/whitelist)은 별도 형식
+	if rule.Black || rule.White {
+		// 소스 IP
+		if rule.SIP != "" {
+			parts = append(parts, fmt.Sprintf("-s=%s", rule.SIP))
+		}
+		// ACL Action
+		if rule.Black {
+			parts = append(parts, "-a=blocklist")
+		} else if rule.White {
+			parts = append(parts, "-a=whitelist")
+		}
+		return strings.Join(parts, " ")
+	}
+
+	// IPS 규칙은 체인이 없음
+	if rule.Protocol == model.ProtocolIPS {
+		parts = append(parts, fmt.Sprintf("-p=%s", FormatProtocolWithOptions(rule.Protocol, rule.Options)))
+		parts = append(parts, fmt.Sprintf("-a=%s", model.ActionToString(rule.Action)))
+		return strings.Join(parts, " ")
+	}
+
+	// 일반 방화벽 규칙
 	parts = append(parts, fmt.Sprintf("-c=%s", model.ChainToString(rule.Chain)))
 	// 프로토콜 옵션 포함하여 포맷
 	parts = append(parts, fmt.Sprintf("-p=%s", FormatProtocolWithOptions(rule.Protocol, rule.Options)))
@@ -208,18 +267,16 @@ func RuleToLine(rule *model.FirewallRule) string {
 		parts = append(parts, fmt.Sprintf("--dport=%s", rule.DPort))
 	}
 	if rule.SIP != "" {
-		parts = append(parts, fmt.Sprintf("--sip=%s", rule.SIP))
+		parts = append(parts, fmt.Sprintf("-s=%s", rule.SIP))
 	}
 	if rule.DIP != "" {
-		parts = append(parts, fmt.Sprintf("--dip=%s", rule.DIP))
+		parts = append(parts, fmt.Sprintf("--dest=%s", rule.DIP))
 	}
-
-	// 플래그 (true일 때만 출력)
-	if rule.Black {
-		parts = append(parts, "--black")
+	if rule.InInterface != "" {
+		parts = append(parts, fmt.Sprintf("-i=%s", rule.InInterface))
 	}
-	if rule.White {
-		parts = append(parts, "--white")
+	if rule.OutInterface != "" {
+		parts = append(parts, fmt.Sprintf("-o=%s", rule.OutInterface))
 	}
 
 	return strings.Join(parts, " ")
@@ -248,7 +305,7 @@ func ParseTextToRules(text string) ([]*model.FirewallRule, []string, []error) {
 		}
 
 		// NAT 규칙은 건너뛰기 (ParseTextToNATRules에서 처리)
-		if strings.Contains(line, "-t=nat") {
+		if IsNATLine(line) {
 			continue
 		}
 
@@ -281,4 +338,10 @@ func RulesToText(rules []*model.FirewallRule, comments []string) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// IsIPSLine 라인이 IPS 규칙인지 확인
+func IsIPSLine(line string) bool {
+	// IPS 형식: -p="IPS?syn-flood&limit=50&seconds=1&enable=1"
+	return strings.Contains(line, "-p=\"IPS?") || strings.Contains(line, "-p=IPS?")
 }
