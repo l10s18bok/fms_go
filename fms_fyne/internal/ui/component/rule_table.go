@@ -19,9 +19,11 @@ const (
 	colPort
 	colSIP
 	colDIP
+	colInIF  // 입력 인터페이스 (-i)
+	colOutIF // 출력 인터페이스 (-o)
 	colBlack
 	colWhite
-	colCount // 총 컬럼 수 = 10
+	colCount // 총 컬럼 수 = 12
 )
 
 // 고정 너비 컬럼 (픽셀)
@@ -55,13 +57,15 @@ func (t *RuleTable) createTable() {
 	config := EditableTableConfig{
 		Columns: []EditableTableColumn{
 			{Header: "", Width: fixedWidthDelete},
-			{Header: "Chain", WidthRatio: 0.12},
-			{Header: "Proto", WidthRatio: 0.10},
-			{Header: "Options", WidthRatio: 0.14},
-			{Header: "Action", WidthRatio: 0.12},
+			{Header: "Chain", WidthRatio: 0.10},
+			{Header: "Proto", WidthRatio: 0.08},
+			{Header: "Options", WidthRatio: 0.12},
+			{Header: "Action", WidthRatio: 0.10},
 			{Header: "Port", WidthRatio: 0.08},
-			{Header: "SIP", WidthRatio: 0.22},
-			{Header: "DIP", WidthRatio: 0.22},
+			{Header: "SIP", WidthRatio: 0.16},
+			{Header: "DIP", WidthRatio: 0.16},
+			{Header: "InIF", WidthRatio: 0.06},
+			{Header: "OutIF", WidthRatio: 0.06},
 			{Header: "Black", Width: fixedWidthBlack},
 			{Header: "White", Width: fixedWidthWhite},
 		},
@@ -179,6 +183,30 @@ func (t *RuleTable) getCellConfig(row, col int) EditableCellConfig {
 			OnChanged: func(value any) {
 				if row < len(t.rules) {
 					t.rules[row].DIP = value.(string)
+					t.triggerChange()
+				}
+			},
+		}
+
+	case colInIF:
+		return EditableCellConfig{
+			Type: CellTypeEntry,
+			Text: rule.InInterface,
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].InInterface = value.(string)
+					t.triggerChange()
+				}
+			},
+		}
+
+	case colOutIF:
+		return EditableCellConfig{
+			Type: CellTypeEntry,
+			Text: rule.OutInterface,
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].OutInterface = value.(string)
 					t.triggerChange()
 				}
 			},
