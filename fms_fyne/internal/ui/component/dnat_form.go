@@ -18,11 +18,11 @@ type DNATForm struct {
 
 	// UI 요소
 	protoSel       *FixedWidthSelect // 프로토콜
-	matchPortEntry *widget.Entry     // 매칭 포트 (Match_Port)
-	matchIPEntry   *widget.Entry     // 매칭 IP (Match_IP)
-	transIPEntry   *widget.Entry     // 변환 IP (Trans_IP)
-	transPortEntry *widget.Entry     // 목적지 포트 (D_Port)
-	inIfEntry      *widget.Entry     // 입력 인터페이스 (In_IFace)
+	matchPortEntry *widget.Entry     // 매칭 포트 (MatchPort)
+	matchIPEntry   *widget.Entry     // 매칭 IP (MatchIP)
+	transIPEntry   *widget.Entry     // 변환 IP (TransIP)
+	transPortEntry *widget.Entry     // 변환 포트 (TransPort)
+	inIfEntry      *widget.Entry     // 입력 인터페이스 (InIF)
 	// descEntry      *widget.Entry     // 설명 (선택) - 현재 미사용
 	addBtn  fyne.CanvasObject
 	content *fyne.Container
@@ -45,7 +45,7 @@ func (f *DNATForm) createUI() {
 	// 프로토콜 선택
 	f.protoSel = NewFixedWidthSelect(model.GetProtocolOptions(), nil, selectWidth)
 
-	// 매칭 포트 (Match_Port) - 필수 필드
+	// 매칭 포트 (MatchPort) - 필수 필드
 	f.matchPortEntry = widget.NewEntry()
 	f.matchPortEntry.SetPlaceHolder("Port (필수)")
 	f.matchPortEntry.Validator = func(s string) error {
@@ -55,13 +55,13 @@ func (f *DNATForm) createUI() {
 		return nil
 	}
 
-	// 매칭 IP (Match_IP) - 선택
+	// 매칭 IP (MatchIP) - 선택
 	f.matchIPEntry = widget.NewEntry()
-	f.matchIPEntry.SetPlaceHolder("Match IP")
+	f.matchIPEntry.SetPlaceHolder("MatchIP")
 
-	// 변환 IP (Trans_IP) - 필수 필드
+	// 변환 IP (TransIP) - 필수 필드
 	f.transIPEntry = widget.NewEntry()
-	f.transIPEntry.SetPlaceHolder("Trans IP (필수)")
+	f.transIPEntry.SetPlaceHolder("TransIP (필수)")
 	f.transIPEntry.Validator = func(s string) error {
 		if s == "" {
 			return fmt.Errorf("필수 입력")
@@ -69,11 +69,11 @@ func (f *DNATForm) createUI() {
 		return nil
 	}
 
-	// 목적지 포트 (D_Port)
+	// 변환 포트 (TransPort)
 	f.transPortEntry = widget.NewEntry()
 	f.transPortEntry.SetPlaceHolder("Port")
 
-	// 입력 인터페이스 (In_IFace)
+	// 입력 인터페이스 (InIF)
 	f.inIfEntry = widget.NewEntry()
 	f.inIfEntry.SetPlaceHolder("eth0")
 
@@ -89,28 +89,28 @@ func (f *DNATForm) createUI() {
 		f.showDNATHelp()
 	})
 
-	// 첫 번째 행: Proto, Match_Port, Match_IP, ? (오른쪽 끝)
+	// 첫 번째 행: Proto, MatchPort, MatchIP, ? (오른쪽 끝)
 	row1 := container.NewBorder(
 		nil, nil, nil,
 		helpBtn, // 오른쪽 끝에 도움말 버튼
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(50, rowHeight), widget.NewLabel("Proto:")),
 			container.NewGridWrap(fyne.NewSize(100, rowHeight), f.protoSel),
-			container.NewGridWrap(fyne.NewSize(85, rowHeight), widget.NewLabel("Match_Port:")),
+			container.NewGridWrap(fyne.NewSize(85, rowHeight), widget.NewLabel("MatchPort:")),
 			container.NewGridWrap(fyne.NewSize(140, rowHeight), f.matchPortEntry),
-			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("Match_IP:")),
+			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("MatchIP:")),
 			container.NewGridWrap(fyne.NewSize(170, rowHeight), f.matchIPEntry),
 			layout.NewSpacer(),
 		),
 	)
 
-	// 두 번째 행: Trans_IP, D_Port, In_IFace
+	// 두 번째 행: TransIP, TransPort, InIF
 	row2 := container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("Trans_IP:")),
+		container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("TransIP:")),
 		container.NewGridWrap(fyne.NewSize(170, rowHeight), f.transIPEntry),
-		container.NewGridWrap(fyne.NewSize(55, rowHeight), widget.NewLabel("D_Port:")),
+		container.NewGridWrap(fyne.NewSize(75, rowHeight), widget.NewLabel("TransPort:")),
 		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.transPortEntry),
-		container.NewGridWrap(fyne.NewSize(65, rowHeight), widget.NewLabel("In_IFace:")),
+		container.NewGridWrap(fyne.NewSize(45, rowHeight), widget.NewLabel("InIF:")),
 		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.inIfEntry),
 	)
 

@@ -16,9 +16,9 @@ type SNATForm struct {
 
 	// UI 요소
 	protoSel     *FixedWidthSelect // 프로토콜
-	matchIPEntry *widget.Entry     // Match_IP
-	outIfEntry   *widget.Entry     // Out_Face (출력 인터페이스)
-	transIPEntry *widget.Entry     // Trans_IP (변환 IP)
+	matchIPEntry *widget.Entry     // MatchIP
+	outIfEntry   *widget.Entry     // OutIF (출력 인터페이스)
+	transIPEntry *widget.Entry     // TransIP (변환 IP)
 	// descEntry    *widget.Entry     // 설명 (선택) - 현재 미사용
 	addBtn  fyne.CanvasObject
 	content *fyne.Container
@@ -39,17 +39,17 @@ func (f *SNATForm) createUI() {
 	// 프로토콜 선택
 	f.protoSel = NewFixedWidthSelect(model.GetProtocolOptions(), nil, float32(80))
 
-	// Match_IP
+	// MatchIP
 	f.matchIPEntry = widget.NewEntry()
-	f.matchIPEntry.SetPlaceHolder("Match IP")
+	f.matchIPEntry.SetPlaceHolder("MatchIP")
 
-	// Out_Face (출력 인터페이스)
+	// OutIF (출력 인터페이스)
 	f.outIfEntry = widget.NewEntry()
-	f.outIfEntry.SetPlaceHolder("Out Interface")
+	f.outIfEntry.SetPlaceHolder("OutIF")
 
-	// Trans_IP (변환 IP)
+	// TransIP (변환 IP)
 	f.transIPEntry = widget.NewEntry()
-	f.transIPEntry.SetPlaceHolder("Trans IP")
+	f.transIPEntry.SetPlaceHolder("TransIP")
 
 	// 행 높이
 	rowHeight := float32(36)
@@ -59,24 +59,24 @@ func (f *SNATForm) createUI() {
 		f.showSNATHelp()
 	})
 
-	// 첫 번째 행: Proto, Match_IP, ? (오른쪽 끝)
+	// 첫 번째 행: Proto, MatchIP, ? (오른쪽 끝)
 	row1 := container.NewBorder(
 		nil, nil, nil,
 		helpBtn, // 오른쪽 끝에 도움말 버튼
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(50, rowHeight), widget.NewLabel("Proto:")),
 			container.NewGridWrap(fyne.NewSize(80, rowHeight), f.protoSel),
-			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("Match_IP:")),
+			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("MatchIP:")),
 			container.NewGridWrap(fyne.NewSize(180, rowHeight), f.matchIPEntry),
 			layout.NewSpacer(),
 		),
 	)
 
-	// 두 번째 행: Out_Face, Trans_IP
+	// 두 번째 행: OutIF, TransIP
 	row2 := container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("Out_Face:")),
+		container.NewGridWrap(fyne.NewSize(50, rowHeight), widget.NewLabel("OutIF:")),
 		container.NewGridWrap(fyne.NewSize(150, rowHeight), f.outIfEntry),
-		container.NewGridWrap(fyne.NewSize(65, rowHeight), widget.NewLabel("Trans_IP:")),
+		container.NewGridWrap(fyne.NewSize(60, rowHeight), widget.NewLabel("TransIP:")),
 		container.NewGridWrap(fyne.NewSize(180, rowHeight), f.transIPEntry),
 	)
 

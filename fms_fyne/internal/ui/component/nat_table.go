@@ -1,8 +1,6 @@
 package component
 
 import (
-	"fmt"
-
 	"fms/internal/model"
 
 	"fyne.io/fyne/v2"
@@ -15,10 +13,13 @@ const (
 	natColDelete = iota
 	natColType
 	natColProto
-	natColMatch
-	natColTranslate
-	natColInterface
-	natColCount // 총 컬럼 수 = 6
+	natColSrcIP     // MatchIP (-s)
+	natColDstIP     // TranslateIP (--dest)
+	natColDPort     // MatchPort (--dport)
+	natColTransPort // TranslatePort
+	natColInIF      // InInterface (-i)
+	natColOutIF     // OutInterface (-o)
+	natColCount     // 총 컬럼 수 = 9
 )
 
 // NAT 테이블 고정 너비 컬럼 (픽셀)
@@ -54,9 +55,12 @@ func (t *NATTable) createTable() {
 			{Header: "", Width: natFixedWidthDelete},
 			{Header: "Type", Width: natFixedWidthType},
 			{Header: "Proto", Width: natFixedWidthProto},
-			{Header: "Match", WidthRatio: 0.30},
-			{Header: "Translate", WidthRatio: 0.35},
-			{Header: "Interface", WidthRatio: 0.35},
+			{Header: "MatchIP", WidthRatio: 0.18},
+			{Header: "TransIP", WidthRatio: 0.18},
+			{Header: "MatchPort", WidthRatio: 0.10},
+			{Header: "TransPort", WidthRatio: 0.10},
+			{Header: "InIF", WidthRatio: 0.08},
+			{Header: "OutIF", WidthRatio: 0.08},
 		},
 		GetRowCount: func() int {
 			return len(t.rules)
@@ -99,64 +103,70 @@ func (t *NATTable) getCellConfig(row, col int) EditableCellConfig {
 			Text: model.ProtocolToString(rule.Protocol),
 		}
 
-	case natColMatch:
-		// 매칭 조건 표시: IP:Port 형식
-		matchStr := ""
-		if rule.MatchIP != "" && rule.MatchIP != "ANY" {
-			matchStr = rule.MatchIP
-		}
-		if rule.MatchPort != "" {
-			if matchStr != "" {
-				matchStr += ":"
-			}
-			matchStr += rule.MatchPort
-		}
-		if matchStr == "" {
-			matchStr = "ANY"
+	case natColSrcIP:
+		// 소스 IP (-s)
+		srcIP := rule.MatchIP
+		if srcIP == "" {
+			srcIP = "-"
 		}
 		return EditableCellConfig{
 			Type: CellTypeLabel,
-			Text: matchStr,
+			Text: srcIP,
 		}
 
-	case natColTranslate:
-		// 변환 대상 표시: IP:Port 형식
-		transStr := ""
-		if rule.TranslateIP != "" {
-			transStr = rule.TranslateIP
-		}
-		if rule.TranslatePort != "" {
-			if transStr != "" {
-				transStr += ":"
-			}
-			transStr += rule.TranslatePort
-		}
-		if transStr == "" {
-			transStr = "-"
+	case natColDstIP:
+		// 목적지 IP (--dest)
+		dstIP := rule.TranslateIP
+		if dstIP == "" {
+			dstIP = "-"
 		}
 		return EditableCellConfig{
 			Type: CellTypeLabel,
-			Text: transStr,
+			Text: dstIP,
 		}
 
-	case natColInterface:
-		// 인터페이스 표시: IN/OUT 형식
-		ifStr := ""
-		if rule.InInterface != "" {
-			ifStr = fmt.Sprintf("IN:%s", rule.InInterface)
-		}
-		if rule.OutInterface != "" {
-			if ifStr != "" {
-				ifStr += " "
-			}
-			ifStr += fmt.Sprintf("OUT:%s", rule.OutInterface)
-		}
-		if ifStr == "" {
-			ifStr = "-"
+	case natColDPort:
+		// 매칭 포트 (--dport)
+		dport := rule.MatchPort
+		if dport == "" {
+			dport = "-"
 		}
 		return EditableCellConfig{
 			Type: CellTypeLabel,
-			Text: ifStr,
+			Text: dport,
+		}
+
+	case natColTransPort:
+		// 변환 포트
+		tport := rule.TranslatePort
+		if tport == "" {
+			tport = "-"
+		}
+		return EditableCellConfig{
+			Type: CellTypeLabel,
+			Text: tport,
+		}
+
+	case natColInIF:
+		// 입력 인터페이스 (-i)
+		inIF := rule.InInterface
+		if inIF == "" {
+			inIF = "-"
+		}
+		return EditableCellConfig{
+			Type: CellTypeLabel,
+			Text: inIF,
+		}
+
+	case natColOutIF:
+		// 출력 인터페이스 (-o)
+		outIF := rule.OutInterface
+		if outIF == "" {
+			outIF = "-"
+		}
+		return EditableCellConfig{
+			Type: CellTypeLabel,
+			Text: outIF,
 		}
 	}
 
