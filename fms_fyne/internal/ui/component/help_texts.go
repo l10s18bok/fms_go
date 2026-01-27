@@ -184,41 +184,107 @@ const ICMPOptionsHelpText = `ICMP Type 옵션 설명:
 • addressmask-reply
   - 서브넷 마스크 응답입니다.`
 
+// IPSOptionsHelpText IPS 옵션 도움말
+const IPSOptionsHelpText = `IPS (Intrusion Prevention System) 옵션 설명:
+
+Smartfw의 IPS 기능은 다양한 네트워크 공격을 탐지하고 차단합니다.
+
+[IP Layer 필터]
+
+• land-attack - Source IP = Dest IP 패킷 차단
+• ip-spoofing - IP 스푸핑 공격 차단
+• ip-tunnel - GRE/IPIP 터널링 차단
+• ip-fragment - IP 조각화 공격 차단 (Teardrop 포함)
+• ttl-attack - 비정상 TTL(≤1) 패킷 차단
+• port-scan - 포트 스캔 탐지/차단
+• ip-protocol - 비정상 프로토콜 차단
+• ip-options - IP Options 필드 패킷 차단
+• ip-fragment-tiny - Tiny Fragment 공격 차단
+• MCAST-DST-PING - 멀티캐스트 ICMP 차단
+
+[TCP 필터]
+
+• syn-flood - SYN 패킷 대량 전송 공격
+• concurrent-conn - IP당 동시 세션 제한
+• synack-flood - SYN-ACK 플러드 공격
+• ack-flood - ACK 플러드 공격
+• rst-flood - RST 플러드 공격
+• fin-flood - FIN 플러드 공격
+• pshack-flood - PSH-ACK 플러드 공격
+• tcp-total - TCP 종합 플러드 공격
+
+[UDP 필터]
+
+• udp-flood - UDP 패킷 대량 전송 공격
+• udp-bytes - UDP 대용량 페이로드 공격
+
+[ICMP 필터]
+
+• icmp-flood - ICMP 패킷 대량 전송 공격
+• icmp-bytes - ICMP 대용량 페이로드 공격
+
+[파라미터 설명]
+
+• limit: 허용할 최대 패킷/바이트 수
+• seconds: 측정 시간 간격 (초)
+• enable: 활성화 여부 (1=활성, 0=비활성)
+
+[예시]
+
+SYN Flood: limit=50&seconds=1&enable=1
+→ 초당 50개 이상 SYN 패킷 차단
+
+Port Scan: limit=32&seconds=1&enable=1
+→ 초당 32개 이상 포트 스캔 차단`
+
 // GeneralRuleHelpText 일반 규칙 도움말
 const GeneralRuleHelpText = `일반 규칙 도움말:
 
 방화벽 규칙을 세부적으로 설정합니다.
+(Smartfw-manual.docx 기준)
 
 [입력 필드 설명]
 
-• Chain (체인)
+• Chain (체인) - 옵션: -c
   - INPUT: 서버로 들어오는 트래픽
   - OUTPUT: 서버에서 나가는 트래픽
   - FORWARD: 서버를 경유하는 트래픽
+  - PREROUTING: 라우팅 전 (NAT용)
+  - POSTROUTING: 라우팅 후 (NAT용)
 
-• Action (동작)
+• Action (동작) - 옵션: -a
   - ACCEPT: 트래픽 허용
   - DROP: 트래픽 차단 (응답 없음)
-  - REJECT: 트래픽 차단 (거부 응답 전송)
-  - RETURN: 현재 체인 종료
-  - FLUSH: 체인의 모든 규칙 삭제
-  - LOG: 로그 기록
+  - IDS: 허용 + 로그 기록 (Intrusion Detection)
+  - IPS: 차단 + 로그 기록 (Intrusion Prevention)
 
-• Protocol (프로토콜)
+• Protocol (프로토콜) - 옵션: -p
   - TCP: 웹, SSH, FTP 등 연결 지향
   - UDP: DNS, NTP 등 비연결 지향
   - ICMP: ping, traceroute 등
   - ANY: 모든 프로토콜
 
-• SIP / DIP (소스/목적지 IP)
-  - 특정 IP 또는 네트워크 지정
+• SIP (소스 IP) - 옵션: -s
+  - 출발지 IP 또는 네트워크 지정
   - 예: 192.168.1.100, 10.0.0.0/8
+  - CIDR, 범위(-), 콤마(,) 형식 지원
   - 비워두면 ANY (모든 IP)
 
-• 포트 옵션 (TCP/UDP)
-  - SPort: 소스 포트
-  - DPort: 목적지 포트
-  - 예: 80, 443, 22, 1024:65535
+• DIP (목적지 IP) - 옵션: --dest
+  - 목적지 IP 또는 네트워크 지정
+  - 예: 192.168.1.100, 10.0.0.0/8
+  - CIDR, 범위(-), 콤마(,) 형식 지원
+  - 비워두면 ANY (모든 IP)
+
+• Port (목적지 포트) - 옵션: --dport
+  - 예: 80, 443, 80-90, 80,443,8080
+  - 범위(-), 콤마(,) 형식 지원
+
+• InIF / OutIF (인터페이스) - 옵션: -i, -o
+  - 트래픽이 들어오거나 나가는 네트워크 인터페이스
+  - 예: eth0, eth1, wan0
+  - 정규식 지원: eth+ (eth로 시작하는 모든 인터페이스)
+  - 비워두면 모든 인터페이스에 적용
 
 • TCP Flags (TCP 전용)
   - 특정 TCP 플래그 조합을 필터링
@@ -273,27 +339,27 @@ const DNATHelpText = `포트 포워딩 (DNAT) 도움말:
   - 포트 포워딩을 적용할 프로토콜입니다.
   - tcp, udp 중 선택합니다.
 
-• Match_Port (매칭 포트)
+• MatchPort (매칭 포트)
   - 외부에서 접속할 포트 번호입니다.
   - 필수 입력 항목입니다.
   - 예: 8080, 443, 22
 
-• Match_IP (매칭 IP)
+• MatchIP (매칭 IP)
   - 접속을 허용할 출발지 IP입니다.
   - 비워두면 모든 IP에서 접속을 허용합니다.
   - 예: 192.168.1.0/24, 10.0.0.5
 
-• Trans_IP (변환 IP)
+• TransIP (변환 IP)
   - 트래픽을 전달할 내부 서버 IP입니다.
   - 필수 입력 항목입니다.
   - 예: 192.168.1.10, 10.0.0.100
 
-• D_Port (목적지 포트)
+• TransPort (변환 포트)
   - 내부 서버의 실제 서비스 포트입니다.
-  - 비워두면 Match_Port와 동일한 포트를 사용합니다.
+  - 비워두면 MatchPort와 동일한 포트를 사용합니다.
   - 예: 80, 443, 3389
 
-• In_IFace (입력 인터페이스)
+• InIF (입력 인터페이스)
   - 트래픽이 들어오는 인터페이스입니다.
   - 선택 사항입니다.
   - 예: eth0, wan0
@@ -301,11 +367,11 @@ const DNATHelpText = `포트 포워딩 (DNAT) 도움말:
 [사용 예시]
 
 웹 서버 포트 포워딩:
-  Match_Port=8080, Trans_IP=192.168.1.10, D_Port=80
+  MatchPort=8080, TransIP=192.168.1.10, TransPort=80
   → 외부:8080 접속 시 내부 192.168.1.10:80으로 전달
 
 SSH 포트 포워딩 (특정 IP만 허용):
-  Match_Port=2222, Match_IP=10.0.0.0/8, Trans_IP=192.168.1.5, D_Port=22
+  MatchPort=2222, MatchIP=10.0.0.0/8, TransIP=192.168.1.5, TransPort=22
   → 10.x.x.x 대역에서만 SSH 접속 허용`
 
 // SNATHelpText SNAT 도움말
@@ -320,33 +386,40 @@ const SNATHelpText = `소스 NAT (SNAT) 도움말:
   - NAT를 적용할 프로토콜입니다.
   - tcp, udp 중 선택합니다.
 
-• Match_IP (매칭 IP/네트워크)
+• MatchIP (매칭 IP/네트워크)
   - NAT를 적용할 내부 네트워크입니다.
   - 예: 192.168.1.0/24, 10.0.0.0/8
 
-• Out_Face (출력 인터페이스)
+• OutIF (출력 인터페이스)
   - 트래픽이 나가는 외부 인터페이스입니다.
   - 선택 사항입니다.
   - 예: eth0, ppp0, wan0
 
-• Trans_IP (변환 IP)
+• TransIP (변환 IP)
   - 소스 IP를 변환할 공인 IP입니다.
   - 예: 203.0.113.1, 1.2.3.4
 
 [사용 예시]
 
 기업 네트워크 (SNAT):
-  Match_IP=10.0.0.0/8, Trans_IP=203.0.113.1
+  MatchIP=10.0.0.0/8, TransIP=203.0.113.1
   → 내부 10.x.x.x가 고정 IP 203.0.113.1로 변환
 
 인터페이스 지정:
-  Match_IP=192.168.1.0/24, Trans_IP=1.2.3.4, Out_Face=eth0
+  MatchIP=192.168.1.0/24, TransIP=1.2.3.4, OutIF=eth0
   → 192.168.1.x가 eth0으로 나갈 때 1.2.3.4로 변환`
 
 // FirewallEditExampleText 방화벽 규칙 편집 예시 텍스트
-const FirewallEditExampleText = `agent -m=insert -c=INPUT -p=any -a=DROP --sip=203.248.252.2
-agent -m=insert -c=INPUT -p=any -a=DROP --black
-agent -m=insert -t=nat --nat-type=dnat -p=tcp --match-port=6060 -s=203.248.252.2 --to-dest=192.168.3.1:8080`
+// Smartfw-manual.docx 문서 기준
+const FirewallEditExampleText = `agent -m=insert -c=INPUT -p=tcp -a=DROP -s=203.248.252.2 --dport=80
+agent -m=insert -c=INPUT -p=any -a=ACCEPT -s=192.168.1.0/24 --dest=10.0.0.1 -i=eth0
+agent -m=insert -s=192.168.30.30 -a=blocklist
+agent -m=insert -s=10.0.0.0/8 -a=whitelist
+agent -m=insert -p="TCP?DNAT" --dest=192.168.0.10:8080 --dport=80 -a=NAT
+agent -m=insert -p="ANY?SNAT" -s=192.168.0.0/24 --dest=203.0.113.10 -a=NAT
+agent -m=insert -p="ANY?SNAT" -s=192.168.0.0/24 -o=eth0 -a=NAT
+agent -m=insert -p="IPS?syn-flood&limit=50&seconds=1&enable=1" -a=IPS
+agent -m=insert -p="IPS?udp-flood&limit=500&seconds=1&enable=1" -a=IPS`
 
 // FirewallFileHelpText 방화벽 룰 관리 도움말
 const FirewallFileHelpText = `

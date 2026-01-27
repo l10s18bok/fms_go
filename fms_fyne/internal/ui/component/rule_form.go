@@ -38,14 +38,16 @@ type RuleForm struct {
 	onAdd func(*model.FirewallRule)
 
 	// UI 요소
-	chainSel   *FixedWidthSelect
-	protoSel   *FixedWidthSelect
-	actionSel  *FixedWidthSelect
-	dportEntry *widget.Entry
-	sipEntry   *widget.Entry
-	dipEntry   *widget.Entry
-	addBtn     fyne.CanvasObject
-	content    *fyne.Container
+	chainSel       *FixedWidthSelect
+	protoSel       *FixedWidthSelect
+	actionSel      *FixedWidthSelect
+	dportEntry     *widget.Entry
+	sipEntry       *widget.Entry
+	dipEntry       *widget.Entry
+	inIfaceEntry   *widget.Entry // 입력 인터페이스 (-i)
+	outIfaceEntry  *widget.Entry // 출력 인터페이스 (-o)
+	addBtn         fyne.CanvasObject
+	content        *fyne.Container
 
 	// TCP Flags 옵션 UI
 	tcpFlagsPresetSel *widget.Select
@@ -60,6 +62,11 @@ type RuleForm struct {
 	icmpCodeEntry  *widget.Entry   // Code 커스텀 숫자용
 	icmpCodeRow    *fyne.Container // Code 행 (조건부 표시용)
 	icmpOptionsBox *fyne.Container
+
+	// IPS 옵션 UI
+	ipsTypeSel    *widget.Select  // IPS 타입 선택 (syn-flood, land-attack 등)
+	ipsParamsEntry *widget.Entry  // IPS 파라미터 (limit=50&seconds=1&enable=1)
+	ipsOptionsBox  *fyne.Container
 
 	// 옵션 컨테이너
 	optionsContainer *fyne.Container
@@ -108,6 +115,14 @@ func (f *RuleForm) createUI() {
 	f.dipEntry = widget.NewEntry()
 	f.dipEntry.SetPlaceHolder("Dest IP")
 
+	// In Interface 입력
+	f.inIfaceEntry = widget.NewEntry()
+	f.inIfaceEntry.SetPlaceHolder("eth0")
+
+	// Out Interface 입력
+	f.outIfaceEntry = widget.NewEntry()
+	f.outIfaceEntry.SetPlaceHolder("eth1")
+
 	// 추가 버튼 (진한 회색 배경)
 	f.addBtn = NewCustomButton("+ 추가", nil, nil, themes.Colors["darkgray"], func() {
 		f.SubmitRule()
@@ -118,6 +133,9 @@ func (f *RuleForm) createUI() {
 
 	// ICMP 옵션 UI 생성
 	f.createICMPOptionsUI()
+
+	// IPS 옵션 UI 생성
+	f.createIPSOptionsUI()
 
 	// 옵션 컨테이너 (프로토콜에 따라 동적으로 표시)
 	f.optionsContainer = container.NewVBox()
@@ -146,8 +164,16 @@ func (f *RuleForm) createUI() {
 		container.NewGridWrap(fyne.NewSize(230, rowHeight), f.dipEntry),
 	)
 
+	// 세 번째 행: In Interface, Out Interface
+	row3 := container.NewHBox(
+		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("In IF:")),
+		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.inIfaceEntry),
+		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Out IF:")),
+		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.outIfaceEntry),
+	)
+
 	// 전체 폼 레이아웃 (Black/White 체크박스 제거됨 - BlackWhiteForm에서 별도 처리)
-	formContent := container.NewVBox(row1, row2, f.optionsContainer)
+	formContent := container.NewVBox(row1, row2, row3, f.optionsContainer)
 
 	// 테두리가 있는 카드 형태
 	f.content = container.NewVBox(
@@ -299,23 +325,88 @@ func (f *RuleForm) showICMPHelp() {
 	ShowHelpPopup("ICMP Options 도움말", ICMPOptionsHelpText, f.content)
 }
 
+// createIPSOptionsUI IPS 옵션 UI 생성
+func (f *RuleForm) createIPSOptionsUI() {
+	// IPS 타입 선택
+	f.ipsTypeSel = widget.NewSelect(model.GetIPSTypeOptions(), func(s string) {
+		f.onIPSTypeChanged(s)
+	})
+
+	// IPS 파라미터 입력
+	f.ipsParamsEntry = widget.NewEntry()
+	f.ipsParamsEntry.SetPlaceHolder("limit=50&seconds=1&enable=1")
+
+	rowHeight := float32(36)
+
+	typeRow := container.NewHBox(
+		widget.NewLabel("Type:"),
+		container.NewGridWrap(fyne.NewSize(150, rowHeight), f.ipsTypeSel),
+	)
+
+	paramsRow := container.NewHBox(
+		widget.NewLabel("Params:"),
+		container.NewGridWrap(fyne.NewSize(300, rowHeight), f.ipsParamsEntry),
+	)
+
+	// 헬프 버튼 ("?" 아이콘)
+	helpBtn := widget.NewButtonWithIcon("", theme.QuestionIcon(), func() {
+		f.showIPSHelp()
+	})
+
+	// 헤더: "IPS Options" + 헬프 버튼
+	headerRow := container.NewHBox(
+		widget.NewLabel("IPS Options"),
+		helpBtn,
+	)
+
+	f.ipsOptionsBox = container.NewVBox(
+		headerRow,
+		typeRow,
+		paramsRow,
+	)
+}
+
+// onIPSTypeChanged IPS 타입 변경 시 기본 파라미터 설정
+func (f *RuleForm) onIPSTypeChanged(ipsType string) {
+	// 기본 파라미터 설정
+	defaults := model.GetIPSTypeDefaults(ipsType)
+	f.ipsParamsEntry.SetText(defaults)
+}
+
+// showIPSHelp IPS 옵션 헬프 팝업 표시
+func (f *RuleForm) showIPSHelp() {
+	ShowHelpPopup("IPS Options 도움말", IPSOptionsHelpText, f.content)
+}
+
 // onProtocolChanged 프로토콜 변경 시 옵션 UI 전환 및 포트 필드 활성/비활성화
 func (f *RuleForm) onProtocolChanged(proto string) {
 	f.optionsContainer.Objects = nil
 
+	// IPS에서 전환 시 필드 재활성화 헬퍼
+	enableCommonFields := func() {
+		f.chainSel.Enable()
+		f.sipEntry.Enable()
+		f.dipEntry.Enable()
+		f.inIfaceEntry.Enable()
+		f.outIfaceEntry.Enable()
+	}
+
 	switch strings.ToLower(proto) {
 	case "tcp":
+		enableCommonFields()
 		f.optionsContainer.Add(f.tcpOptionsBox)
 		f.setTCPOptionsEnabled(true)
 		f.dportEntry.Enable()
 		f.dportEntry.SetPlaceHolder("포트")
 	case "udp":
+		enableCommonFields()
 		// UDP: TCP 옵션 박스 표시하되 비활성화
 		f.optionsContainer.Add(f.tcpOptionsBox)
 		f.setTCPOptionsEnabled(false)
 		f.dportEntry.Enable()
 		f.dportEntry.SetPlaceHolder("포트")
 	case "icmp":
+		enableCommonFields()
 		f.optionsContainer.Add(f.icmpOptionsBox)
 		f.setICMPOptionsEnabled(true)
 		// ICMP는 포트 개념이 없음
@@ -323,12 +414,35 @@ func (f *RuleForm) onProtocolChanged(proto string) {
 		f.dportEntry.SetText("")
 		f.dportEntry.SetPlaceHolder("N/A")
 	case "any":
+		enableCommonFields()
 		// ANY: TCP 옵션 박스 표시하되 비활성화
 		f.optionsContainer.Add(f.tcpOptionsBox)
 		f.setTCPOptionsEnabled(false)
 		f.dportEntry.Enable()
 		f.dportEntry.SetPlaceHolder("포트")
+	case "ips":
+		// IPS: IPS 옵션 박스 표시
+		f.optionsContainer.Add(f.ipsOptionsBox)
+		// IPS 프로토콜 선택 시 Action을 IPS로 자동 변경
+		f.actionSel.SetSelected("IPS")
+		// IPS는 포트 개념이 없음
+		f.dportEntry.Disable()
+		f.dportEntry.SetText("")
+		f.dportEntry.SetPlaceHolder("N/A")
+		// SIP, DIP도 필요 없음
+		f.sipEntry.Disable()
+		f.sipEntry.SetText("")
+		f.dipEntry.Disable()
+		f.dipEntry.SetText("")
+		// Chain도 의미 없음 (IPS는 커널 레벨에서 처리)
+		f.chainSel.Disable()
+		// 인터페이스도 필요 없음
+		f.inIfaceEntry.Disable()
+		f.inIfaceEntry.SetText("")
+		f.outIfaceEntry.Disable()
+		f.outIfaceEntry.SetText("")
 	default:
+		enableCommonFields()
 		f.optionsContainer.Add(f.tcpOptionsBox)
 		f.setTCPOptionsEnabled(false)
 		f.dportEntry.Enable()
@@ -493,18 +607,36 @@ func (f *RuleForm) getICMPCode() string {
 	return ""
 }
 
+// getIPSOptions IPS 옵션 문자열 가져오기
+// 예: "syn-flood&limit=50&seconds=1&enable=1"
+func (f *RuleForm) getIPSOptions() string {
+	ipsType := f.ipsTypeSel.Selected
+	if ipsType == "" {
+		return ""
+	}
+
+	params := strings.TrimSpace(f.ipsParamsEntry.Text)
+	if params == "" {
+		return ipsType
+	}
+
+	return ipsType + "&" + params
+}
+
 // SubmitRule 규칙 생성 및 콜백 호출 (다이얼로그에서 호출 가능)
 // 성공 시 true, 실패 시 false 반환
 func (f *RuleForm) SubmitRule() bool {
 	rule := &model.FirewallRule{
-		Chain:    model.StringToChain(f.chainSel.Selected),
-		Protocol: model.StringToProtocol(f.protoSel.Selected),
-		Action:   model.StringToAction(f.actionSel.Selected),
-		DPort:    f.dportEntry.Text,
-		SIP:      f.sipEntry.Text,
-		DIP:      f.dipEntry.Text,
-		Black:    false, // 일반 규칙은 Black/White 아님
-		White:    false,
+		Chain:        model.StringToChain(f.chainSel.Selected),
+		Protocol:     model.StringToProtocol(f.protoSel.Selected),
+		Action:       model.StringToAction(f.actionSel.Selected),
+		DPort:        f.dportEntry.Text,
+		SIP:          f.sipEntry.Text,
+		DIP:          f.dipEntry.Text,
+		InInterface:  f.inIfaceEntry.Text,
+		OutInterface: f.outIfaceEntry.Text,
+		Black:        false, // 일반 규칙은 Black/White 아님
+		White:        false,
 	}
 
 	// 프로토콜 옵션 설정
@@ -525,6 +657,11 @@ func (f *RuleForm) SubmitRule() bool {
 				ICMPCode: icmpCode,
 			}
 		}
+	case "ips":
+		ipsType := f.getIPSOptions()
+		if ipsType != "" {
+			rule.Options = &model.ProtocolOptions{IPSType: ipsType}
+		}
 	}
 
 	if f.onAdd != nil {
@@ -543,6 +680,8 @@ func (f *RuleForm) Reset() {
 	f.dportEntry.SetText("")
 	f.sipEntry.SetText("")
 	f.dipEntry.SetText("")
+	f.inIfaceEntry.SetText("")
+	f.outIfaceEntry.SetText("")
 
 	// TCP Flags 초기화
 	f.tcpFlagsPresetSel.SetSelected("None")
@@ -561,6 +700,10 @@ func (f *RuleForm) Reset() {
 	f.icmpCodeEntry.SetText("")
 	f.icmpCodeEntry.Hide()
 	f.icmpCodeRow.Hide()
+
+	// IPS 옵션 초기화
+	f.ipsTypeSel.SetSelected("")
+	f.ipsParamsEntry.SetText("")
 
 	// 프로토콜에 따른 옵션 UI 표시
 	f.onProtocolChanged(f.protoSel.Selected)

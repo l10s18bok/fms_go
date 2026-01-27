@@ -25,6 +25,7 @@ const (
 	ProtocolUDP  Protocol = 17
 	ProtocolICMP Protocol = 1
 	ProtocolANY  Protocol = 255
+	ProtocolIPS  Protocol = 254 // IPS 규칙용 특수 프로토콜
 )
 
 // Action 규칙 액션 타입
@@ -33,7 +34,8 @@ type Action int
 const (
 	ActionDROP   Action = 0
 	ActionACCEPT Action = 1
-	ActionREJECT Action = 2
+	ActionIDS    Action = 2
+	ActionIPS    Action = 3
 )
 
 // ProtocolOptions 프로토콜별 세부 옵션
@@ -44,6 +46,9 @@ type ProtocolOptions struct {
 	// ICMP 옵션
 	ICMPType string // 예: "echo-request", "8"
 	ICMPCode string // 예: "0", "3" (선택)
+
+	// IPS 옵션
+	IPSType string // 예: "syn-flood", "land-attack", "udp-flood"
 }
 
 // IsEmpty 옵션이 비어있는지 확인
@@ -51,7 +56,15 @@ func (o *ProtocolOptions) IsEmpty() bool {
 	if o == nil {
 		return true
 	}
-	return o.TCPFlags == "" && o.ICMPType == "" && o.ICMPCode == ""
+	return o.TCPFlags == "" && o.ICMPType == "" && o.ICMPCode == "" && o.IPSType == ""
+}
+
+// HasIPSOptions IPS 옵션이 있는지 확인
+func (o *ProtocolOptions) HasIPSOptions() bool {
+	if o == nil {
+		return false
+	}
+	return o.IPSType != ""
 }
 
 // HasTCPOptions TCP 옵션이 있는지 확인
@@ -72,15 +85,17 @@ func (o *ProtocolOptions) HasICMPOptions() bool {
 
 // FirewallRule 방화벽 규칙 구조체
 type FirewallRule struct {
-	Chain    Chain
-	Protocol Protocol
-	Options  *ProtocolOptions // 프로토콜 옵션
-	Action   Action
-	DPort    string // Destination 포트
-	SIP      string // Source IP (콤마리스트 지원)
-	DIP      string // Destination IP (콤마리스트 지원)
-	Black    bool   // 블랙리스트 규칙 여부
-	White    bool   // 화이트리스트 규칙 여부
+	Chain        Chain
+	Protocol     Protocol
+	Options      *ProtocolOptions // 프로토콜 옵션
+	Action       Action
+	DPort        string // Destination 포트
+	SIP          string // Source IP (콤마리스트 지원)
+	DIP          string // Destination IP (콤마리스트 지원)
+	InInterface  string // 입력 인터페이스 (-i)
+	OutInterface string // 출력 인터페이스 (-o)
+	Black        bool   // 블랙리스트 규칙 여부
+	White        bool   // 화이트리스트 규칙 여부
 }
 
 // NewFirewallRule 기본값으로 새 규칙 생성
@@ -139,6 +154,8 @@ func ProtocolToString(p Protocol) string {
 		return "icmp"
 	case ProtocolANY:
 		return "any"
+	case ProtocolIPS:
+		return "IPS"
 	default:
 		return "tcp"
 	}
@@ -155,6 +172,8 @@ func StringToProtocol(s string) Protocol {
 		return ProtocolICMP
 	case "any":
 		return ProtocolANY
+	case "ips":
+		return ProtocolIPS
 	default:
 		return ProtocolTCP
 	}
@@ -167,8 +186,10 @@ func ActionToString(a Action) string {
 		return "DROP"
 	case ActionACCEPT:
 		return "ACCEPT"
-	case ActionREJECT:
-		return "REJECT"
+	case ActionIDS:
+		return "IDS"
+	case ActionIPS:
+		return "IPS"
 	default:
 		return "DROP"
 	}
@@ -181,27 +202,110 @@ func StringToAction(s string) Action {
 		return ActionDROP
 	case "ACCEPT":
 		return ActionACCEPT
-	case "REJECT":
-		return ActionREJECT
+	case "IDS":
+		return ActionIDS
+	case "IPS":
+		return ActionIPS
 	default:
 		return ActionDROP
 	}
 }
 
 // GetChainOptions UI Select용 Chain 옵션 목록
+// Smartfw 문서 기준: PREROUTING, INPUT, FORWARD, OUTPUT, POSTROUTING
 func GetChainOptions() []string {
-	return []string{"INPUT", "OUTPUT", "FORWARD"}
-	// "PREROUTING", "POSTROUTING" - 현재 미사용
+	return []string{"PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"}
 }
 
 // GetProtocolOptions UI Select용 Protocol 옵션 목록
 func GetProtocolOptions() []string {
-	return []string{"tcp", "udp", "icmp", "any"}
+	return []string{"tcp", "udp", "icmp", "any", "IPS"}
+}
+
+// GetIPSTypeOptions IPS 타입 옵션 목록 (UI Select용)
+// Smartfw 문서 기준 전체 IPS 타입
+func GetIPSTypeOptions() []string {
+	return []string{
+		// IP Layer
+		"land-attack",
+		"ip-spoofing",
+		"ip-tunnel",
+		"ip-fragment",
+		"ttl-attack",
+		"port-scan",
+		"ip-protocol",
+		"ip-options",
+		"ip-fragment-tiny",
+		"MCAST-DST-PING",
+		// TCP
+		"syn-flood",
+		"concurrent-conn",
+		"synack-flood",
+		"ack-flood",
+		"rst-flood",
+		"fin-flood",
+		"pshack-flood",
+		"tcp-total",
+		// UDP
+		"udp-flood",
+		"udp-bytes",
+		// ICMP
+		"icmp-flood",
+		"icmp-bytes",
+	}
+}
+
+// GetIPSTypeDefaults IPS 타입별 기본 파라미터 반환
+// Smartfw 문서 기준 기본값
+func GetIPSTypeDefaults(ipsType string) string {
+	switch ipsType {
+	// IP Layer (enable만 있는 타입)
+	case "land-attack", "ip-spoofing", "ip-tunnel", "ip-fragment",
+		"ttl-attack", "ip-options", "ip-fragment-tiny", "MCAST-DST-PING":
+		return "enable=1"
+	case "ip-protocol":
+		return "enable=0" // 기본 비활성화
+	case "port-scan":
+		return "limit=32&seconds=1&enable=1"
+
+	// TCP
+	case "syn-flood":
+		return "limit=50&seconds=1&enable=1"
+	case "concurrent-conn":
+		return "limit=200&seconds=1&enable=1"
+	case "synack-flood":
+		return "limit=1000&seconds=1&enable=0" // 기본 비활성화
+	case "ack-flood":
+		return "limit=2000&seconds=1&enable=0" // 기본 비활성화
+	case "rst-flood":
+		return "limit=500&seconds=1&enable=0" // 기본 비활성화
+	case "fin-flood":
+		return "limit=500&seconds=1&enable=0" // 기본 비활성화
+	case "pshack-flood":
+		return "limit=2000&seconds=1&enable=0" // 기본 비활성화
+	case "tcp-total":
+		return "limit=3000&seconds=1&enable=0" // 기본 비활성화
+
+	// UDP
+	case "udp-flood":
+		return "limit=500&seconds=1&enable=1"
+	case "udp-bytes":
+		return "limit=50000&seconds=1&enable=1" // 50KB
+
+	// ICMP
+	case "icmp-flood":
+		return "limit=50&seconds=1&enable=1"
+	case "icmp-bytes":
+		return "limit=20000&seconds=1&enable=1" // 20KB
+
+	default:
+		return "enable=1"
+	}
 }
 
 // GetActionOptions UI Select용 Action 옵션 목록
 func GetActionOptions() []string {
-	return []string{"DROP", "ACCEPT"}
+	return []string{"DROP", "ACCEPT", "IDS", "IPS"}
 }
 
 // TCPFlagsPreset TCP Flags 프리셋 정의
