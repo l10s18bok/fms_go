@@ -44,20 +44,6 @@ func main() {
 	}
 	defer sqliteStore.Close()
 
-	// JSON → SQLite 마이그레이션 (필요한 경우)
-	if storage.NeedsMigration(configDir, jsonStore, sqliteStore) {
-		log.Println("기존 배포 이력 마이그레이션 시작...")
-		if err := storage.BackupHistoryJSON(configDir); err != nil {
-			log.Printf("백업 실패 (계속 진행): %v", err)
-		}
-		result, err := storage.MigrateHistoryToSQLite(jsonStore, sqliteStore)
-		if err != nil {
-			log.Printf("마이그레이션 실패: %v", err)
-		} else if result.Success {
-			log.Printf("마이그레이션 완료: %d개 이력 이전됨", result.MigratedCount)
-		}
-	}
-
 	// History Repository 생성 (SQLite 사용)
 	historyRepo := repository.NewSQLiteHistoryRepository(sqliteStore)
 
@@ -80,18 +66,7 @@ func main() {
 
 	// 메인 윈도우 생성
 	w := a.NewWindow("FMS - Firewall Management System")
-
-	// 플랫폼에 따른 윈도우 크기 설정
-	// 모바일에서는 Resize가 무시되고 전체화면으로 동작
-	device := fyne.CurrentDevice()
-	if device.IsMobile() {
-		// 모바일: 전체화면 (Resize 호출해도 무시됨)
-		log.Println("모바일 환경 감지됨")
-	} else {
-		// 데스크톱: 지정 크기로 설정
-		w.Resize(fyne.NewSize(1400, 800))
-		log.Println("데스크톱 환경 감지됨")
-	}
+	w.Resize(fyne.NewSize(1400, 800))
 
 	// 메인 UI 생성 및 설정
 	mainUI := ui.NewMainUI(w, jsonStore, fileStore, historyRepo)
