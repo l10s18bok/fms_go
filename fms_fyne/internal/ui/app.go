@@ -739,7 +739,7 @@ func (m *MainUI) showExportDialog() {
 func (m *MainUI) showResetDialog() {
 	// 경고 다이얼로그 표시
 	dialog.ShowConfirm("⚠️ 경고",
-		"모든 데이터(방화벽 파일, 장비, 배포이력, 패키지)를 초기화하시겠습니까?",
+		"모든 데이터(방화벽 파일, 장비, 배포이력, 패키지, 앱설정)를 초기화하시겠습니까?",
 		func(ok bool) {
 			if !ok {
 				return
@@ -765,6 +765,12 @@ func (m *MainUI) showResetDialog() {
 
 			// 모든 패키지 삭제
 			if err := m.store.ClearPrograms(); err != nil {
+				dialog.ShowError(err, m.window)
+				return
+			}
+
+			// 설정 초기화 (기본값으로)
+			if err := m.store.SaveConfig(model.DefaultConfig()); err != nil {
 				dialog.ShowError(err, m.window)
 				return
 			}

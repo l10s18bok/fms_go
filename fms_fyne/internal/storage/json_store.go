@@ -542,15 +542,18 @@ func (s *JSONStore) GetConfigDir() string {
 
 // 설정을 로드합니다.
 func (s *JSONStore) GetConfig() (*model.Config, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	path := filepath.Join(s.configDir, configFile)
 
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		// 설정 파일이 없으면 기본값 반환
-		return model.DefaultConfig(), nil
+		// 설정 파일이 없으면 기본값으로 파일 생성
+		config := model.DefaultConfig()
+		configData, _ := json.MarshalIndent(config, "", "  ")
+		os.WriteFile(path, configData, 0644)
+		return config, nil
 	}
 	if err != nil {
 		return nil, err
