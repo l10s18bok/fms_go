@@ -52,3 +52,6 @@ fms_flutter/build/
 # Go 모듈 파일 (루트에서 제외, 각 프로젝트 내 파일은 추적)
 /go.mod
 /go.sum
+
+# 문서 이미지 (스크린샷 등)
+docs/images/
