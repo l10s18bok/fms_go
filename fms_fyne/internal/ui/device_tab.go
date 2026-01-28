@@ -217,13 +217,15 @@ func (d *DeviceTab) updateStatusSummary() {
 
 // 장비 테이블 패널을 생성합니다. (PRD 3.3.3 기준)
 func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
-	// PRD 테이블 컬럼: 선택, 장비명, 장비 IP, 장비상태, 상태 체크시간, CPU, 메모리, 디스크, 네트워크
+	// PRD 테이블 컬럼: 선택, 장비명, 장비 IP, 위치, 장비상태, OS 정보, 상태 체크시간, CPU, 메모리, 디스크, 네트워크
 	d.deviceTable = component.NewPagedTableWithWindow(component.PagedTableConfig{
 		Columns: []component.ColumnDef{
 			{Header: "선택", Width: 50},
 			{Header: "장비명", Width: 150},
 			{Header: "장비 IP", Width: 150},
+			{Header: "위치", Width: 150},
 			{Header: "장비상태", Width: 80},
+			{Header: "OS 정보", Width: 150},
 			{Header: "상태 체크시간", Width: 150},
 			{Header: "CPU", Width: 70},
 			{Header: "메모리", Width: 70},
@@ -336,33 +338,45 @@ func (d *DeviceTab) updateDeviceCell(row int, col int, cell fyne.CanvasObject) {
 		} else {
 			label.SetText(fw.DeviceName)
 		}
-	case 3: // 장비상태 - OnCustomCell에서 처리
+	case 3: // 위치
+		if fw.Location != "" {
+			label.SetText(fw.Location)
+		} else {
+			label.SetText("-")
+		}
+	case 4: // 장비상태 - OnCustomCell에서 처리
 		// 커스텀 셀에서 처리하므로 여기서는 아무것도 하지 않음
-	case 4: // 상태 체크시간
+	case 5: // OS 정보
+		if fw.OSInfo != "" {
+			label.SetText(fw.OSInfo)
+		} else {
+			label.SetText("-")
+		}
+	case 6: // 상태 체크시간
 		if fw.LastCheckedAt != "" {
 			label.SetText(fw.LastCheckedAt)
 		} else {
 			label.SetText("-")
 		}
-	case 5: // CPU 사용률
+	case 7: // CPU 사용률
 		if fw.ServerStatus == model.ServerStatusRunning && fw.CPUUsage > 0 {
 			label.SetText(fmt.Sprintf("%.1f%%", fw.CPUUsage))
 		} else {
 			label.SetText("-")
 		}
-	case 6: // 메모리 사용률
+	case 8: // 메모리 사용률
 		if fw.ServerStatus == model.ServerStatusRunning && fw.MemoryUsage > 0 {
 			label.SetText(fmt.Sprintf("%.1f%%", fw.MemoryUsage))
 		} else {
 			label.SetText("-")
 		}
-	case 7: // 디스크 사용률
+	case 9: // 디스크 사용률
 		if fw.ServerStatus == model.ServerStatusRunning && fw.DiskUsage > 0 {
 			label.SetText(fmt.Sprintf("%.1f%%", fw.DiskUsage))
 		} else {
 			label.SetText("-")
 		}
-	case 8: // 네트워크
+	case 10: // 네트워크
 		if fw.ServerStatus == model.ServerStatusRunning && fw.NetworkUsage > 0 {
 			label.SetText(fmt.Sprintf("%.2f MB/s", fw.NetworkUsage))
 		} else {
@@ -373,8 +387,8 @@ func (d *DeviceTab) updateDeviceCell(row int, col int, cell fyne.CanvasObject) {
 
 // 커스텀 셀을 업데이트합니다. (장비상태 컬럼에 색상 원 표시)
 func (d *DeviceTab) updateCustomCell(row int, col int, cont *fyne.Container) bool {
-	// 장비상태 컬럼(3)만 커스텀 처리
-	if col != 3 {
+	// 장비상태 컬럼(4)만 커스텀 처리
+	if col != 4 {
 		return false
 	}
 

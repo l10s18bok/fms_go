@@ -21,6 +21,10 @@ type Firewall struct {
 	// 상태 정보 (PRD: lastCheckedAt)
 	LastCheckedAt string `json:"lastCheckedAt,omitempty"` // 마지막 상태 확인 시간
 
+	// 장비 추가 정보
+	Location string `json:"location,omitempty"` // 위치 정보
+	OSInfo   string `json:"osInfo,omitempty"`   // OS 정보
+
 	// 시스템 리소스 정보 (상태 체크 시 업데이트)
 	CPUUsage     float64 `json:"cpuUsage,omitempty"`     // CPU 사용률 (%)
 	MemoryUsage  float64 `json:"memoryUsage,omitempty"`  // 메모리 사용률 (%)
@@ -143,6 +147,8 @@ func (f *Firewall) Clone() *Firewall {
 		DevicePW:           f.DevicePW,
 		DevicePPK:          f.DevicePPK,
 		LastCheckedAt:      f.LastCheckedAt,
+		Location:           f.Location,
+		OSInfo:             f.OSInfo,
 		CPUUsage:           f.CPUUsage,
 		MemoryUsage:        f.MemoryUsage,
 		DiskUsage:          f.DiskUsage,
