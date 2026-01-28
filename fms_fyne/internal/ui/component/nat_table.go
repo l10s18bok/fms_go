@@ -11,6 +11,7 @@ import (
 // NAT 테이블 컬럼 인덱스 상수
 const (
 	natColDelete = iota
+	natColCommand   // INSERT/DELETE
 	natColType
 	natColProto
 	natColSrcIP     // MatchIP (-s)
@@ -19,7 +20,7 @@ const (
 	natColTransPort // TranslatePort
 	natColInIF      // InInterface (-i)
 	natColOutIF     // OutInterface (-o)
-	natColCount     // 총 컬럼 수 = 9
+	natColCount     // 총 컬럼 수 = 10
 )
 
 // NAT 테이블 고정 너비 컬럼 (픽셀)
@@ -53,14 +54,15 @@ func (t *NATTable) createTable() {
 	config := EditableTableConfig{
 		Columns: []EditableTableColumn{
 			{Header: "", Width: natFixedWidthDelete},
+			{Header: "Cmd", WidthRatio: 0.08},
 			{Header: "Type", Width: natFixedWidthType},
 			{Header: "Proto", Width: natFixedWidthProto},
-			{Header: "MatchIP", WidthRatio: 0.18},
-			{Header: "TransIP", WidthRatio: 0.18},
-			{Header: "MatchPort", WidthRatio: 0.10},
-			{Header: "TransPort", WidthRatio: 0.10},
-			{Header: "InIF", WidthRatio: 0.08},
-			{Header: "OutIF", WidthRatio: 0.08},
+			{Header: "MatchIP", WidthRatio: 0.16},
+			{Header: "TransIP", WidthRatio: 0.16},
+			{Header: "MatchPort", WidthRatio: 0.09},
+			{Header: "TransPort", WidthRatio: 0.09},
+			{Header: "InIF", WidthRatio: 0.07},
+			{Header: "OutIF", WidthRatio: 0.07},
 		},
 		GetRowCount: func() int {
 			return len(t.rules)
@@ -88,6 +90,19 @@ func (t *NATTable) getCellConfig(row, col int) EditableCellConfig {
 			Icon: theme.DeleteIcon(),
 			OnTapped: func() {
 				t.RemoveRule(row)
+			},
+		}
+
+	case natColCommand:
+		return EditableCellConfig{
+			Type:     CellTypeSelect,
+			Options:  []string{"INSERT", "DELETE"},
+			Selected: model.CommandToString(rule.Command),
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].Command = model.StringToCommand(value.(string))
+					t.triggerChange()
+				}
 			},
 		}
 

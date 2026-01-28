@@ -401,17 +401,57 @@ const SNATHelpText = `소스 NAT (SNAT) 도움말:
   MatchIP=192.168.1.0/24, TransIP=1.2.3.4, OutIF=eth0
   → 192.168.1.x가 eth0으로 나갈 때 1.2.3.4로 변환`
 
-// FirewallEditExampleText 방화벽 규칙 편집 예시 텍스트
-// Smartfw-manual.docx 문서 기준
-const FirewallEditExampleText = `agent -m=insert -c=INPUT -p=tcp -a=DROP -s=203.248.252.2 --dport=80
-agent -m=insert -c=INPUT -p=any -a=ACCEPT -s=192.168.1.0/24 --dest=10.0.0.1 -i=eth0
-agent -m=insert -s=192.168.30.30 -a=blocklist
-agent -m=insert -s=10.0.0.0/8 -a=whitelist
-agent -m=insert -p="TCP?DNAT" --dest=192.168.0.10:8080 --dport=80 -a=NAT
-agent -m=insert -p="ANY?SNAT" -s=192.168.0.0/24 --dest=203.0.113.10 -a=NAT
-agent -m=insert -p="ANY?SNAT" -s=192.168.0.0/24 -o=eth0 -a=NAT
-agent -m=insert -p="IPS?syn-flood&limit=50&seconds=1&enable=1" -a=IPS
-agent -m=insert -p="IPS?udp-flood&limit=500&seconds=1&enable=1" -a=IPS`
+// FirewallEditExampleText 방화벽 규칙 편집 예시 텍스트 (호환용)
+const FirewallEditExampleText = `./agent -f -I -c INPUT -a ACCEPT -p TCP -n 80
+./agent -f -I -c INPUT -a ACCEPT -p TCP -n 22 -s 192.168.1.0/24
+./agent -f -I -c OUTPUT -a ACCEPT -p TCP -e 10.0.0.1 -n 443
+./agent -f -I -c INPUT -a DROP -p TCP -n 23
+./agent -f -D -c INPUT -a ACCEPT -p TCP -n 80
+./agent -f -I -c FORWARD -a NAT -p TCP -n 80 -s 0.0.0.0/0 -e 192.168.1.10
+./agent -f -I -c FORWARD -a NAT -p TCP -n 443 -i eth0 -o eth1
+./agent -f -I -c FORWARD -a NAT -s 192.168.1.0/24 -e 10.0.0.0/8 -i eth1 -o eth0`
+
+// FirewallExampleRule 방화벽 예시 규칙 구조체
+type FirewallExampleRule struct {
+	Description string // 규칙 설명 (주석)
+	Command     string // 규칙 명령어
+}
+
+// FirewallExampleRules 방화벽 예시 규칙 목록
+var FirewallExampleRules = []FirewallExampleRule{
+	{
+		Description: "HTTP 포트 허용",
+		Command:     "./agent -f -I -c INPUT -a ACCEPT -p TCP -n 80",
+	},
+	{
+		Description: "특정 소스 IP에서 SSH 허용",
+		Command:     "./agent -f -I -c INPUT -a ACCEPT -p TCP -n 22 -s 192.168.1.0/24",
+	},
+	{
+		Description: "특정 목적지로 나가는 트래픽 허용",
+		Command:     "./agent -f -I -c OUTPUT -a ACCEPT -p TCP -e 10.0.0.1 -n 443",
+	},
+	{
+		Description: "Telnet 포트 차단",
+		Command:     "./agent -f -I -c INPUT -a DROP -p TCP -n 23",
+	},
+	{
+		Description: "룰 삭제 (-D 사용)",
+		Command:     "./agent -f -D -c INPUT -a ACCEPT -p TCP -n 80",
+	},
+	{
+		Description: "포트 포워딩 (외부 80 → 내부 서버)",
+		Command:     "./agent -f -I -c FORWARD -a NAT -p TCP -n 80 -s 0.0.0.0/0 -e 192.168.1.10",
+	},
+	{
+		Description: "HTTPS NAT 룰",
+		Command:     "./agent -f -I -c FORWARD -a NAT -p TCP -n 443 -i eth0 -o eth1",
+	},
+	{
+		Description: "내부 네트워크 NAT",
+		Command:     "./agent -f -I -c FORWARD -a NAT -s 192.168.1.0/24 -e 10.0.0.0/8 -i eth1 -o eth0",
+	},
+}
 
 // FirewallFileHelpText 방화벽 룰 관리 도움말
 const FirewallFileHelpText = `

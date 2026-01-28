@@ -76,7 +76,7 @@ func (t *FirewallEditTab) GetFileName() string {
 func (t *FirewallEditTab) createUI() {
 	// 텍스트 편집기
 	t.textEditor = widget.NewMultiLineEntry()
-	t.textEditor.SetPlaceHolder("규칙 내용을 입력하세요...\n\n예시:\nagent -m=insert -c=INPUT -p=tcp --dport=9010 -a=DROP")
+	t.textEditor.SetPlaceHolder("규칙 내용을 입력하세요...")
 	t.textEditor.Wrapping = fyne.TextWrapOff
 	t.textEditor.OnChanged = func(s string) {
 		t.isDirty = true
@@ -88,44 +88,8 @@ func (t *FirewallEditTab) createUI() {
 	// NAT 규칙 빌더
 	t.natBuilder = NewNATBuilder(t.window, nil)
 
-	// 각 줄을 회색 텍스트로 생성 (UI에는 최대 3줄만 표시, 복사는 전체)
-	grayColor := color.RGBA{R: 128, G: 128, B: 128, A: 255}
-	allLines := strings.Split(component.FirewallEditExampleText, "\n")
-	lines := allLines
-	if len(allLines) > 3 {
-		lines = allLines[:3]
-	}
-	textObjects := make([]fyne.CanvasObject, len(lines))
-	for i, line := range lines {
-		text := canvas.NewText(line, grayColor)
-		text.TextStyle = fyne.TextStyle{Monospace: true}
-		textObjects[i] = text
-	}
-
-	// 텍스트를 패딩과 함께 배치
-	textContent := container.NewVBox(textObjects...)
-	paddedText := container.NewPadded(textContent)
-
-	// 테두리 박스 (회색, 라운드)
-	border := canvas.NewRectangle(color.Transparent)
-	border.StrokeColor = grayColor
-	border.StrokeWidth = 1
-	border.CornerRadius = 5
-
-	// 테두리와 텍스트 결합
-	textBox := container.NewStack(border, paddedText)
-
-	// 예시 헤더와 복사 버튼
-	exampleLabel := widget.NewLabel("예시:")
-	copyBtn := widget.NewButton("복사", func() {
-		fyne.CurrentApp().Clipboard().SetContent(component.FirewallEditExampleText)
-	})
-	exampleHeader := container.NewHBox(exampleLabel, copyBtn)
-
-	exampleContainer := container.NewVBox(
-		exampleHeader,
-		textBox,
-	)
+	// 예시 규칙 목록 UI 생성
+	exampleContainer := t.createExampleRulesUI()
 
 	// 텍스트 편집 탭 (편집기 + 예시)
 	textEditContent := container.NewBorder(
@@ -386,4 +350,68 @@ func (t *FirewallEditTab) ResetTabs() {
 	}
 	t.ruleBuilder.ResetTabs()
 	t.natBuilder.ResetTabs()
+}
+
+// createExampleRulesUI 예시 규칙 목록 UI 생성
+func (t *FirewallEditTab) createExampleRulesUI() fyne.CanvasObject {
+	grayColor := color.RGBA{R: 128, G: 128, B: 128, A: 255}
+
+	// 예시 헤더
+	exampleLabel := widget.NewLabelWithStyle("예시 규칙:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+
+	// 각 규칙에 대한 행 생성
+	var rows []fyne.CanvasObject
+	for _, rule := range component.FirewallExampleRules {
+		row := t.createExampleRuleRow(rule, grayColor)
+		rows = append(rows, row)
+	}
+
+	// 규칙 목록을 VBox로 묶기
+	rulesList := container.NewVBox(rows...)
+
+	// 스크롤 가능한 컨테이너
+	scrollContainer := container.NewVScroll(rulesList)
+	scrollContainer.SetMinSize(fyne.NewSize(0, 200))
+
+	// 테두리 박스
+	border := canvas.NewRectangle(color.Transparent)
+	border.StrokeColor = grayColor
+	border.StrokeWidth = 1
+	border.CornerRadius = 5
+
+	// 테두리와 스크롤 컨테이너 결합
+	paddedScroll := container.NewPadded(scrollContainer)
+	rulesBox := container.NewStack(border, paddedScroll)
+
+	return container.NewVBox(
+		exampleLabel,
+		rulesBox,
+	)
+}
+
+// createExampleRuleRow 개별 예시 규칙 행 생성
+func (t *FirewallEditTab) createExampleRuleRow(rule component.FirewallExampleRule, grayColor color.RGBA) fyne.CanvasObject {
+	// 설명 텍스트 (회색, 작은 글씨)
+	descText := canvas.NewText("# "+rule.Description, grayColor)
+	descText.TextSize = 11
+
+	// 명령어 텍스트 (모노스페이스)
+	cmdText := canvas.NewText(rule.Command, grayColor)
+	cmdText.TextStyle = fyne.TextStyle{Monospace: true}
+	cmdText.TextSize = 12
+
+	// 복사 버튼
+	copyBtn := widget.NewButton("복사", func() {
+		fyne.CurrentApp().Clipboard().SetContent(rule.Command)
+		component.ShowSuccessToast(t.window, "클립보드에 복사됨")
+	})
+	copyBtn.Importance = widget.LowImportance
+
+	// 텍스트 영역 (설명 + 명령어)
+	textArea := container.NewVBox(descText, cmdText)
+
+	// 행: 텍스트 영역 + 복사 버튼
+	row := container.NewBorder(nil, nil, nil, copyBtn, textArea)
+
+	return container.NewPadded(row)
 }

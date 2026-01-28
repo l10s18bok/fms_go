@@ -38,6 +38,7 @@ type RuleForm struct {
 	onAdd func(*model.FirewallRule)
 
 	// UI 요소
+	commandSel     *FixedWidthSelect // INSERT/DELETE
 	chainSel       *FixedWidthSelect
 	protoSel       *FixedWidthSelect
 	actionSel      *FixedWidthSelect
@@ -92,6 +93,9 @@ func (f *RuleForm) createUI() {
 	// 드롭다운 고정 너비
 	selectWidth := float32(100)
 
+	// Command 선택 (INSERT/DELETE)
+	f.commandSel = NewFixedWidthSelect([]string{"INSERT", "DELETE"}, nil, 120)
+
 	// Chain 선택
 	f.chainSel = NewFixedWidthSelect(model.GetChainOptions(), nil, selectWidth)
 
@@ -144,16 +148,18 @@ func (f *RuleForm) createUI() {
 	labelWidth := float32(50)
 	rowHeight := float32(36)
 
-	// 첫 번째 행: Chain, Protocol, Action, DPort
+	// 첫 번째 행: Command, Chain, Protocol, Action, DPort
 	row1 := container.NewHBox(
+		container.NewGridWrap(fyne.NewSize(35, rowHeight), widget.NewLabel("Cmd:")),
+		container.NewGridWrap(fyne.NewSize(120, rowHeight), f.commandSel),
 		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Chain:")),
 		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.chainSel),
 		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Proto:")),
 		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.protoSel),
 		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Action:")),
 		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.actionSel),
-		container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("Port:")),
-		container.NewGridWrap(fyne.NewSize(140, rowHeight), f.dportEntry),
+		container.NewGridWrap(fyne.NewSize(40, rowHeight), widget.NewLabel("Port:")),
+		container.NewGridWrap(fyne.NewSize(100, rowHeight), f.dportEntry),
 	)
 
 	// 두 번째 행: SIP, DIP
@@ -627,6 +633,7 @@ func (f *RuleForm) getIPSOptions() string {
 // 성공 시 true, 실패 시 false 반환
 func (f *RuleForm) SubmitRule() bool {
 	rule := &model.FirewallRule{
+		Command:      model.StringToCommand(f.commandSel.Selected),
 		Chain:        model.StringToChain(f.chainSel.Selected),
 		Protocol:     model.StringToProtocol(f.protoSel.Selected),
 		Action:       model.StringToAction(f.actionSel.Selected),
@@ -674,6 +681,7 @@ func (f *RuleForm) SubmitRule() bool {
 
 // Reset 폼 초기화
 func (f *RuleForm) Reset() {
+	f.commandSel.SetSelected("INSERT")
 	f.chainSel.SetSelected("INPUT")
 	f.protoSel.SetSelected("tcp")
 	f.actionSel.SetSelected("DROP")

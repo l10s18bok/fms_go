@@ -15,6 +15,7 @@ type SNATForm struct {
 	onAdd func(*model.NATRule)
 
 	// UI 요소
+	commandSel   *FixedWidthSelect // INSERT/DELETE
 	protoSel     *FixedWidthSelect // 프로토콜
 	matchIPEntry *widget.Entry     // MatchIP
 	outIfEntry   *widget.Entry     // OutIF (출력 인터페이스)
@@ -36,6 +37,9 @@ func NewSNATForm(onAdd func(*model.NATRule)) *SNATForm {
 
 // createUI UI 생성
 func (f *SNATForm) createUI() {
+	// Command 선택 (INSERT/DELETE)
+	f.commandSel = NewFixedWidthSelect([]string{"INSERT", "DELETE"}, nil, 120)
+
 	// 프로토콜 선택
 	f.protoSel = NewFixedWidthSelect(model.GetProtocolOptions(), nil, float32(80))
 
@@ -59,11 +63,13 @@ func (f *SNATForm) createUI() {
 		f.showSNATHelp()
 	})
 
-	// 첫 번째 행: Proto, MatchIP, ? (오른쪽 끝)
+	// 첫 번째 행: Cmd, Proto, MatchIP, ? (오른쪽 끝)
 	row1 := container.NewBorder(
 		nil, nil, nil,
 		helpBtn, // 오른쪽 끝에 도움말 버튼
 		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(35, rowHeight), widget.NewLabel("Cmd:")),
+			container.NewGridWrap(fyne.NewSize(120, rowHeight), f.commandSel),
 			container.NewGridWrap(fyne.NewSize(50, rowHeight), widget.NewLabel("Proto:")),
 			container.NewGridWrap(fyne.NewSize(80, rowHeight), f.protoSel),
 			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("MatchIP:")),
@@ -97,6 +103,7 @@ func (f *SNATForm) showSNATHelp() {
 // 성공 시 true, 실패 시 false 반환
 func (f *SNATForm) SubmitRule() bool {
 	rule := &model.NATRule{
+		Command:      model.StringToCommand(f.commandSel.Selected),
 		NATType:      model.NATTypeSNAT,
 		Protocol:     model.StringToProtocol(f.protoSel.Selected),
 		MatchIP:      f.matchIPEntry.Text,
@@ -114,6 +121,7 @@ func (f *SNATForm) SubmitRule() bool {
 
 // Reset 폼 초기화
 func (f *SNATForm) Reset() {
+	f.commandSel.SetSelected("INSERT")
 	f.protoSel.SetSelected("tcp")
 	f.matchIPEntry.SetText("")
 	f.outIfEntry.SetText("")

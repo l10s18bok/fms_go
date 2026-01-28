@@ -12,6 +12,7 @@ import (
 // 컬럼 인덱스 상수
 const (
 	colDelete = iota
+	colCommand // INSERT/DELETE
 	colChain
 	colProto
 	colOptions
@@ -23,7 +24,7 @@ const (
 	colOutIF // 출력 인터페이스 (-o)
 	colBlack
 	colWhite
-	colCount // 총 컬럼 수 = 12
+	colCount // 총 컬럼 수 = 13
 )
 
 // 고정 너비 컬럼 (픽셀)
@@ -57,13 +58,14 @@ func (t *RuleTable) createTable() {
 	config := EditableTableConfig{
 		Columns: []EditableTableColumn{
 			{Header: "", Width: fixedWidthDelete},
-			{Header: "Chain", WidthRatio: 0.10},
-			{Header: "Proto", WidthRatio: 0.08},
-			{Header: "Options", WidthRatio: 0.12},
-			{Header: "Action", WidthRatio: 0.10},
-			{Header: "Port", WidthRatio: 0.08},
-			{Header: "SIP", WidthRatio: 0.16},
-			{Header: "DIP", WidthRatio: 0.16},
+			{Header: "Cmd", WidthRatio: 0.07},
+			{Header: "Chain", WidthRatio: 0.09},
+			{Header: "Proto", WidthRatio: 0.07},
+			{Header: "Options", WidthRatio: 0.11},
+			{Header: "Action", WidthRatio: 0.08},
+			{Header: "Port", WidthRatio: 0.07},
+			{Header: "SIP", WidthRatio: 0.15},
+			{Header: "DIP", WidthRatio: 0.15},
 			{Header: "InIF", WidthRatio: 0.06},
 			{Header: "OutIF", WidthRatio: 0.06},
 			{Header: "Black", Width: fixedWidthBlack},
@@ -95,6 +97,19 @@ func (t *RuleTable) getCellConfig(row, col int) EditableCellConfig {
 			Icon: theme.DeleteIcon(),
 			OnTapped: func() {
 				t.RemoveRule(row)
+			},
+		}
+
+	case colCommand:
+		return EditableCellConfig{
+			Type:     CellTypeSelect,
+			Options:  []string{"INSERT", "DELETE"},
+			Selected: model.CommandToString(rule.Command),
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].Command = model.StringToCommand(value.(string))
+					t.triggerChange()
+				}
 			},
 		}
 

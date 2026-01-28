@@ -17,6 +17,7 @@ type DNATForm struct {
 	onAdd func(*model.NATRule)
 
 	// UI 요소
+	commandSel     *FixedWidthSelect // INSERT/DELETE
 	protoSel       *FixedWidthSelect // 프로토콜
 	matchPortEntry *widget.Entry     // 매칭 포트 (MatchPort)
 	matchIPEntry   *widget.Entry     // 매칭 IP (MatchIP)
@@ -41,6 +42,9 @@ func NewDNATForm(onAdd func(*model.NATRule)) *DNATForm {
 // createUI UI 생성
 func (f *DNATForm) createUI() {
 	selectWidth := float32(100)
+
+	// Command 선택 (INSERT/DELETE)
+	f.commandSel = NewFixedWidthSelect([]string{"INSERT", "DELETE"}, nil, 120)
 
 	// 프로토콜 선택
 	f.protoSel = NewFixedWidthSelect(model.GetProtocolOptions(), nil, selectWidth)
@@ -89,17 +93,19 @@ func (f *DNATForm) createUI() {
 		f.showDNATHelp()
 	})
 
-	// 첫 번째 행: Proto, MatchPort, MatchIP, ? (오른쪽 끝)
+	// 첫 번째 행: Cmd, Proto, MatchPort, MatchIP, ? (오른쪽 끝)
 	row1 := container.NewBorder(
 		nil, nil, nil,
 		helpBtn, // 오른쪽 끝에 도움말 버튼
 		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(35, rowHeight), widget.NewLabel("Cmd:")),
+			container.NewGridWrap(fyne.NewSize(120, rowHeight), f.commandSel),
 			container.NewGridWrap(fyne.NewSize(50, rowHeight), widget.NewLabel("Proto:")),
-			container.NewGridWrap(fyne.NewSize(100, rowHeight), f.protoSel),
+			container.NewGridWrap(fyne.NewSize(80, rowHeight), f.protoSel),
 			container.NewGridWrap(fyne.NewSize(85, rowHeight), widget.NewLabel("MatchPort:")),
-			container.NewGridWrap(fyne.NewSize(140, rowHeight), f.matchPortEntry),
+			container.NewGridWrap(fyne.NewSize(100, rowHeight), f.matchPortEntry),
 			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("MatchIP:")),
-			container.NewGridWrap(fyne.NewSize(170, rowHeight), f.matchIPEntry),
+			container.NewGridWrap(fyne.NewSize(150, rowHeight), f.matchIPEntry),
 			layout.NewSpacer(),
 		),
 	)
@@ -153,6 +159,7 @@ func (f *DNATForm) SubmitRule() bool {
 	}
 
 	rule := &model.NATRule{
+		Command:       model.StringToCommand(f.commandSel.Selected),
 		NATType:       model.NATTypeDNAT,
 		Protocol:      model.StringToProtocol(f.protoSel.Selected),
 		MatchIP:       matchIP,
@@ -173,6 +180,7 @@ func (f *DNATForm) SubmitRule() bool {
 
 // Reset 폼 초기화
 func (f *DNATForm) Reset() {
+	f.commandSel.SetSelected("INSERT")
 	f.protoSel.SetSelected("tcp")
 	f.matchPortEntry.SetText("")
 	f.matchIPEntry.SetText("")

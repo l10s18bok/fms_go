@@ -89,7 +89,7 @@ func (d *RuleAddDialog) createUI() {
 	)
 
 	// 고정 크기 컨테이너
-	sizedContent := container.NewGridWrap(fyne.NewSize(700, 400), content)
+	sizedContent := container.NewGridWrap(fyne.NewSize(800, 400), content)
 
 	// 팝업 생성 (처음에는 숨김)
 	d.popup = widget.NewModalPopUp(sizedContent, d.window.Canvas())
