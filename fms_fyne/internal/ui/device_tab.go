@@ -1636,6 +1636,10 @@ func (d *DeviceTab) startAutoStatusCheck() {
 	d.autoCheckTicker = time.NewTicker(time.Duration(d.autoCheckInterval) * time.Second)
 
 	go func() {
+		// 시작 직후 바로 상태 체크 수행
+		log.Printf("[DEBUG] startAutoStatusCheck: 초기 상태 체크 수행")
+		d.performAutoStatusCheck()
+
 		for {
 			select {
 			case <-d.stopAutoCheck:
@@ -1727,12 +1731,9 @@ func (d *DeviceTab) onToggleAutoCheck() {
 	d.updateAutoCheckButton(newEnabled)
 	d.SetAutoStatusCheck(newEnabled, config.GetStatusCheckInterval())
 
-	// 토스트 메시지
-	if newEnabled {
-		component.ShowSuccessToast(d.window, "자동 상태 체크 활성화")
-	} else {
-		component.ShowSuccessToast(d.window, "자동 상태 체크 비활성화")
-	}
+	// 참고: Toast 대신 버튼 아이콘(Play/Pause)과 상태 박스 테두리 색상(회색/주황)으로
+	// 상태 변경을 표시합니다. Toast 사용 시 fyne-tooltip과 ModalPopUp 간 충돌로
+	// "no tool tip layer created for current overlay" 오류가 발생합니다.
 }
 
 // 자동 상태 체크 버튼 아이콘과 툴팁을 업데이트합니다.
