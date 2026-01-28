@@ -141,16 +141,23 @@ FMS 클라이언트 → 방화벽 장비 (직접 연결)
 
 ## 템플릿 규칙 포맷
 
-규칙은 Agent 서버를 통해 방화벽 장비의 `/proc/smartfw` 커널 모듈로 전달됩니다.
+규칙은 Agent 명령어 형식으로 장비에 전달됩니다.
 
+### 일반 방화벽 규칙
 ```
-req|INSERT|{ID}|{CHAIN}|{ACTION}|{PROTOCOL}|{SRC}|{DST}|{옵션들}
+./agent -f -I -c {CHAIN} -a {ACTION} -p {PROTOCOL} -s {SRC} -d {DST} --dport {PORT}
+```
+
+### NAT 규칙
+```
+./agent -f -I -a NAT -p {PROTOCOL}?{NAT_TYPE} -s {SRC} --dest {DEST_IP} --dport {PORT}
 ```
 
 ### 예시
 ```
-req|INSERT|3813792919|INPUT|FLUSH|ANY|ANY|ANY|||
-req|INSERT|3813792919|INPUT|ACCEPT|TCP|192.168.1.0/24|ANY|80||
+./agent -f -I -c INPUT -a ACCEPT -p tcp -s 192.168.1.0/24 --dport 80
+./agent -f -I -a NAT -p tcp?DNAT --dest 192.168.30.180 --dport 6080 --to-port 8080
+./agent -f -I -a NAT -p tcp?SNAT -s 192.168.1.0/24 --dest 203.0.113.1
 ```
 
 ---

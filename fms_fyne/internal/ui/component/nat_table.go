@@ -25,9 +25,10 @@ const (
 
 // NAT 테이블 고정 너비 컬럼 (픽셀)
 const (
-	natFixedWidthDelete = 36  // 삭제 버튼
-	natFixedWidthType   = 100 // NAT 타입
-	natFixedWidthProto  = 70  // 프로토콜
+	natFixedWidthDelete  = 36  // 삭제 버튼
+	natFixedWidthCommand = 100 // Command (INSERT/DELETE)
+	natFixedWidthType    = 120 // NAT 타입 (SNAT/DNAT/MASQUERADE)
+	natFixedWidthProto   = 100 // 프로토콜 (TCP/UDP/ANY)
 )
 
 // NATTable EditableTable 기반 NAT 규칙 테이블
@@ -54,15 +55,15 @@ func (t *NATTable) createTable() {
 	config := EditableTableConfig{
 		Columns: []EditableTableColumn{
 			{Header: "", Width: natFixedWidthDelete},
-			{Header: "Cmd", WidthRatio: 0.08},
+			{Header: "Cmd", Width: natFixedWidthCommand},
 			{Header: "Type", Width: natFixedWidthType},
 			{Header: "Proto", Width: natFixedWidthProto},
-			{Header: "MatchIP", WidthRatio: 0.16},
-			{Header: "TransIP", WidthRatio: 0.16},
-			{Header: "MatchPort", WidthRatio: 0.09},
-			{Header: "TransPort", WidthRatio: 0.09},
-			{Header: "InIF", WidthRatio: 0.07},
-			{Header: "OutIF", WidthRatio: 0.07},
+			{Header: "MatchIP", WidthRatio: 0.18},
+			{Header: "TransIP", WidthRatio: 0.18},
+			{Header: "MatchPort", WidthRatio: 0.10},
+			{Header: "TransPort", WidthRatio: 0.10},
+			{Header: "InIF", WidthRatio: 0.08},
+			{Header: "OutIF", WidthRatio: 0.08},
 		},
 		GetRowCount: func() int {
 			return len(t.rules)
@@ -108,80 +109,106 @@ func (t *NATTable) getCellConfig(row, col int) EditableCellConfig {
 
 	case natColType:
 		return EditableCellConfig{
-			Type: CellTypeLabel,
-			Text: model.NATTypeToString(rule.NATType),
+			Type:     CellTypeSelect,
+			Options:  []string{"SNAT", "DNAT", "MASQUERADE"},
+			Selected: model.NATTypeToString(rule.NATType),
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].NATType = model.StringToNATType(value.(string))
+					t.triggerChange()
+				}
+			},
 		}
 
 	case natColProto:
 		return EditableCellConfig{
-			Type: CellTypeLabel,
-			Text: model.ProtocolToString(rule.Protocol),
+			Type:     CellTypeSelect,
+			Options:  []string{"tcp", "udp", "any"},
+			Selected: model.ProtocolToString(rule.Protocol),
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].Protocol = model.StringToProtocol(value.(string))
+					t.triggerChange()
+				}
+			},
 		}
 
 	case natColSrcIP:
 		// 소스 IP (-s)
-		srcIP := rule.MatchIP
-		if srcIP == "" {
-			srcIP = "-"
-		}
 		return EditableCellConfig{
-			Type: CellTypeLabel,
-			Text: srcIP,
+			Type: CellTypeEntry,
+			Text: rule.MatchIP,
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].MatchIP = value.(string)
+					t.triggerChange()
+				}
+			},
 		}
 
 	case natColDstIP:
 		// 목적지 IP (--dest)
-		dstIP := rule.TranslateIP
-		if dstIP == "" {
-			dstIP = "-"
-		}
 		return EditableCellConfig{
-			Type: CellTypeLabel,
-			Text: dstIP,
+			Type: CellTypeEntry,
+			Text: rule.TranslateIP,
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].TranslateIP = value.(string)
+					t.triggerChange()
+				}
+			},
 		}
 
 	case natColDPort:
 		// 매칭 포트 (--dport)
-		dport := rule.MatchPort
-		if dport == "" {
-			dport = "-"
-		}
 		return EditableCellConfig{
-			Type: CellTypeLabel,
-			Text: dport,
+			Type: CellTypeEntry,
+			Text: rule.MatchPort,
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].MatchPort = value.(string)
+					t.triggerChange()
+				}
+			},
 		}
 
 	case natColTransPort:
 		// 변환 포트
-		tport := rule.TranslatePort
-		if tport == "" {
-			tport = "-"
-		}
 		return EditableCellConfig{
-			Type: CellTypeLabel,
-			Text: tport,
+			Type: CellTypeEntry,
+			Text: rule.TranslatePort,
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].TranslatePort = value.(string)
+					t.triggerChange()
+				}
+			},
 		}
 
 	case natColInIF:
 		// 입력 인터페이스 (-i)
-		inIF := rule.InInterface
-		if inIF == "" {
-			inIF = "-"
-		}
 		return EditableCellConfig{
-			Type: CellTypeLabel,
-			Text: inIF,
+			Type: CellTypeEntry,
+			Text: rule.InInterface,
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].InInterface = value.(string)
+					t.triggerChange()
+				}
+			},
 		}
 
 	case natColOutIF:
 		// 출력 인터페이스 (-o)
-		outIF := rule.OutInterface
-		if outIF == "" {
-			outIF = "-"
-		}
 		return EditableCellConfig{
-			Type: CellTypeLabel,
-			Text: outIF,
+			Type: CellTypeEntry,
+			Text: rule.OutInterface,
+			OnChanged: func(value any) {
+				if row < len(t.rules) {
+					t.rules[row].OutInterface = value.(string)
+					t.triggerChange()
+				}
+			},
 		}
 	}
 
