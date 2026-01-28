@@ -306,15 +306,7 @@ func (m *MainUI) showSettingsDialog() {
 	firewallDeployPortEntry.SetText(strconv.Itoa(config.FirewallDeployPort))
 	firewallDeployPortEntry.SetPlaceHolder(strconv.Itoa(model.DefaultAPIPort))
 
-	// 장비 상태 체크 경로/포트
-	healthCheckPathEntry := widget.NewEntry()
-	healthCheckPathEntry.SetText(config.HealthCheckPath)
-	healthCheckPathEntry.SetPlaceHolder(model.DefaultHealthCheckPath)
-	healthCheckPortEntry := widget.NewEntry()
-	healthCheckPortEntry.SetText(strconv.Itoa(config.HealthCheckPort))
-	healthCheckPortEntry.SetPlaceHolder(strconv.Itoa(model.DefaultAPIPort))
-
-	// 장비 상세보기 경로/포트
+	// 장비 상세보기 및 상태 체크 경로/포트
 	deviceInfoPathEntry := widget.NewEntry()
 	deviceInfoPathEntry.SetText(config.DeviceInfoPath)
 	deviceInfoPathEntry.SetPlaceHolder(model.DefaultDeviceInfoPath)
@@ -346,8 +338,7 @@ func (m *MainUI) showSettingsDialog() {
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
 		widget.NewFormItem("패키지 업데이트 요청", makePathPortRow(programUpdatePathEntry, programUpdatePortEntry)),
 		widget.NewFormItem("방화벽 규칙 배포", makePathPortRow(firewallDeployPathEntry, firewallDeployPortEntry)),
-		widget.NewFormItem("장비 상태 체크", makePathPortRow(healthCheckPathEntry, healthCheckPortEntry)),
-		widget.NewFormItem("장비 상세보기", makePathPortRow(deviceInfoPathEntry, deviceInfoPortEntry)),
+		widget.NewFormItem("장비 보고", makePathPortRow(deviceInfoPathEntry, deviceInfoPortEntry)),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
 		widget.NewFormItem("설정 저장 경로", configPathLabel),
 	}
@@ -376,11 +367,6 @@ func (m *MainUI) showSettingsDialog() {
 			dialog.ShowError(fmt.Errorf("방화벽 배포 포트는 1~65535 사이의 숫자를 입력해주세요"), m.window)
 			return
 		}
-		healthCheckPort, err := strconv.Atoi(healthCheckPortEntry.Text)
-		if err != nil || healthCheckPort < 1 || healthCheckPort > 65535 {
-			dialog.ShowError(fmt.Errorf("장비 상태 체크 포트는 1~65535 사이의 숫자를 입력해주세요"), m.window)
-			return
-		}
 		deviceInfoPort, err := strconv.Atoi(deviceInfoPortEntry.Text)
 		if err != nil || deviceInfoPort < 1 || deviceInfoPort > 65535 {
 			dialog.ShowError(fmt.Errorf("장비 상세보기 포트는 1~65535 사이의 숫자를 입력해주세요"), m.window)
@@ -404,8 +390,6 @@ func (m *MainUI) showSettingsDialog() {
 			ProgramUpdatePort:   programUpdatePort,
 			FirewallDeployPath:  firewallDeployPathEntry.Text,
 			FirewallDeployPort:  firewallDeployPort,
-			HealthCheckPath:     healthCheckPathEntry.Text,
-			HealthCheckPort:     healthCheckPort,
 			DeviceInfoPath:      deviceInfoPathEntry.Text,
 			DeviceInfoPort:      deviceInfoPort,
 		}

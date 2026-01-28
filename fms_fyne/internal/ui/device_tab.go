@@ -60,8 +60,8 @@ type DeviceTab struct {
 	autoCheckInterval int
 	autoCheckTicker   *time.Ticker
 	stopAutoCheck     chan struct{}
-	statusBorder *canvas.Rectangle  // 상태 박스 테두리
-	autoCheckBtn *ttwidget.Button   // 자동 상태 체크 토글 버튼
+	statusBorder      *canvas.Rectangle // 상태 박스 테두리
+	autoCheckBtn      *ttwidget.Button  // 자동 상태 체크 토글 버튼
 }
 
 // 새로운 장비 관리 탭을 생성합니다.
@@ -482,11 +482,6 @@ func (d *DeviceTab) showAddEditDialog() {
 	firewallDeployPortEntry := widget.NewEntry()
 	firewallDeployPortEntry.SetPlaceHolder("8080")
 
-	healthCheckPathEntry := widget.NewEntry()
-	healthCheckPathEntry.SetPlaceHolder("/agent/respCheck")
-	healthCheckPortEntry := widget.NewEntry()
-	healthCheckPortEntry.SetPlaceHolder("8080")
-
 	deviceInfoPathEntry := widget.NewEntry()
 	deviceInfoPathEntry.SetPlaceHolder("/device-report")
 	deviceInfoPortEntry := widget.NewEntry()
@@ -557,10 +552,6 @@ func (d *DeviceTab) showAddEditDialog() {
 		if editingFw.FirewallDeployPort > 0 {
 			firewallDeployPortEntry.SetText(fmt.Sprintf("%d", editingFw.FirewallDeployPort))
 		}
-		healthCheckPathEntry.SetText(editingFw.HealthCheckPath)
-		if editingFw.HealthCheckPort > 0 {
-			healthCheckPortEntry.SetText(fmt.Sprintf("%d", editingFw.HealthCheckPort))
-		}
 		deviceInfoPathEntry.SetText(editingFw.DeviceInfoPath)
 		if editingFw.DeviceInfoPort > 0 {
 			deviceInfoPortEntry.SetText(fmt.Sprintf("%d", editingFw.DeviceInfoPort))
@@ -585,10 +576,6 @@ func (d *DeviceTab) showAddEditDialog() {
 			firewallDeployPathEntry.SetText(config.FirewallDeployPath)
 			if config.FirewallDeployPort > 0 {
 				firewallDeployPortEntry.SetText(fmt.Sprintf("%d", config.FirewallDeployPort))
-			}
-			healthCheckPathEntry.SetText(config.HealthCheckPath)
-			if config.HealthCheckPort > 0 {
-				healthCheckPortEntry.SetText(fmt.Sprintf("%d", config.HealthCheckPort))
 			}
 			deviceInfoPathEntry.SetText(config.DeviceInfoPath)
 			if config.DeviceInfoPort > 0 {
@@ -657,15 +644,7 @@ func (d *DeviceTab) showAddEditDialog() {
 			container.NewGridWrap(fyne.NewSize(portEntryWidth, rowHeight), firewallDeployPortEntry),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing/2), layout.NewSpacer()), // 간격
-		// 서버 상태 체크
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), widget.NewLabel("상태체크:")),
-			container.NewGridWrap(fyne.NewSize(pathEntryWidth, rowHeight), healthCheckPathEntry),
-			widget.NewLabel("포트:"),
-			container.NewGridWrap(fyne.NewSize(portEntryWidth, rowHeight), healthCheckPortEntry),
-		),
-		container.NewGridWrap(fyne.NewSize(1, rowSpacing/2), layout.NewSpacer()), // 간격
-		// 장비 상세보기
+		// 장비 상세보기 (상태체크 포함)
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), widget.NewLabel("상세보기:")),
 			container.NewGridWrap(fyne.NewSize(pathEntryWidth, rowHeight), deviceInfoPathEntry),
@@ -729,12 +708,6 @@ func (d *DeviceTab) showAddEditDialog() {
 		if firewallDeployPortEntry.Text != "" {
 			if port, err := strconv.Atoi(firewallDeployPortEntry.Text); err == nil {
 				fw.FirewallDeployPort = port
-			}
-		}
-		fw.HealthCheckPath = healthCheckPathEntry.Text
-		if healthCheckPortEntry.Text != "" {
-			if port, err := strconv.Atoi(healthCheckPortEntry.Text); err == nil {
-				fw.HealthCheckPort = port
 			}
 		}
 		fw.DeviceInfoPath = deviceInfoPathEntry.Text
@@ -895,21 +868,6 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		firewallDeployPort = model.DefaultAPIPort
 	}
 
-	healthCheckPath := fw.HealthCheckPath
-	if healthCheckPath == "" && config != nil {
-		healthCheckPath = config.HealthCheckPath
-	}
-	if healthCheckPath == "" {
-		healthCheckPath = model.DefaultHealthCheckPath
-	}
-	healthCheckPort := fw.HealthCheckPort
-	if healthCheckPort == 0 && config != nil {
-		healthCheckPort = config.HealthCheckPort
-	}
-	if healthCheckPort == 0 {
-		healthCheckPort = model.DefaultAPIPort
-	}
-
 	deviceInfoPath := fw.DeviceInfoPath
 	if deviceInfoPath == "" && config != nil {
 		deviceInfoPath = config.DeviceInfoPath
@@ -1004,12 +962,7 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("방화벽 배포:")),
 			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s, 포트:%d", firewallDeployPath, firewallDeployPort))),
 		),
-		// 상태체크
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("상태체크:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s, 포트:%d", healthCheckPath, healthCheckPort))),
-		),
-		// 상세보기
+		// 상세보기 (상태체크 포함)
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("상세보기:")),
 			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s, 포트:%d", deviceInfoPath, deviceInfoPort))),
@@ -1026,44 +979,6 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
 	)
-
-	// 프로세스 리스트 컨테이너 (API 호출 성공 시에만 표시) - 임시 주석처리
-	// var processListContainer fyne.CanvasObject
-	// if len(processes) > 0 {
-	// 	// 프로세스 리스트 생성
-	// 	processList := widget.NewList(
-	// 		func() int {
-	// 			return len(processes)
-	// 		},
-	// 		func() fyne.CanvasObject {
-	// 			return container.NewHBox(
-	// 				widget.NewLabel("이름"),
-	// 				layout.NewSpacer(),
-	// 				widget.NewLabel("버전"),
-	// 			)
-	// 		},
-	// 		func(id widget.ListItemID, obj fyne.CanvasObject) {
-	// 			cont := obj.(*fyne.Container)
-	// 			nameLabel := cont.Objects[0].(*widget.Label)
-	// 			versionLabel := cont.Objects[2].(*widget.Label)
-	// 			if id < len(processes) {
-	// 				nameLabel.SetText(processes[id].Name)
-	// 				versionLabel.SetText(processes[id].Version)
-	// 			}
-	// 		},
-	// 	)
-	// 	processList.Resize(fyne.NewSize(280, float32(len(processes)*35)))
-
-	// 	processListContainer = container.NewVBox(
-	// 		// 프로세스 정보 라벨
-	// 		container.NewHBox(
-	// 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("프로세스:")),
-	// 		),
-	// 		// 프로세스 리스트
-	// 		container.NewGridWrap(fyne.NewSize(300, float32(len(processes)*35+10)), processList),
-	// 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
-	// 	)
-	// }
 
 	// 확인 버튼
 	confirmBtn := component.NewCustomButton("확인", nil, nil, themes.Colors["blue"], func() {
@@ -1083,10 +998,6 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
 		formContent,
 	}
-	// 프로세스 리스트가 있으면 추가 - 임시 주석처리
-	// if processListContainer != nil {
-	// 	contentItems = append(contentItems, processListContainer)
-	// }
 	contentItems = append(contentItems,
 		btnContainer,
 		container.NewGridWrap(fyne.NewSize(1, 15), layout.NewSpacer()),
@@ -1095,9 +1006,6 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 
 	// 다이얼로그 높이 계산 (프로세스 리스트 유무에 따라) - 임시 주석처리
 	dialogHeight := float32(640)
-	// if len(processes) > 0 {
-	// 	dialogHeight += float32(len(processes)*35 + 60)
-	// }
 
 	// 고정 크기 컨테이너
 	paddedContent := container.New(layout.NewCustomPaddedLayout(15, 15, 15, 15), content)

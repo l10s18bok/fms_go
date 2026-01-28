@@ -57,21 +57,21 @@ func (c *Client) CheckHealthDirect(fw *model.Firewall) (bool, error) {
 	}
 
 	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
-	port := fw.HealthCheckPort
+	port := fw.DeviceInfoPort
 	if port == 0 {
-		port = c.config.HealthCheckPort
+		port = c.config.DeviceInfoPort
 	}
 	if port == 0 {
 		port = model.DefaultAPIPort
 	}
 
 	// 경로 결정 (장비별 설정 > 전역 설정 > 기본값)
-	path := fw.HealthCheckPath
+	path := fw.DeviceInfoPath
 	if path == "" {
-		path = c.config.HealthCheckPath
+		path = c.config.DeviceInfoPath
 	}
 	if path == "" {
-		path = model.DefaultHealthCheckPath
+		path = model.DefaultDeviceInfoPath
 	}
 
 	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
