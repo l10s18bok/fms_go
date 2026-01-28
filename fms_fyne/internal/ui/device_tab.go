@@ -248,7 +248,7 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 				d.showDetailDialog(d.filteredFirewalls[row])
 			}
 		},
-		// 장비명(1)과 장비 IP(2) 컬럼 인라인 편집 설정
+		// 장비명(1), 장비 IP(2), 위치(3), OS정보(5) 컬럼 인라인 편집 설정
 		EditableColumns: map[int]component.EditColumnConfig{
 			1: { // 장비명 컬럼
 				Type: component.EditTypeEntry,
@@ -299,6 +299,48 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 						}
 						fw := d.filteredFirewalls[row]
 						fw.DeviceIP = newValue
+						if err := d.store.SaveFirewall(fw); err != nil {
+							dialog.ShowError(err, d.window)
+							return false
+						}
+						return true
+					}
+					return false
+				},
+			},
+			3: { // 위치 컬럼
+				Type: component.EditTypeEntry,
+				GetValue: func(row int) string {
+					if row >= 0 && row < len(d.filteredFirewalls) {
+						return d.filteredFirewalls[row].Location
+					}
+					return ""
+				},
+				OnEdit: func(row int, oldValue, newValue string) bool {
+					if row >= 0 && row < len(d.filteredFirewalls) {
+						fw := d.filteredFirewalls[row]
+						fw.Location = newValue
+						if err := d.store.SaveFirewall(fw); err != nil {
+							dialog.ShowError(err, d.window)
+							return false
+						}
+						return true
+					}
+					return false
+				},
+			},
+			5: { // OS 정보 컬럼
+				Type: component.EditTypeEntry,
+				GetValue: func(row int) string {
+					if row >= 0 && row < len(d.filteredFirewalls) {
+						return d.filteredFirewalls[row].OSInfo
+					}
+					return ""
+				},
+				OnEdit: func(row int, oldValue, newValue string) bool {
+					if row >= 0 && row < len(d.filteredFirewalls) {
+						fw := d.filteredFirewalls[row]
+						fw.OSInfo = newValue
 						if err := d.store.SaveFirewall(fw); err != nil {
 							dialog.ShowError(err, d.window)
 							return false
@@ -487,15 +529,21 @@ func (d *DeviceTab) showAddEditDialog() {
 
 	// 입력 필드 너비
 	entryWidth := float32(250)
-	rowHeight := float32(36)
+	rowHeight := float32(32)
 	labelWidth := float32(80)
-	rowSpacing := float32(20) // 라인 간격 2배
+	rowSpacing := float32(8) // 라인 간격
 
 	deviceNameEntry := widget.NewEntry()
 	deviceNameEntry.SetPlaceHolder("장비 이름")
 
 	serverIPEntry := widget.NewEntry()
 	serverIPEntry.SetPlaceHolder("192.168.1.1 또는 192.168.1.1:8080")
+
+	locationEntry := widget.NewEntry()
+	locationEntry.SetPlaceHolder("예: 서버실 1층")
+
+	osInfoEntry := widget.NewEntry()
+	osInfoEntry.SetPlaceHolder("예: Ubuntu 22.04")
 
 	// 배포 경로 필드들
 	pathEntryWidth := float32(150)
@@ -575,6 +623,8 @@ func (d *DeviceTab) showAddEditDialog() {
 		} else {
 			serverIPEntry.SetText(editingFw.DeviceName) // 기존 데이터 호환
 		}
+		locationEntry.SetText(editingFw.Location)
+		osInfoEntry.SetText(editingFw.OSInfo)
 		// 배포 경로 필드
 		programUploadPathEntry.SetText(editingFw.ProgramUploadPath)
 		programUpdatePathEntry.SetText(editingFw.ProgramUpdatePath)
@@ -639,6 +689,18 @@ func (d *DeviceTab) showAddEditDialog() {
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("장비 IP:")),
 			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), serverIPEntry),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격
+		// 위치
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("위치:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), locationEntry),
+		),
+		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격
+		// OS 정보
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("OS 정보:")),
+			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), osInfoEntry),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 간격
 		// 접속선택
@@ -713,6 +775,8 @@ func (d *DeviceTab) showAddEditDialog() {
 
 		fw.DeviceName = deviceNameEntry.Text
 		fw.DeviceIP = serverIPEntry.Text
+		fw.Location = locationEntry.Text
+		fw.OSInfo = osInfoEntry.Text
 
 		// DeviceName이 비어있으면 IP 사용
 		if fw.DeviceName == "" {
@@ -862,6 +926,18 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		ipValue = fw.DeviceName
 	}
 
+	// 위치 값
+	locationValue := fw.Location
+	if locationValue == "" {
+		locationValue = "-"
+	}
+
+	// OS 정보 값
+	osInfoValue := fw.OSInfo
+	if osInfoValue == "" {
+		osInfoValue = "-"
+	}
+
 	// config 가져오기
 	config, _ := d.store.GetConfig()
 
@@ -953,6 +1029,16 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("IP:")),
 			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(ipValue)),
 		),
+		// 위치
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("위치:")),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(locationValue)),
+		),
+		// OS 정보
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("OS 정보:")),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(osInfoValue)),
+		),
 		// 연결상태
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("연결상태:")),
@@ -1038,7 +1124,7 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 	content := container.NewVBox(contentItems...)
 
 	// 다이얼로그 높이 계산 (프로세스 리스트 유무에 따라) - 임시 주석처리
-	dialogHeight := float32(640)
+	dialogHeight := float32(650)
 
 	// 고정 크기 컨테이너
 	paddedContent := container.New(layout.NewCustomPaddedLayout(15, 15, 15, 15), content)
