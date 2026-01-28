@@ -8,7 +8,7 @@ import (
 )
 
 // ParseNATLine NAT 규칙 라인을 파싱하여 NATRule로 변환
-// 지원 형식: ./agent -f -I -c FORWARD -a NAT -p TCP -n 80 -s 0.0.0.0/0 -e 192.168.1.10
+// 지원 형식: ./agent -f -I -a NAT -p TCP?SNAT -s 192.168.1.0/24 -e 1.2.3.4 -o eth0
 func ParseNATLine(line string) (*model.NATRule, error) {
 	line = strings.TrimSpace(line)
 
@@ -55,7 +55,9 @@ func ParseNATLine(line string) (*model.NATRule, error) {
 		case "-p":
 			if i+1 < len(parts) {
 				i++
-				rule.Protocol = model.StringToProtocol(parts[i])
+				protoStr := parts[i]
+				// TCP?SNAT, TCP?DNAT, TCP?MASQUERADE 형식 파싱
+				rule.Protocol, rule.NATType = parseProtocolWithNATType(protoStr)
 			}
 		case "-a":
 			if i+1 < len(parts) {
@@ -99,8 +101,25 @@ func ParseNATLine(line string) (*model.NATRule, error) {
 	return rule, nil
 }
 
+// parseProtocolWithNATType 프로토콜 문자열에서 NAT 타입 추출
+// 입력: "TCP?SNAT", "UDP?DNAT", "TCP?MASQUERADE", "TCP"
+// 출력: Protocol, NATType
+func parseProtocolWithNATType(s string) (model.Protocol, model.NATType) {
+	s = strings.ToUpper(s)
+
+	// "?" 기준으로 분리
+	if idx := strings.Index(s, "?"); idx != -1 {
+		protoStr := s[:idx]
+		natTypeStr := s[idx+1:]
+		return model.StringToProtocol(protoStr), model.StringToNATType(natTypeStr)
+	}
+
+	// NAT 타입이 없으면 기본값 DNAT
+	return model.StringToProtocol(s), model.NATTypeDNAT
+}
+
 // NATRuleToLine NATRule을 agent 명령어 형식으로 변환
-// 출력 형식: ./agent -f -I -c FORWARD -a NAT -p TCP -n 80 -s 0.0.0.0/0 -e 192.168.1.10
+// 출력 형식: ./agent -f -I -a NAT -p TCP?SNAT -s 192.168.1.0/24 -e 1.2.3.4 -o eth0
 func NATRuleToLine(rule *model.NATRule) string {
 	if rule == nil {
 		return ""
@@ -117,31 +136,29 @@ func NATRuleToLine(rule *model.NATRule) string {
 		parts = append(parts, "-I")
 	}
 
-	// Chain: -c FORWARD
-	parts = append(parts, "-c")
-	parts = append(parts, model.ChainToString(rule.Chain))
-
 	// Action: -a NAT
 	parts = append(parts, "-a")
 	parts = append(parts, "NAT")
 
-	// Protocol: -p TCP
+	// Protocol with NAT Type: -p TCP?SNAT
 	parts = append(parts, "-p")
-	parts = append(parts, strings.ToUpper(model.ProtocolToString(rule.Protocol)))
+	protoStr := strings.ToUpper(model.ProtocolToString(rule.Protocol))
+	natTypeStr := model.NATTypeToString(rule.NATType)
+	parts = append(parts, protoStr+"?"+natTypeStr)
 
-	// Port: -n port
+	// Port: -n port (DNAT에서 주로 사용)
 	if rule.MatchPort != "" {
 		parts = append(parts, "-n")
 		parts = append(parts, rule.MatchPort)
 	}
 
-	// Source IP: -s ip
+	// Source IP: -s ip (MatchIP)
 	if rule.MatchIP != "" && rule.MatchIP != "ANY" {
 		parts = append(parts, "-s")
 		parts = append(parts, rule.MatchIP)
 	}
 
-	// Destination IP: -e ip (TranslateIP)
+	// Destination IP: -e ip (TranslateIP:TranslatePort)
 	if rule.TranslateIP != "" {
 		parts = append(parts, "-e")
 		if rule.TranslatePort != "" {

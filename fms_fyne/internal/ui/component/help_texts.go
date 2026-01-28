@@ -407,9 +407,9 @@ const FirewallEditExampleText = `./agent -f -I -c INPUT -a ACCEPT -p TCP -n 80
 ./agent -f -I -c OUTPUT -a ACCEPT -p TCP -e 10.0.0.1 -n 443
 ./agent -f -I -c INPUT -a DROP -p TCP -n 23
 ./agent -f -D -c INPUT -a ACCEPT -p TCP -n 80
-./agent -f -I -c FORWARD -a NAT -p TCP -n 80 -s 0.0.0.0/0 -e 192.168.1.10
-./agent -f -I -c FORWARD -a NAT -p TCP -n 443 -i eth0 -o eth1
-./agent -f -I -c FORWARD -a NAT -s 192.168.1.0/24 -e 10.0.0.0/8 -i eth1 -o eth0`
+./agent -f -I -a NAT -p TCP?DNAT -n 80 -e 192.168.1.10:80 -i eth0
+./agent -f -I -a NAT -p TCP?SNAT -s 192.168.1.0/24 -e 1.2.3.4 -o eth0
+./agent -f -I -a NAT -p TCP?MASQUERADE -s 192.168.1.0/24 -o eth0`
 
 // FirewallExampleRule 방화벽 예시 규칙 구조체
 type FirewallExampleRule struct {
@@ -440,16 +440,16 @@ var FirewallExampleRules = []FirewallExampleRule{
 		Command:     "./agent -f -D -c INPUT -a ACCEPT -p TCP -n 80",
 	},
 	{
-		Description: "포트 포워딩 (외부 80 → 내부 서버)",
-		Command:     "./agent -f -I -c FORWARD -a NAT -p TCP -n 80 -s 0.0.0.0/0 -e 192.168.1.10",
+		Description: "DNAT (포트 포워딩: 외부 80 → 내부 서버)",
+		Command:     "./agent -f -I -a NAT -p TCP?DNAT -n 80 -e 192.168.1.10:80 -i eth0",
 	},
 	{
-		Description: "HTTPS NAT 룰",
-		Command:     "./agent -f -I -c FORWARD -a NAT -p TCP -n 443 -i eth0 -o eth1",
+		Description: "SNAT (내부 → 공인 IP 변환)",
+		Command:     "./agent -f -I -a NAT -p TCP?SNAT -s 192.168.1.0/24 -e 1.2.3.4 -o eth0",
 	},
 	{
-		Description: "내부 네트워크 NAT",
-		Command:     "./agent -f -I -c FORWARD -a NAT -s 192.168.1.0/24 -e 10.0.0.0/8 -i eth1 -o eth0",
+		Description: "MASQUERADE (동적 IP용 SNAT)",
+		Command:     "./agent -f -I -a NAT -p TCP?MASQUERADE -s 192.168.1.0/24 -o eth0",
 	},
 }
 
