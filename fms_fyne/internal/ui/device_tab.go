@@ -217,15 +217,18 @@ func (d *DeviceTab) updateStatusSummary() {
 
 // 장비 테이블 패널을 생성합니다. (PRD 3.3.3 기준)
 func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
-	// PRD 테이블 컬럼: 선택, 장비명, 장비 IP, 장비상태, 상태 체크시간, 접속방식
+	// PRD 테이블 컬럼: 선택, 장비명, 장비 IP, 장비상태, 상태 체크시간, CPU, 메모리, 디스크, 네트워크
 	d.deviceTable = component.NewPagedTableWithWindow(component.PagedTableConfig{
 		Columns: []component.ColumnDef{
 			{Header: "선택", Width: 50},
-			{Header: "장비명", Width: 240},
-			{Header: "장비 IP", Width: 300},
+			{Header: "장비명", Width: 150},
+			{Header: "장비 IP", Width: 150},
 			{Header: "장비상태", Width: 80},
-			{Header: "상태 체크시간", Width: 225},
-			{Header: "접속방식", Width: 80},
+			{Header: "상태 체크시간", Width: 150},
+			{Header: "CPU", Width: 70},
+			{Header: "메모리", Width: 70},
+			{Header: "디스크", Width: 70},
+			{Header: "네트워크", Width: 100},
 		},
 		PageSize: 15,
 		OnCellUpdate: func(row int, col int, cell fyne.CanvasObject) {
@@ -341,11 +344,27 @@ func (d *DeviceTab) updateDeviceCell(row int, col int, cell fyne.CanvasObject) {
 		} else {
 			label.SetText("-")
 		}
-	case 5: // 접속방식
-		if fw.DevicePPK != "" {
-			label.SetText("PPK")
-		} else if fw.DevicePW != "" {
-			label.SetText("PW")
+	case 5: // CPU 사용률
+		if fw.ServerStatus == model.ServerStatusRunning && fw.CPUUsage > 0 {
+			label.SetText(fmt.Sprintf("%.1f%%", fw.CPUUsage))
+		} else {
+			label.SetText("-")
+		}
+	case 6: // 메모리 사용률
+		if fw.ServerStatus == model.ServerStatusRunning && fw.MemoryUsage > 0 {
+			label.SetText(fmt.Sprintf("%.1f%%", fw.MemoryUsage))
+		} else {
+			label.SetText("-")
+		}
+	case 7: // 디스크 사용률
+		if fw.ServerStatus == model.ServerStatusRunning && fw.DiskUsage > 0 {
+			label.SetText(fmt.Sprintf("%.1f%%", fw.DiskUsage))
+		} else {
+			label.SetText("-")
+		}
+	case 8: // 네트워크
+		if fw.ServerStatus == model.ServerStatusRunning && fw.NetworkUsage > 0 {
+			label.SetText(fmt.Sprintf("%.2f MB/s", fw.NetworkUsage))
 		} else {
 			label.SetText("-")
 		}

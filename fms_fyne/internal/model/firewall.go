@@ -21,6 +21,12 @@ type Firewall struct {
 	// 상태 정보 (PRD: lastCheckedAt)
 	LastCheckedAt string `json:"lastCheckedAt,omitempty"` // 마지막 상태 확인 시간
 
+	// 시스템 리소스 정보 (상태 체크 시 업데이트)
+	CPUUsage     float64 `json:"cpuUsage,omitempty"`     // CPU 사용률 (%)
+	MemoryUsage  float64 `json:"memoryUsage,omitempty"`  // 메모리 사용률 (%)
+	DiskUsage    float64 `json:"diskUsage,omitempty"`    // 디스크 사용률 (%)
+	NetworkUsage float64 `json:"networkUsage,omitempty"` // 네트워크 트래픽 (MB/s)
+
 	// 장비별 API 경로 설정 (비어있으면 전역 설정 사용)
 	ProgramUploadPath  string `json:"programUploadPath,omitempty"`  // 패키지 업로드 경로 (SFTP)
 	ProgramUpdatePath  string `json:"programUpdatePath,omitempty"`  // 패키지 업데이트 요청 경로
@@ -137,6 +143,10 @@ func (f *Firewall) Clone() *Firewall {
 		DevicePW:           f.DevicePW,
 		DevicePPK:          f.DevicePPK,
 		LastCheckedAt:      f.LastCheckedAt,
+		CPUUsage:           f.CPUUsage,
+		MemoryUsage:        f.MemoryUsage,
+		DiskUsage:          f.DiskUsage,
+		NetworkUsage:       f.NetworkUsage,
 		ProgramUploadPath:  f.ProgramUploadPath,
 		ProgramUpdatePath:  f.ProgramUpdatePath,
 		ProgramUpdatePort:  f.ProgramUpdatePort,
