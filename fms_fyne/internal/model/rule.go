@@ -36,7 +36,40 @@ const (
 	ActionACCEPT Action = 1
 	ActionIDS    Action = 2
 	ActionIPS    Action = 3
+	ActionNAT    Action = 4 // NAT 액션 추가
 )
+
+// Command 명령 타입 (Insert/Delete)
+type Command int
+
+const (
+	CommandInsert Command = 0
+	CommandDelete Command = 1
+)
+
+// CommandToString Command를 문자열로 변환
+func CommandToString(c Command) string {
+	switch c {
+	case CommandInsert:
+		return "INSERT"
+	case CommandDelete:
+		return "DELETE"
+	default:
+		return "INSERT"
+	}
+}
+
+// StringToCommand 문자열을 Command로 변환
+func StringToCommand(s string) Command {
+	switch strings.ToUpper(s) {
+	case "INSERT", "I":
+		return CommandInsert
+	case "DELETE", "D":
+		return CommandDelete
+	default:
+		return CommandInsert
+	}
+}
 
 // ProtocolOptions 프로토콜별 세부 옵션
 type ProtocolOptions struct {
@@ -85,6 +118,7 @@ func (o *ProtocolOptions) HasICMPOptions() bool {
 
 // FirewallRule 방화벽 규칙 구조체
 type FirewallRule struct {
+	Command      Command          // 명령 타입 (Insert/Delete)
 	Chain        Chain
 	Protocol     Protocol
 	Options      *ProtocolOptions // 프로토콜 옵션
@@ -190,6 +224,8 @@ func ActionToString(a Action) string {
 		return "IDS"
 	case ActionIPS:
 		return "IPS"
+	case ActionNAT:
+		return "NAT"
 	default:
 		return "DROP"
 	}
@@ -206,6 +242,8 @@ func StringToAction(s string) Action {
 		return ActionIDS
 	case "IPS":
 		return ActionIPS
+	case "NAT":
+		return ActionNAT
 	default:
 		return ActionDROP
 	}
@@ -305,7 +343,7 @@ func GetIPSTypeDefaults(ipsType string) string {
 
 // GetActionOptions UI Select용 Action 옵션 목록
 func GetActionOptions() []string {
-	return []string{"DROP", "ACCEPT", "IDS", "IPS"}
+	return []string{"DROP", "ACCEPT", "IDS", "IPS", "NAT"}
 }
 
 // TCPFlagsPreset TCP Flags 프리셋 정의

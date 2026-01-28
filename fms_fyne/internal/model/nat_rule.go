@@ -13,6 +13,10 @@ const (
 
 // NATRule NAT 규칙 구조체
 type NATRule struct {
+	// 명령 필드
+	Command Command // Insert/Delete
+	Chain   Chain   // FORWARD 등
+
 	// 기본 필드
 	NATType  NATType  // DNAT, SNAT, MASQUERADE
 	Protocol Protocol // TCP, UDP, ANY
@@ -36,6 +40,8 @@ type NATRule struct {
 // NewNATRule 기본값으로 새 NAT 규칙 생성
 func NewNATRule() *NATRule {
 	return &NATRule{
+		Command:  CommandInsert,
+		Chain:    ChainFORWARD,
 		NATType:  NATTypeDNAT,
 		Protocol: ProtocolTCP,
 		MatchIP:  "ANY",
@@ -45,6 +51,8 @@ func NewNATRule() *NATRule {
 // NewDNATRule DNAT 규칙 생성
 func NewDNATRule() *NATRule {
 	return &NATRule{
+		Command:  CommandInsert,
+		Chain:    ChainFORWARD,
 		NATType:  NATTypeDNAT,
 		Protocol: ProtocolTCP,
 		MatchIP:  "ANY",
@@ -54,6 +62,8 @@ func NewDNATRule() *NATRule {
 // NewSNATRule SNAT 규칙 생성
 func NewSNATRule() *NATRule {
 	return &NATRule{
+		Command:  CommandInsert,
+		Chain:    ChainFORWARD,
 		NATType:  NATTypeSNAT,
 		Protocol: ProtocolTCP,
 	}
@@ -62,6 +72,8 @@ func NewSNATRule() *NATRule {
 // NewMASQUERADERule MASQUERADE 규칙 생성
 func NewMASQUERADERule() *NATRule {
 	return &NATRule{
+		Command:  CommandInsert,
+		Chain:    ChainFORWARD,
 		NATType:  NATTypeMASQUERADE,
 		Protocol: ProtocolTCP,
 	}

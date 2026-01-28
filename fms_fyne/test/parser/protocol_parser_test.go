@@ -277,25 +277,25 @@ func TestParseLine_WithOptions(t *testing.T) {
 		wantICMPCode string
 	}{
 		{
-			name:      "기존 형식 (옵션 없음)",
-			line:      "agent -m=insert -c=INPUT -p=tcp -a=DROP",
+			name:      "옵션 없음",
+			line:      "./agent -f -I -c INPUT -a DROP -p TCP",
 			wantProto: model.ProtocolTCP,
 		},
 		{
 			name:         "TCP flags",
-			line:         "agent -m=insert -c=INPUT -p=tcp?flags=syn/syn -a=DROP --dport=80",
+			line:         "./agent -f -I -c INPUT -a DROP -p TCP?flags=syn/syn -n 80",
 			wantProto:    model.ProtocolTCP,
 			wantTCPFlags: "syn/syn",
 		},
 		{
 			name:         "ICMP type",
-			line:         "agent -m=insert -c=INPUT -p=icmp?type=echo-request -a=DROP",
+			line:         "./agent -f -I -c INPUT -a DROP -p ICMP?type=echo-request",
 			wantProto:    model.ProtocolICMP,
 			wantICMPType: "echo-request",
 		},
 		{
 			name:         "ICMP type + code",
-			line:         "agent -m=insert -c=INPUT -p=icmp?type=3&code=0 -a=DROP",
+			line:         "./agent -f -I -c INPUT -a DROP -p ICMP?type=3&code=0",
 			wantProto:    model.ProtocolICMP,
 			wantICMPType: "3",
 			wantICMPCode: "0",
@@ -347,7 +347,8 @@ func TestRuleToLine_WithOptions(t *testing.T) {
 				Protocol: model.ProtocolTCP,
 				Action:   model.ActionDROP,
 			},
-			contains: []string{"-p=tcp", "-a=DROP"},
+			// 새로운 형식: ./agent -f -I -c INPUT -a DROP -p TCP
+			contains: []string{"-p TCP", "-a DROP", "-c INPUT"},
 		},
 		{
 			name: "TCP flags",
@@ -358,7 +359,8 @@ func TestRuleToLine_WithOptions(t *testing.T) {
 				Action:   model.ActionDROP,
 				DPort:    "80",
 			},
-			contains: []string{"-p=tcp?flags=syn/syn", "--dport=80"},
+			// 새로운 형식: ./agent -f -I -c INPUT -a DROP -p TCP?FLAGS=SYN/SYN -n 80
+			contains: []string{"-p TCP?FLAGS=SYN/SYN", "-n 80"},
 		},
 		{
 			name: "ICMP type",
@@ -368,7 +370,8 @@ func TestRuleToLine_WithOptions(t *testing.T) {
 				Options:  &model.ProtocolOptions{ICMPType: "echo-request"},
 				Action:   model.ActionDROP,
 			},
-			contains: []string{"-p=icmp?type=echo-request"},
+			// 새로운 형식: ./agent -f -I -c INPUT -a DROP -p ICMP?TYPE=ECHO-REQUEST
+			contains: []string{"-p ICMP?TYPE=ECHO-REQUEST"},
 		},
 		{
 			name: "ICMP type + code",
@@ -378,7 +381,8 @@ func TestRuleToLine_WithOptions(t *testing.T) {
 				Options:  &model.ProtocolOptions{ICMPType: "3", ICMPCode: "0"},
 				Action:   model.ActionDROP,
 			},
-			contains: []string{"-p=icmp?type=3&code=0"},
+			// 새로운 형식: ./agent -f -I -c INPUT -a DROP -p ICMP?TYPE=3&CODE=0
+			contains: []string{"-p ICMP?TYPE=3&CODE=0"},
 		},
 	}
 

@@ -167,6 +167,7 @@ func ParseOptionsOnly(s string) *model.ProtocolOptions {
 
 // ParseLine 단일 라인을 파싱하여 FirewallRule로 변환
 // 빈 줄이나 주석은 nil을 반환
+// 지원 형식: ./agent -f -I -c INPUT -a ACCEPT -p TCP -n 80
 func ParseLine(line string) (*model.FirewallRule, error) {
 	line = strings.TrimSpace(line)
 
@@ -180,44 +181,76 @@ func ParseLine(line string) (*model.FirewallRule, error) {
 		return nil, nil
 	}
 
-	// agent 형식이 아니면 오류
-	if !strings.HasPrefix(line, "agent ") {
+	// agent 형식 확인 (./agent)
+	if !strings.HasPrefix(line, "./agent ") {
 		return nil, fmt.Errorf("알 수 없는 형식: %s", line)
 	}
 
 	rule := model.NewFirewallRule()
 	parts := strings.Fields(line)
 
-	for _, part := range parts {
-		switch {
-		case strings.HasPrefix(part, "-c="):
-			rule.Chain = model.StringToChain(part[3:])
-		case strings.HasPrefix(part, "-p="):
-			// 프로토콜 옵션 파싱 (쿼리 스트링 형식 지원)
-			proto, opts, _ := ParseProtocolWithOptions(part[3:])
-			rule.Protocol = proto
-			rule.Options = opts
-		case strings.HasPrefix(part, "-a="):
-			// ACL 처리: blocklist, whitelist
-			actionStr := part[3:]
-			switch actionStr {
-			case "blocklist":
-				rule.Black = true
-			case "whitelist":
-				rule.White = true
-			default:
-				rule.Action = model.StringToAction(actionStr)
+	// 인덱스 기반 파싱 (공백 구분 형식)
+	for i := 0; i < len(parts); i++ {
+		part := parts[i]
+
+		switch part {
+		case "-f":
+			// 방화벽 모드 플래그 - 무시
+			continue
+		case "-I":
+			rule.Command = model.CommandInsert
+		case "-D":
+			rule.Command = model.CommandDelete
+		case "-c":
+			if i+1 < len(parts) {
+				i++
+				rule.Chain = model.StringToChain(parts[i])
 			}
-		case strings.HasPrefix(part, "--dport="):
-			rule.DPort = part[8:]
-		case strings.HasPrefix(part, "-s="):
-			rule.SIP = part[3:]
-		case strings.HasPrefix(part, "--dest="):
-			rule.DIP = part[7:]
-		case strings.HasPrefix(part, "-i="):
-			rule.InInterface = part[3:]
-		case strings.HasPrefix(part, "-o="):
-			rule.OutInterface = part[3:]
+		case "-p":
+			if i+1 < len(parts) {
+				i++
+				proto, opts, _ := ParseProtocolWithOptions(parts[i])
+				rule.Protocol = proto
+				rule.Options = opts
+			}
+		case "-a":
+			if i+1 < len(parts) {
+				i++
+				actionStr := parts[i]
+				switch actionStr {
+				case "blocklist":
+					rule.Black = true
+				case "whitelist":
+					rule.White = true
+				default:
+					rule.Action = model.StringToAction(actionStr)
+				}
+			}
+		case "-n":
+			if i+1 < len(parts) {
+				i++
+				rule.DPort = parts[i]
+			}
+		case "-s":
+			if i+1 < len(parts) {
+				i++
+				rule.SIP = parts[i]
+			}
+		case "-e":
+			if i+1 < len(parts) {
+				i++
+				rule.DIP = parts[i]
+			}
+		case "-i":
+			if i+1 < len(parts) {
+				i++
+				rule.InInterface = parts[i]
+			}
+		case "-o":
+			if i+1 < len(parts) {
+				i++
+				rule.OutInterface = parts[i]
+			}
 		}
 	}
 
@@ -225,58 +258,87 @@ func ParseLine(line string) (*model.FirewallRule, error) {
 }
 
 // RuleToLine FirewallRule을 텍스트 라인으로 변환
+// 출력 형식: ./agent -f -I -c INPUT -a ACCEPT -p TCP -n 80
 func RuleToLine(rule *model.FirewallRule) string {
 	if rule == nil {
 		return ""
 	}
 
 	var parts []string
-	parts = append(parts, "agent")
-	parts = append(parts, "-m=insert")
+	parts = append(parts, "./agent")
+	parts = append(parts, "-f")
+
+	// Command (Insert/Delete)
+	if rule.Command == model.CommandDelete {
+		parts = append(parts, "-D")
+	} else {
+		parts = append(parts, "-I")
+	}
 
 	// ACL 규칙 (blocklist/whitelist)은 별도 형식
 	if rule.Black || rule.White {
 		// 소스 IP
 		if rule.SIP != "" {
-			parts = append(parts, fmt.Sprintf("-s=%s", rule.SIP))
+			parts = append(parts, "-s")
+			parts = append(parts, rule.SIP)
 		}
 		// ACL Action
 		if rule.Black {
-			parts = append(parts, "-a=blocklist")
+			parts = append(parts, "-a")
+			parts = append(parts, "blocklist")
 		} else if rule.White {
-			parts = append(parts, "-a=whitelist")
+			parts = append(parts, "-a")
+			parts = append(parts, "whitelist")
 		}
 		return strings.Join(parts, " ")
 	}
 
 	// IPS 규칙은 체인이 없음
 	if rule.Protocol == model.ProtocolIPS {
-		parts = append(parts, fmt.Sprintf("-p=%s", FormatProtocolWithOptions(rule.Protocol, rule.Options)))
-		parts = append(parts, fmt.Sprintf("-a=%s", model.ActionToString(rule.Action)))
+		parts = append(parts, "-p")
+		parts = append(parts, FormatProtocolWithOptions(rule.Protocol, rule.Options))
+		parts = append(parts, "-a")
+		parts = append(parts, model.ActionToString(rule.Action))
 		return strings.Join(parts, " ")
 	}
 
-	// 일반 방화벽 규칙
-	parts = append(parts, fmt.Sprintf("-c=%s", model.ChainToString(rule.Chain)))
-	// 프로토콜 옵션 포함하여 포맷
-	parts = append(parts, fmt.Sprintf("-p=%s", FormatProtocolWithOptions(rule.Protocol, rule.Options)))
-	parts = append(parts, fmt.Sprintf("-a=%s", model.ActionToString(rule.Action)))
+	// 일반 방화벽 규칙: -c Chain
+	parts = append(parts, "-c")
+	parts = append(parts, model.ChainToString(rule.Chain))
+
+	// Action: -a Action
+	parts = append(parts, "-a")
+	parts = append(parts, model.ActionToString(rule.Action))
+
+	// Protocol: -p Protocol
+	parts = append(parts, "-p")
+	parts = append(parts, strings.ToUpper(FormatProtocolWithOptions(rule.Protocol, rule.Options)))
 
 	// 선택 필드 (값이 있을 때만 출력)
+	// Port: -n port
 	if rule.DPort != "" {
-		parts = append(parts, fmt.Sprintf("--dport=%s", rule.DPort))
+		parts = append(parts, "-n")
+		parts = append(parts, rule.DPort)
 	}
+	// Source IP: -s ip
 	if rule.SIP != "" {
-		parts = append(parts, fmt.Sprintf("-s=%s", rule.SIP))
+		parts = append(parts, "-s")
+		parts = append(parts, rule.SIP)
 	}
+	// Destination IP: -e ip
 	if rule.DIP != "" {
-		parts = append(parts, fmt.Sprintf("--dest=%s", rule.DIP))
+		parts = append(parts, "-e")
+		parts = append(parts, rule.DIP)
 	}
+	// In Interface: -i interface
 	if rule.InInterface != "" {
-		parts = append(parts, fmt.Sprintf("-i=%s", rule.InInterface))
+		parts = append(parts, "-i")
+		parts = append(parts, rule.InInterface)
 	}
+	// Out Interface: -o interface
 	if rule.OutInterface != "" {
-		parts = append(parts, fmt.Sprintf("-o=%s", rule.OutInterface))
+		parts = append(parts, "-o")
+		parts = append(parts, rule.OutInterface)
 	}
 
 	return strings.Join(parts, " ")
