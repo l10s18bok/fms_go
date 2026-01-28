@@ -32,13 +32,16 @@ type Firewall struct {
 	NetworkUsage float64 `json:"networkUsage,omitempty"` // 네트워크 트래픽 (MB/s)
 
 	// 장비별 API 경로 설정 (비어있으면 전역 설정 사용)
-	ProgramUploadPath  string `json:"programUploadPath,omitempty"`  // 패키지 업로드 경로 (SFTP)
-	ProgramUpdatePath  string `json:"programUpdatePath,omitempty"`  // 패키지 업데이트 요청 경로
-	ProgramUpdatePort  int    `json:"programUpdatePort,omitempty"`  // 패키지 업데이트 요청 포트
-	FirewallDeployPath string `json:"firewallDeployPath,omitempty"` // 방화벽 규칙 배포 경로
-	FirewallDeployPort int    `json:"firewallDeployPort,omitempty"` // 방화벽 규칙 배포 포트
-	DeviceInfoPath     string `json:"deviceInfoPath,omitempty"`     // 장비 상세보기 및 상태 체크 경로
-	DeviceInfoPort     int    `json:"deviceInfoPort,omitempty"`     // 장비 상세보기 및 상태 체크 포트
+	ProgramUploadPath    string `json:"programUploadPath,omitempty"`    // 패키지 업로드 경로 (SFTP)
+	ProgramUpdateScheme  string `json:"programUpdateScheme,omitempty"`  // 패키지 업데이트 요청 스킴 (http/https)
+	ProgramUpdatePath    string `json:"programUpdatePath,omitempty"`    // 패키지 업데이트 요청 경로
+	ProgramUpdatePort    int    `json:"programUpdatePort,omitempty"`    // 패키지 업데이트 요청 포트
+	FirewallDeployScheme string `json:"firewallDeployScheme,omitempty"` // 방화벽 규칙 배포 스킴 (http/https)
+	FirewallDeployPath   string `json:"firewallDeployPath,omitempty"`   // 방화벽 규칙 배포 경로
+	FirewallDeployPort   int    `json:"firewallDeployPort,omitempty"`   // 방화벽 규칙 배포 포트
+	DeviceInfoScheme     string `json:"deviceInfoScheme,omitempty"`     // 장비 상세보기 스킴 (http/https)
+	DeviceInfoPath       string `json:"deviceInfoPath,omitempty"`       // 장비 상세보기 및 상태 체크 경로
+	DeviceInfoPort       int    `json:"deviceInfoPort,omitempty"`       // 장비 상세보기 및 상태 체크 포트
 }
 
 // 배포 결과를 나타냅니다.
@@ -137,29 +140,32 @@ func (f *Firewall) IsValid() bool {
 // 장비의 복사본을 반환합니다.
 func (f *Firewall) Clone() *Firewall {
 	clone := &Firewall{
-		Index:              f.Index,
-		DeviceName:         f.DeviceName,
-		DeviceIP:           f.DeviceIP,
-		ServerStatus:       f.ServerStatus,
-		DeployStatus:       f.DeployStatus,
-		Version:            f.Version,
-		DeviceID:           f.DeviceID,
-		DevicePW:           f.DevicePW,
-		DevicePPK:          f.DevicePPK,
-		LastCheckedAt:      f.LastCheckedAt,
-		Location:           f.Location,
-		OSInfo:             f.OSInfo,
-		CPUUsage:           f.CPUUsage,
-		MemoryUsage:        f.MemoryUsage,
-		DiskUsage:          f.DiskUsage,
-		NetworkUsage:       f.NetworkUsage,
-		ProgramUploadPath:  f.ProgramUploadPath,
-		ProgramUpdatePath:  f.ProgramUpdatePath,
-		ProgramUpdatePort:  f.ProgramUpdatePort,
-		FirewallDeployPath: f.FirewallDeployPath,
-		FirewallDeployPort: f.FirewallDeployPort,
-		DeviceInfoPath:     f.DeviceInfoPath,
-		DeviceInfoPort:     f.DeviceInfoPort,
+		Index:                f.Index,
+		DeviceName:           f.DeviceName,
+		DeviceIP:             f.DeviceIP,
+		ServerStatus:         f.ServerStatus,
+		DeployStatus:         f.DeployStatus,
+		Version:              f.Version,
+		DeviceID:             f.DeviceID,
+		DevicePW:             f.DevicePW,
+		DevicePPK:            f.DevicePPK,
+		LastCheckedAt:        f.LastCheckedAt,
+		Location:             f.Location,
+		OSInfo:               f.OSInfo,
+		CPUUsage:             f.CPUUsage,
+		MemoryUsage:          f.MemoryUsage,
+		DiskUsage:            f.DiskUsage,
+		NetworkUsage:         f.NetworkUsage,
+		ProgramUploadPath:    f.ProgramUploadPath,
+		ProgramUpdateScheme:  f.ProgramUpdateScheme,
+		ProgramUpdatePath:    f.ProgramUpdatePath,
+		ProgramUpdatePort:    f.ProgramUpdatePort,
+		FirewallDeployScheme: f.FirewallDeployScheme,
+		FirewallDeployPath:   f.FirewallDeployPath,
+		FirewallDeployPort:   f.FirewallDeployPort,
+		DeviceInfoScheme:     f.DeviceInfoScheme,
+		DeviceInfoPath:       f.DeviceInfoPath,
+		DeviceInfoPort:       f.DeviceInfoPort,
 	}
 
 	// DeployResult 복사

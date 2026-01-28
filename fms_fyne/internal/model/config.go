@@ -41,6 +41,12 @@ const (
 // 기본 API 포트
 const DefaultAPIPort = 8080
 
+// HTTP 스킴 상수
+const (
+	SchemeHTTP  = "http"
+	SchemeHTTPS = "https"
+)
+
 // 애플리케이션 설정을 나타냅니다.
 type Config struct {
 	TimeoutSeconds      int    `json:"timeoutSeconds"`      // HTTP 타임아웃 (초)
@@ -49,28 +55,56 @@ type Config struct {
 	StatusCheckInterval int    `json:"statusCheckInterval"` // 장비 체크 주기 (초)
 
 	// API 경로 설정
-	ProgramUpdatePath  string `json:"programUpdatePath"`  // 패키지 업데이트 요청 경로
-	ProgramUpdatePort  int    `json:"programUpdatePort"`  // 패키지 업데이트 요청 포트
-	FirewallDeployPath string `json:"firewallDeployPath"` // 방화벽 규칙 배포 경로
-	FirewallDeployPort int    `json:"firewallDeployPort"` // 방화벽 규칙 배포 포트
-	DeviceInfoPath     string `json:"deviceInfoPath"`     // 장비 상세보기 및 상태 체크 경로
-	DeviceInfoPort     int    `json:"deviceInfoPort"`     // 장비 상세보기 및 상태 체크 포트
+	ProgramUpdateScheme string `json:"programUpdateScheme"` // 패키지 업데이트 요청 스킴 (http/https)
+	ProgramUpdatePath   string `json:"programUpdatePath"`   // 패키지 업데이트 요청 경로
+	ProgramUpdatePort   int    `json:"programUpdatePort"`   // 패키지 업데이트 요청 포트
+	FirewallDeployScheme string `json:"firewallDeployScheme"` // 방화벽 규칙 배포 스킴 (http/https)
+	FirewallDeployPath  string `json:"firewallDeployPath"`  // 방화벽 규칙 배포 경로
+	FirewallDeployPort  int    `json:"firewallDeployPort"`  // 방화벽 규칙 배포 포트
+	DeviceInfoScheme    string `json:"deviceInfoScheme"`    // 장비 상세보기 스킴 (http/https)
+	DeviceInfoPath      string `json:"deviceInfoPath"`      // 장비 상세보기 및 상태 체크 경로
+	DeviceInfoPort      int    `json:"deviceInfoPort"`      // 장비 상세보기 및 상태 체크 포트
 }
 
 // 기본 설정을 반환합니다.
 func DefaultConfig() *Config {
 	return &Config{
-		TimeoutSeconds:      DefaultTimeoutSeconds,
-		Theme:               ThemeLight,
-		AutoStatusCheck:     false,
-		StatusCheckInterval: DefaultStatusCheckInterval,
-		ProgramUpdatePath:   DefaultProgramUpdatePath,
-		ProgramUpdatePort:   DefaultAPIPort,
-		FirewallDeployPath:  DefaultFirewallDeployPath,
-		FirewallDeployPort:  DefaultAPIPort,
-		DeviceInfoPath:      DefaultDeviceInfoPath,
-		DeviceInfoPort:      DefaultAPIPort,
+		TimeoutSeconds:       DefaultTimeoutSeconds,
+		Theme:                ThemeLight,
+		AutoStatusCheck:      false,
+		StatusCheckInterval:  DefaultStatusCheckInterval,
+		ProgramUpdateScheme:  SchemeHTTP,
+		ProgramUpdatePath:    DefaultProgramUpdatePath,
+		ProgramUpdatePort:    DefaultAPIPort,
+		FirewallDeployScheme: SchemeHTTP,
+		FirewallDeployPath:   DefaultFirewallDeployPath,
+		FirewallDeployPort:   DefaultAPIPort,
+		DeviceInfoScheme:     SchemeHTTP,
+		DeviceInfoPath:       DefaultDeviceInfoPath,
+		DeviceInfoPort:       DefaultAPIPort,
 	}
+}
+
+// 스킴 값을 반환합니다 (기본값: http)
+func (c *Config) GetProgramUpdateScheme() string {
+	if c.ProgramUpdateScheme == SchemeHTTPS {
+		return SchemeHTTPS
+	}
+	return SchemeHTTP
+}
+
+func (c *Config) GetFirewallDeployScheme() string {
+	if c.FirewallDeployScheme == SchemeHTTPS {
+		return SchemeHTTPS
+	}
+	return SchemeHTTP
+}
+
+func (c *Config) GetDeviceInfoScheme() string {
+	if c.DeviceInfoScheme == SchemeHTTPS {
+		return SchemeHTTPS
+	}
+	return SchemeHTTP
 }
 
 // 장비 체크 주기를 반환합니다 (최소 10초, 최대 300초)

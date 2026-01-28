@@ -553,16 +553,25 @@ func (d *DeviceTab) showAddEditDialog() {
 	programUploadPathEntry := widget.NewEntry()
 	programUploadPathEntry.SetPlaceHolder("/download/")
 
+	// 패키지 업데이트 요청 스킴/경로/포트
+	programUpdateSchemeSelect := widget.NewSelect([]string{"http", "https"}, nil)
+	programUpdateSchemeSelect.SetSelected("http")
 	programUpdatePathEntry := widget.NewEntry()
 	programUpdatePathEntry.SetPlaceHolder("/program-update")
 	programUpdatePortEntry := widget.NewEntry()
 	programUpdatePortEntry.SetPlaceHolder("8080")
 
+	// 방화벽 규칙 배포 스킴/경로/포트
+	firewallDeploySchemeSelect := widget.NewSelect([]string{"http", "https"}, nil)
+	firewallDeploySchemeSelect.SetSelected("http")
 	firewallDeployPathEntry := widget.NewEntry()
 	firewallDeployPathEntry.SetPlaceHolder("/agent/req-deploy")
 	firewallDeployPortEntry := widget.NewEntry()
 	firewallDeployPortEntry.SetPlaceHolder("8080")
 
+	// 장비보고 스킴/경로/포트
+	deviceInfoSchemeSelect := widget.NewSelect([]string{"http", "https"}, nil)
+	deviceInfoSchemeSelect.SetSelected("http")
 	deviceInfoPathEntry := widget.NewEntry()
 	deviceInfoPathEntry.SetPlaceHolder("/device-report")
 	deviceInfoPortEntry := widget.NewEntry()
@@ -627,13 +636,22 @@ func (d *DeviceTab) showAddEditDialog() {
 		osInfoEntry.SetText(editingFw.OSInfo)
 		// 배포 경로 필드
 		programUploadPathEntry.SetText(editingFw.ProgramUploadPath)
+		if editingFw.ProgramUpdateScheme != "" {
+			programUpdateSchemeSelect.SetSelected(editingFw.ProgramUpdateScheme)
+		}
 		programUpdatePathEntry.SetText(editingFw.ProgramUpdatePath)
 		if editingFw.ProgramUpdatePort > 0 {
 			programUpdatePortEntry.SetText(fmt.Sprintf("%d", editingFw.ProgramUpdatePort))
 		}
+		if editingFw.FirewallDeployScheme != "" {
+			firewallDeploySchemeSelect.SetSelected(editingFw.FirewallDeployScheme)
+		}
 		firewallDeployPathEntry.SetText(editingFw.FirewallDeployPath)
 		if editingFw.FirewallDeployPort > 0 {
 			firewallDeployPortEntry.SetText(fmt.Sprintf("%d", editingFw.FirewallDeployPort))
+		}
+		if editingFw.DeviceInfoScheme != "" {
+			deviceInfoSchemeSelect.SetSelected(editingFw.DeviceInfoScheme)
 		}
 		deviceInfoPathEntry.SetText(editingFw.DeviceInfoPath)
 		if editingFw.DeviceInfoPort > 0 {
@@ -652,14 +670,17 @@ func (d *DeviceTab) showAddEditDialog() {
 		programUploadPathEntry.SetText(model.DefaultRemotePath) // 기본 업로드 경로
 		config, err := d.store.GetConfig()
 		if err == nil {
+			programUpdateSchemeSelect.SetSelected(config.GetProgramUpdateScheme())
 			programUpdatePathEntry.SetText(config.ProgramUpdatePath)
 			if config.ProgramUpdatePort > 0 {
 				programUpdatePortEntry.SetText(fmt.Sprintf("%d", config.ProgramUpdatePort))
 			}
+			firewallDeploySchemeSelect.SetSelected(config.GetFirewallDeployScheme())
 			firewallDeployPathEntry.SetText(config.FirewallDeployPath)
 			if config.FirewallDeployPort > 0 {
 				firewallDeployPortEntry.SetText(fmt.Sprintf("%d", config.FirewallDeployPort))
 			}
+			deviceInfoSchemeSelect.SetSelected(config.GetDeviceInfoScheme())
 			deviceInfoPathEntry.SetText(config.DeviceInfoPath)
 			if config.DeviceInfoPort > 0 {
 				deviceInfoPortEntry.SetText(fmt.Sprintf("%d", config.DeviceInfoPort))
@@ -667,8 +688,8 @@ func (d *DeviceTab) showAddEditDialog() {
 		}
 	}
 
-	// 다이얼로그 컨텐츠 (라인 간격 2배, 버튼-비밀번호 간격 3배)
-	buttonSpacing := float32(60) // 버튼과 비밀번호 간격 3배
+	// 다이얼로그 컨텐츠
+	buttonSpacing := float32(30) // 버튼 윗쪽 간격
 
 	// 헤더 (큰 폰트 - RichText 사용, 수정 모드에 따라 동적 변경)
 	title := "장비 추가"
@@ -723,25 +744,40 @@ func (d *DeviceTab) showAddEditDialog() {
 			container.NewGridWrap(fyne.NewSize(pathEntryWidth, rowHeight), programUploadPathEntry),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing/2), layout.NewSpacer()), // 간격
-		// 패키지 업데이트 요청
+		// 패키지 업데이트 요청 (라벨 + 스킴)
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), widget.NewLabel("패키지업데이트:")),
+			container.NewGridWrap(fyne.NewSize(80, rowHeight), programUpdateSchemeSelect),
+		),
+		// 패키지 업데이트 요청 (경로 + 포트)
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), layout.NewSpacer()),
 			container.NewGridWrap(fyne.NewSize(pathEntryWidth, rowHeight), programUpdatePathEntry),
 			widget.NewLabel("포트:"),
 			container.NewGridWrap(fyne.NewSize(portEntryWidth, rowHeight), programUpdatePortEntry),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing/2), layout.NewSpacer()), // 간격
-		// 방화벽 규칙 배포
+		// 방화벽 규칙 배포 (라벨 + 스킴)
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), widget.NewLabel("방화벽 배포:")),
+			container.NewGridWrap(fyne.NewSize(80, rowHeight), firewallDeploySchemeSelect),
+		),
+		// 방화벽 규칙 배포 (경로 + 포트)
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), layout.NewSpacer()),
 			container.NewGridWrap(fyne.NewSize(pathEntryWidth, rowHeight), firewallDeployPathEntry),
 			widget.NewLabel("포트:"),
 			container.NewGridWrap(fyne.NewSize(portEntryWidth, rowHeight), firewallDeployPortEntry),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing/2), layout.NewSpacer()), // 간격
-		// 장비 상세보기 (상태체크 포함)
+		// 장비보고 (라벨 + 스킴)
 		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), widget.NewLabel("상세보기:")),
+			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), widget.NewLabel("장비보고:")),
+			container.NewGridWrap(fyne.NewSize(80, rowHeight), deviceInfoSchemeSelect),
+		),
+		// 장비보고 (경로 + 포트)
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(pathLabelWidth, rowHeight), layout.NewSpacer()),
 			container.NewGridWrap(fyne.NewSize(pathEntryWidth, rowHeight), deviceInfoPathEntry),
 			widget.NewLabel("포트:"),
 			container.NewGridWrap(fyne.NewSize(portEntryWidth, rowHeight), deviceInfoPortEntry),
@@ -795,18 +831,21 @@ func (d *DeviceTab) showAddEditDialog() {
 
 		// API 경로 설정 저장
 		fw.ProgramUploadPath = programUploadPathEntry.Text
+		fw.ProgramUpdateScheme = programUpdateSchemeSelect.Selected
 		fw.ProgramUpdatePath = programUpdatePathEntry.Text
 		if programUpdatePortEntry.Text != "" {
 			if port, err := strconv.Atoi(programUpdatePortEntry.Text); err == nil {
 				fw.ProgramUpdatePort = port
 			}
 		}
+		fw.FirewallDeployScheme = firewallDeploySchemeSelect.Selected
 		fw.FirewallDeployPath = firewallDeployPathEntry.Text
 		if firewallDeployPortEntry.Text != "" {
 			if port, err := strconv.Atoi(firewallDeployPortEntry.Text); err == nil {
 				fw.FirewallDeployPort = port
 			}
 		}
+		fw.DeviceInfoScheme = deviceInfoSchemeSelect.Selected
 		fw.DeviceInfoPath = deviceInfoPathEntry.Text
 		if deviceInfoPortEntry.Text != "" {
 			if port, err := strconv.Atoi(deviceInfoPortEntry.Text); err == nil {
@@ -961,6 +1000,13 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 	if programUpdatePort == 0 {
 		programUpdatePort = model.DefaultAPIPort
 	}
+	programUpdateScheme := fw.ProgramUpdateScheme
+	if programUpdateScheme == "" && config != nil {
+		programUpdateScheme = config.GetProgramUpdateScheme()
+	}
+	if programUpdateScheme == "" {
+		programUpdateScheme = model.SchemeHTTP
+	}
 
 	firewallDeployPath := fw.FirewallDeployPath
 	if firewallDeployPath == "" && config != nil {
@@ -976,6 +1022,13 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 	if firewallDeployPort == 0 {
 		firewallDeployPort = model.DefaultAPIPort
 	}
+	firewallDeployScheme := fw.FirewallDeployScheme
+	if firewallDeployScheme == "" && config != nil {
+		firewallDeployScheme = config.GetFirewallDeployScheme()
+	}
+	if firewallDeployScheme == "" {
+		firewallDeployScheme = model.SchemeHTTP
+	}
 
 	deviceInfoPath := fw.DeviceInfoPath
 	if deviceInfoPath == "" && config != nil {
@@ -990,6 +1043,13 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 	}
 	if deviceInfoPort == 0 {
 		deviceInfoPort = model.DefaultAPIPort
+	}
+	deviceInfoScheme := fw.DeviceInfoScheme
+	if deviceInfoScheme == "" && config != nil {
+		deviceInfoScheme = config.GetDeviceInfoScheme()
+	}
+	if deviceInfoScheme == "" {
+		deviceInfoScheme = model.SchemeHTTP
 	}
 
 	// 배포정보 - 방화벽 룰 버전
@@ -1074,17 +1134,17 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		// 패키지업데이트
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("패키지업데이트:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s, 포트:%d", programUpdatePath, programUpdatePort))),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s %s, 포트:%d", programUpdateScheme, programUpdatePath, programUpdatePort))),
 		),
 		// 방화벽 배포
 		container.NewHBox(
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("방화벽 배포:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s, 포트:%d", firewallDeployPath, firewallDeployPort))),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s %s, 포트:%d", firewallDeployScheme, firewallDeployPath, firewallDeployPort))),
 		),
-		// 상세보기 (상태체크 포함)
+		// 장비보고 (상태체크 포함)
 		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("상세보기:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s, 포트:%d", deviceInfoPath, deviceInfoPort))),
+			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("장비보고:")),
+			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s %s, 포트:%d", deviceInfoScheme, deviceInfoPath, deviceInfoPort))),
 		),
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
 		// 배포정보
@@ -1124,7 +1184,7 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 	content := container.NewVBox(contentItems...)
 
 	// 다이얼로그 높이 계산 (프로세스 리스트 유무에 따라) - 임시 주석처리
-	dialogHeight := float32(650)
+	dialogHeight := float32(700)
 
 	// 고정 크기 컨테이너
 	paddedContent := container.New(layout.NewCustomPaddedLayout(15, 15, 15, 15), content)

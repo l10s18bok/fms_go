@@ -290,7 +290,9 @@ func (m *MainUI) showSettingsDialog() {
 	timeoutEntry.SetText(strconv.Itoa(config.GetTimeoutSeconds()))
 	timeoutEntry.SetPlaceHolder("10")
 
-	// 패키지 업데이트 요청 경로/포트
+	// 패키지 업데이트 요청 스킴/경로/포트
+	programUpdateSchemeSelect := widget.NewSelect([]string{"http", "https"}, nil)
+	programUpdateSchemeSelect.SetSelected(config.GetProgramUpdateScheme())
 	programUpdatePathEntry := widget.NewEntry()
 	programUpdatePathEntry.SetText(config.ProgramUpdatePath)
 	programUpdatePathEntry.SetPlaceHolder(model.DefaultProgramUpdatePath)
@@ -298,7 +300,9 @@ func (m *MainUI) showSettingsDialog() {
 	programUpdatePortEntry.SetText(strconv.Itoa(config.ProgramUpdatePort))
 	programUpdatePortEntry.SetPlaceHolder(strconv.Itoa(model.DefaultAPIPort))
 
-	// 방화벽 규칙 배포 경로/포트
+	// 방화벽 규칙 배포 스킴/경로/포트
+	firewallDeploySchemeSelect := widget.NewSelect([]string{"http", "https"}, nil)
+	firewallDeploySchemeSelect.SetSelected(config.GetFirewallDeployScheme())
 	firewallDeployPathEntry := widget.NewEntry()
 	firewallDeployPathEntry.SetText(config.FirewallDeployPath)
 	firewallDeployPathEntry.SetPlaceHolder(model.DefaultFirewallDeployPath)
@@ -306,7 +310,9 @@ func (m *MainUI) showSettingsDialog() {
 	firewallDeployPortEntry.SetText(strconv.Itoa(config.FirewallDeployPort))
 	firewallDeployPortEntry.SetPlaceHolder(strconv.Itoa(model.DefaultAPIPort))
 
-	// 장비 상세보기 및 상태 체크 경로/포트
+	// 장비 상세보기 및 상태 체크 스킴/경로/포트
+	deviceInfoSchemeSelect := widget.NewSelect([]string{"http", "https"}, nil)
+	deviceInfoSchemeSelect.SetSelected(config.GetDeviceInfoScheme())
 	deviceInfoPathEntry := widget.NewEntry()
 	deviceInfoPathEntry.SetText(config.DeviceInfoPath)
 	deviceInfoPathEntry.SetPlaceHolder(model.DefaultDeviceInfoPath)
@@ -330,15 +336,24 @@ func (m *MainUI) showSettingsDialog() {
 		)
 	}
 
+	// 라벨+스킴 선택 + 경로/포트 컨테이너 생성 함수
+	makeRouterSettingRow := func(schemeSelect *widget.Select, pathEntry, portEntry *widget.Entry) fyne.CanvasObject {
+		pathPortRow := makePathPortRow(pathEntry, portEntry)
+		return container.NewVBox(
+			container.NewGridWrap(fyne.NewSize(80, 36), schemeSelect),
+			pathPortRow,
+		)
+	}
+
 	// 폼 생성
 	formItems := []*widget.FormItem{
 		widget.NewFormItem("장비 자동 체크 주기(초)", statusCheckIntervalEntry),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
 		widget.NewFormItem("HTTP 응답대기(초)", timeoutEntry),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
-		widget.NewFormItem("패키지 업데이트 요청", makePathPortRow(programUpdatePathEntry, programUpdatePortEntry)),
-		widget.NewFormItem("방화벽 규칙 배포", makePathPortRow(firewallDeployPathEntry, firewallDeployPortEntry)),
-		widget.NewFormItem("장비 보고", makePathPortRow(deviceInfoPathEntry, deviceInfoPortEntry)),
+		widget.NewFormItem("패키지 업데이트 요청", makeRouterSettingRow(programUpdateSchemeSelect, programUpdatePathEntry, programUpdatePortEntry)),
+		widget.NewFormItem("방화벽 규칙 배포", makeRouterSettingRow(firewallDeploySchemeSelect, firewallDeployPathEntry, firewallDeployPortEntry)),
+		widget.NewFormItem("장비 보고", makeRouterSettingRow(deviceInfoSchemeSelect, deviceInfoPathEntry, deviceInfoPortEntry)),
 		widget.NewFormItem("", widget.NewLabel("")), // 빈 줄
 		widget.NewFormItem("설정 저장 경로", configPathLabel),
 	}
@@ -382,16 +397,19 @@ func (m *MainUI) showSettingsDialog() {
 
 		// 설정 저장
 		newConfig := &model.Config{
-			TimeoutSeconds:      timeoutSeconds,
-			Theme:               config.Theme,
-			AutoStatusCheck:     config.AutoStatusCheck,
-			StatusCheckInterval: statusCheckInterval,
-			ProgramUpdatePath:   programUpdatePathEntry.Text,
-			ProgramUpdatePort:   programUpdatePort,
-			FirewallDeployPath:  firewallDeployPathEntry.Text,
-			FirewallDeployPort:  firewallDeployPort,
-			DeviceInfoPath:      deviceInfoPathEntry.Text,
-			DeviceInfoPort:      deviceInfoPort,
+			TimeoutSeconds:       timeoutSeconds,
+			Theme:                config.Theme,
+			AutoStatusCheck:      config.AutoStatusCheck,
+			StatusCheckInterval:  statusCheckInterval,
+			ProgramUpdateScheme:  programUpdateSchemeSelect.Selected,
+			ProgramUpdatePath:    programUpdatePathEntry.Text,
+			ProgramUpdatePort:    programUpdatePort,
+			FirewallDeployScheme: firewallDeploySchemeSelect.Selected,
+			FirewallDeployPath:   firewallDeployPathEntry.Text,
+			FirewallDeployPort:   firewallDeployPort,
+			DeviceInfoScheme:     deviceInfoSchemeSelect.Selected,
+			DeviceInfoPath:       deviceInfoPathEntry.Text,
+			DeviceInfoPort:       deviceInfoPort,
 		}
 
 		if err := m.store.SaveConfig(newConfig); err != nil {

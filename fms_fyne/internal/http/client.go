@@ -56,6 +56,12 @@ func (c *Client) CheckHealthDirect(fw *model.Firewall) (bool, error) {
 		ip = fw.DeviceName
 	}
 
+	// 스킴 결정 (장비별 설정 > 전역 설정 > 기본값)
+	scheme := fw.DeviceInfoScheme
+	if scheme == "" {
+		scheme = c.config.GetDeviceInfoScheme()
+	}
+
 	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
 	port := fw.DeviceInfoPort
 	if port == 0 {
@@ -74,7 +80,7 @@ func (c *Client) CheckHealthDirect(fw *model.Firewall) (bool, error) {
 		path = model.DefaultDeviceInfoPath
 	}
 
-	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
+	url := fmt.Sprintf("%s://%s:%d%s", scheme, ip, port, path)
 	log.Printf("[DEBUG] CheckHealthDirect: URL=%s", url)
 
 	resp, err := c.httpClient.Get(url)
@@ -97,6 +103,12 @@ func (c *Client) DeployDirect(fw *model.Firewall, template string) (*model.Deplo
 		ip = fw.DeviceName
 	}
 
+	// 스킴 결정 (장비별 설정 > 전역 설정 > 기본값)
+	scheme := fw.FirewallDeployScheme
+	if scheme == "" {
+		scheme = c.config.GetFirewallDeployScheme()
+	}
+
 	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
 	port := fw.FirewallDeployPort
 	if port == 0 {
@@ -115,7 +127,7 @@ func (c *Client) DeployDirect(fw *model.Firewall, template string) (*model.Deplo
 		path = model.DefaultFirewallDeployPath
 	}
 
-	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
+	url := fmt.Sprintf("%s://%s:%d%s", scheme, ip, port, path)
 	log.Printf("[DEBUG] DeployDirect: URL=%s", url)
 	log.Printf("[DEBUG] DeployDirect: template length=%d, content=\n%s", len(template), template)
 
@@ -219,6 +231,12 @@ func (c *Client) GetDeviceInfoDirect(fw *model.Firewall) (*DeviceReportResponse,
 		ip = fw.DeviceName
 	}
 
+	// 스킴 결정 (장비별 설정 > 전역 설정 > 기본값)
+	scheme := fw.DeviceInfoScheme
+	if scheme == "" {
+		scheme = c.config.GetDeviceInfoScheme()
+	}
+
 	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
 	port := fw.DeviceInfoPort
 	if port == 0 {
@@ -237,7 +255,7 @@ func (c *Client) GetDeviceInfoDirect(fw *model.Firewall) (*DeviceReportResponse,
 		path = model.DefaultDeviceInfoPath
 	}
 
-	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
+	url := fmt.Sprintf("%s://%s:%d%s", scheme, ip, port, path)
 	log.Printf("[DEBUG] GetDeviceInfoDirect: URL=%s", url)
 
 	resp, err := c.httpClient.Get(url)
@@ -276,6 +294,12 @@ func (c *Client) ProgramUpdateDirect(fw *model.Firewall, req *ProgramUpdateReque
 		ip = fw.DeviceName
 	}
 
+	// 스킴 결정 (장비별 설정 > 전역 설정 > 기본값)
+	scheme := fw.ProgramUpdateScheme
+	if scheme == "" {
+		scheme = c.config.GetProgramUpdateScheme()
+	}
+
 	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
 	port := fw.ProgramUpdatePort
 	if port == 0 {
@@ -294,7 +318,7 @@ func (c *Client) ProgramUpdateDirect(fw *model.Firewall, req *ProgramUpdateReque
 		path = model.DefaultProgramUpdatePath
 	}
 
-	url := fmt.Sprintf("http://%s:%d%s", ip, port, path)
+	url := fmt.Sprintf("%s://%s:%d%s", scheme, ip, port, path)
 	log.Printf("[DEBUG] ProgramUpdateDirect: URL=%s", url)
 	log.Printf("[DEBUG] ProgramUpdateDirect: request=%+v", req)
 
