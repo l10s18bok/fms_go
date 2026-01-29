@@ -2,11 +2,14 @@ package ssh
 
 import (
 	"bytes"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/kayrus/putty"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -167,10 +170,26 @@ func isPPKFormat(data []byte) bool {
 }
 
 // convertPPKToOpenSSH PPK 형식을 OpenSSH 형식으로 변환합니다.
-// 참고: 실제 PPK 변환은 복잡하므로 기본 구현만 제공합니다.
-// 프로덕션에서는 외부 라이브러리 사용을 권장합니다.
 func convertPPKToOpenSSH(ppkData []byte) ([]byte, error) {
-	// PPK 형식은 복잡하므로 OpenSSH 형식(.pem)을 사용하도록 안내
-	return nil, fmt.Errorf("PPK 형식은 지원되지 않습니다. OpenSSH 형식(.pem)으로 변환하여 사용해주세요. " +
-		"PuTTYgen에서 Conversions > Export OpenSSH key로 변환할 수 있습니다")
+	ppkKey, err := putty.New(ppkData)
+	if err != nil {
+		return nil, fmt.Errorf("PPK 파일 파싱 실패: %w", err)
+	}
+
+	privateKey, err := ppkKey.ParseRawPrivateKey(nil)
+	if err != nil {
+		return nil, fmt.Errorf("PPK 개인키 추출 실패: %w", err)
+	}
+
+	derBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("개인키 변환 실패: %w", err)
+	}
+
+	pemBlock := &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: derBytes,
+	}
+
+	return pem.EncodeToMemory(pemBlock), nil
 }

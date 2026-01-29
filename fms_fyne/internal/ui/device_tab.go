@@ -591,18 +591,18 @@ func (d *DeviceTab) showAddEditDialog() {
 	authSelect := widget.NewSelect([]string{"PW", "PPK"}, nil)
 	authSelect.SetSelected("PW")
 
-	// PW 입력 영역 (SSH ID와 비밀번호를 별도 줄에, 너비 2배)
+	// SSH ID 입력 영역 (PW/PPK 공통)
 	sshIDEntryWidth := float32(160)
+	sshIDContainer := container.NewHBox(
+		container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("SSH ID:")),
+		container.NewGridWrap(fyne.NewSize(sshIDEntryWidth, rowHeight), sshIDEntry),
+	)
+
+	// PW 입력 영역 (비밀번호만)
 	sshPWEntryWidth := float32(240)
-	pwContainer := container.NewVBox(
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("SSH ID:")),
-			container.NewGridWrap(fyne.NewSize(sshIDEntryWidth, rowHeight), sshIDEntry),
-		),
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("비밀번호:")),
-			container.NewGridWrap(fyne.NewSize(sshPWEntryWidth, rowHeight), sshPWEntry),
-		),
+	pwContainer := container.NewHBox(
+		container.NewGridWrap(fyne.NewSize(70, rowHeight), widget.NewLabel("비밀번호:")),
+		container.NewGridWrap(fyne.NewSize(sshPWEntryWidth, rowHeight), sshPWEntry),
 	)
 
 	// PPK 입력 영역 (초기에 숨김)
@@ -729,8 +729,10 @@ func (d *DeviceTab) showAddEditDialog() {
 			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("접속선택:")),
 			container.NewGridWrap(fyne.NewSize(entryWidth, rowHeight), authSelect),
 		),
+		// SSH ID (PW/PPK 공통)
+		sshIDContainer,
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing/2), layout.NewSpacer()), // 간격
-		// PW 영역 (점선 테두리)
+		// PW 영역 (비밀번호)
 		pwContainer,
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing/2), layout.NewSpacer()), // 간격
 		// PPK 영역 (점선 테두리)
