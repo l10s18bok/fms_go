@@ -497,7 +497,7 @@ const FirewallDetailHelpText = `
      IPS: 패킷 차단 + 알림 전송
      NAT인 경우 NAT 룰로 분류
 
--p : Protocol (TCP, UDP, ICMP, ANY)
+-p : Protocol (TCP, UDP, ICMP, ANY, IPS?타입명)
      IPS 룰: IPS?타입명 형식
      (예: -p="IPS?syn-flood&limit=50&seconds=2&enable=1")
 
