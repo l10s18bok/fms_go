@@ -607,9 +607,12 @@ func (d *DeviceTab) showAddEditDialog() {
 
 	// PPK 입력 영역 (초기에 숨김)
 	ppkBrowseBtn := widget.NewButton("찾아보기...", nil)
-	ppkContainer := container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(50, rowHeight), widget.NewLabel("PPK:")),
-		ppkBrowseBtn,
+	ppkContainer := container.NewVBox(
+		container.NewHBox(
+			container.NewGridWrap(fyne.NewSize(50, rowHeight), widget.NewLabel("PPK:")),
+			ppkBrowseBtn,
+		),
+		ppkPathLabel,
 	)
 	ppkContainer.Hide()
 
@@ -889,12 +892,12 @@ func (d *DeviceTab) showAddEditDialog() {
 		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()), // 헤더 아래 간격
 		formContent,
 		btnContainer,
-		container.NewGridWrap(fyne.NewSize(1, 20), layout.NewSpacer()), // 하단 여백
+		container.NewGridWrap(fyne.NewSize(1, 10), layout.NewSpacer()), // 하단 여백
 	)
 
 	// 고정 크기 컨테이너 (API 경로 필드 추가로 크기 확장)
-	paddedContent := container.New(layout.NewCustomPaddedLayout(20, 20, 20, 20), content)
-	sizedContent := container.NewGridWrap(fyne.NewSize(480, 850), paddedContent)
+	paddedContent := container.New(layout.NewCustomPaddedLayout(-5, 20, 20, 20), content)
+	sizedContent := container.NewGridWrap(fyne.NewSize(480, 822), paddedContent)
 
 	// 팝업 생성
 	popup = widget.NewModalPopUp(sizedContent, d.window.Canvas())
