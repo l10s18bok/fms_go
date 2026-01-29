@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -123,9 +124,16 @@ func (t *FirewallEditTab) createUI() {
 
 	buttons := container.NewHBox(t.addBtn, saveBtn)
 
-	// 헤더: 왼쪽에 "방화벽 상세보기" 레이블, 오른쪽에 버튼
+	// 도움말 버튼
+	helpBtn := widget.NewButtonWithIcon("", theme.QuestionIcon(), func() {
+		component.ShowHelpPopup("방화벽 상세보기 도움말", component.FirewallDetailHelpText, t.content)
+	})
+	helpBtn.Importance = widget.LowImportance
+
+	// 헤더: 왼쪽에 "방화벽 상세보기" 레이블 + 도움말 버튼, 오른쪽에 버튼
 	titleLabel := widget.NewLabelWithStyle("방화벽 상세보기", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	header := container.NewBorder(nil, nil, titleLabel, buttons, nil)
+	titleRow := container.NewHBox(container.NewCenter(titleLabel), container.NewCenter(helpBtn))
+	header := container.NewBorder(nil, nil, titleRow, buttons, nil)
 
 	// 전체 레이아웃
 	t.content = container.NewBorder(

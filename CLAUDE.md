@@ -67,25 +67,47 @@ FMS 클라이언트 → 방화벽 장비 (직접 연결)
 
 ---
 
-## 템플릿 규칙 포맷
+## 방화벽 규칙 포맷
 
 규칙은 Agent 명령어 형식으로 장비에 전달됩니다.
 
+### 옵션 목록
+
+| 옵션 | 용도 |
+|------|------|
+| `-f` | 방화벽 모드 플래그 |
+| `-I` | 룰 추가 (Insert) |
+| `-D` | 룰 삭제 (Delete) |
+| `-c` | Chain (INPUT, OUTPUT, FORWARD 등) |
+| `-p` | Protocol (TCP, UDP, ICMP, ANY, IPS?타입명) |
+| `-a` | Action (ACCEPT, DROP, IDS, IPS, NAT, blocklist, whitelist) |
+| `-n` | Destination Port |
+| `-s` | Source IP |
+| `-e` | Destination IP |
+| `-i` | Inbound Interface |
+| `-o` | Outbound Interface |
+
 ### 일반 방화벽 규칙
 ```
-./agent -f -I -c {CHAIN} -a {ACTION} -p {PROTOCOL} -s {SRC} -d {DST} --dport {PORT}
+./agent -f -I -c {CHAIN} -a {ACTION} -p {PROTOCOL} -s {SRC} -e {DST} -n {PORT}
 ```
 
 ### NAT 규칙
 ```
-./agent -f -I -a NAT -p {PROTOCOL}?{NAT_TYPE} -s {SRC} --dest {DEST_IP} --dport {PORT}
+./agent -f -I -a NAT -p {PROTOCOL}?{NAT_TYPE} -s {SRC} -e {DEST_IP} -n {PORT}
+```
+
+### IPS 규칙
+```
+./agent -f -I -p "IPS?{IPS_TYPE}&limit={LIMIT}&seconds={SECONDS}&enable={0|1}" -a {IPS|IDS}
 ```
 
 ### 예시
 ```
-./agent -f -I -c INPUT -a ACCEPT -p tcp -s 192.168.1.0/24 --dport 80
-./agent -f -I -a NAT -p tcp?DNAT --dest 192.168.30.180 --dport 6080 --to-port 8080
-./agent -f -I -a NAT -p tcp?SNAT -s 192.168.1.0/24 --dest 203.0.113.1
+./agent -f -I -c INPUT -a ACCEPT -p TCP -s 192.168.1.0/24 -n 80
+./agent -f -I -a NAT -p TCP?DNAT -n 80 -e 192.168.1.10:80 -i eth0
+./agent -f -I -a NAT -p TCP?SNAT -s 192.168.1.0/24 -e 203.0.113.1 -o eth0
+./agent -f -I -p "IPS?syn-flood&limit=50&seconds=2&enable=1" -a IPS
 ```
 
 ---

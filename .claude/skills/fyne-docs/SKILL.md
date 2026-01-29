@@ -213,3 +213,17 @@ parentDialog.Show()
 [추가] 클릭 → 테이블에 빈 행 추가 → 행 내에서 직접 편집
                                     → [찾아보기...] 버튼은 메인 윈도우에서 FileOpen 호출
 ```
+
+## HBox/Border 수직 정렬 문제
+
+`HBox`와 `Border`는 자식 위젯을 세로 방향으로 **늘려서(stretch)** 컨테이너 높이에 맞춥니다. 따라서 높이가 다른 위젯(예: Label과 Button)을 나란히 배치하면 수직 중앙이 맞지 않을 수 있습니다.
+
+**해결:** `container.NewCenter()`로 각 위젯을 감싸면 원래 크기를 유지하면서 중앙 정렬됩니다.
+
+```go
+// ❌ 수직 정렬 안 맞음
+titleRow := container.NewHBox(titleLabel, helpBtn)
+
+// ✅ 수직 중앙 정렬
+titleRow := container.NewHBox(container.NewCenter(titleLabel), container.NewCenter(helpBtn))
+```

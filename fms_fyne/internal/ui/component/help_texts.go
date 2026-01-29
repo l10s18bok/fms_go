@@ -481,3 +481,32 @@ const FirewallFileHelpText = `
 • 파일명에서 첫번째 "-" 을 기준으로 버전 정보를 
   자동으로 추출합니다.  
 • 예: rules-v1_0_1.txt → v1.0.1`
+
+// FirewallDetailHelpText 방화벽 상세보기 옵션 도움말
+const FirewallDetailHelpText = `
+[Agent 명령어 옵션 설명]
+
+./agent -f : 방화벽 명령어 시작
+
+-I : 룰 추가 (Insert) | -D : 룰 삭제 (Delete)
+
+-c : Chain (INPUT, OUTPUT, FORWARD 등)
+
+-a : Action (ACCEPT, DROP, IDS, IPS, NAT)
+     IDS: 패킷 허용 + 알림 전송
+     IPS: 패킷 차단 + 알림 전송
+     NAT인 경우 NAT 룰로 분류
+
+-p : Protocol (TCP, UDP, ICMP, ANY)
+     IPS 룰: IPS?타입명 형식
+     (예: -p="IPS?syn-flood&limit=50&seconds=2&enable=1")
+
+-s : Source IP (출발지 IP/네트워크)
+
+-e : Destination IP (목적지 IP/네트워크)
+
+-n : Destination Port (목적지 포트)
+
+-i : Inbound Interface (인바운드 인터페이스)
+
+-o : Outbound Interface (아웃바운드 인터페이스)`

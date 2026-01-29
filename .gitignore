@@ -23,6 +23,7 @@ smartfw_hs/
 .vscode/
 *.swp
 *.swo
+*.sh
 
 # Claude Code 로컬 설정
 .claude/
@@ -32,6 +33,8 @@ nul
 
 # 개인키 생성안내 제외
 ssh키생성.txt
+
+delete.txt
 
 # OS
 .DS_Store
