@@ -156,16 +156,22 @@ func (t *FirewallEditTab) loadContent() {
 func (t *FirewallEditTab) onSubTabChanged(tab *container.TabItem) {
 	switch tab.Text {
 	case "Firewall":
-		// 텍스트 -> 룰 빌더로 변환 (필터 규칙만)
+		// 텍스트 -> 양쪽 빌더로 변환 (탭 전환 시 규칙 소실 방지)
 		rules, comments, _ := parser.ParseTextToRules(t.textEditor.Text)
 		t.ruleBuilder.SetRules(rules)
 		t.ruleBuilder.SetComments(comments)
+		natRules, natComments, _ := parser.ParseTextToNATRules(t.textEditor.Text)
+		t.natBuilder.SetRules(natRules)
+		t.natBuilder.SetComments(natComments)
 		t.addBtn.Show() // 추가 버튼 표시
 	case "NAT":
-		// 텍스트 -> NAT 빌더로 변환 (NAT 규칙만)
-		natRules, comments, _ := parser.ParseTextToNATRules(t.textEditor.Text)
+		// 텍스트 -> 양쪽 빌더로 변환 (탭 전환 시 규칙 소실 방지)
+		rules, comments, _ := parser.ParseTextToRules(t.textEditor.Text)
+		t.ruleBuilder.SetRules(rules)
+		t.ruleBuilder.SetComments(comments)
+		natRules, natComments, _ := parser.ParseTextToNATRules(t.textEditor.Text)
 		t.natBuilder.SetRules(natRules)
-		t.natBuilder.SetComments(comments)
+		t.natBuilder.SetComments(natComments)
 		t.addBtn.Show() // 추가 버튼 표시
 	case "목록보기":
 		// 모든 빌더의 내용을 텍스트로 통합
@@ -359,6 +365,23 @@ func (t *FirewallEditTab) createExampleRulesUI() fyne.CanvasObject {
 	// 예시 헤더
 	exampleLabel := widget.NewLabelWithStyle("예시 규칙:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
+	// 전체복사 버튼 (규칙만 복사, 주석 제외)
+	copyAllBtn := widget.NewButton("전체복사", func() {
+		var allRules strings.Builder
+		for i, rule := range component.FirewallExampleRules {
+			allRules.WriteString(rule.Command)
+			if i < len(component.FirewallExampleRules)-1 {
+				allRules.WriteString("\n")
+			}
+		}
+		fyne.CurrentApp().Clipboard().SetContent(allRules.String())
+		component.ShowSuccessToast(t.window, "전체 예시 규칙이 클립보드에 복사됨")
+	})
+	copyAllBtn.Importance = widget.LowImportance
+
+	// 헤더 행 (라벨 + 전체복사 버튼)
+	headerRow := container.NewHBox(exampleLabel, copyAllBtn)
+
 	// 각 규칙에 대한 행 생성
 	var rows []fyne.CanvasObject
 	for _, rule := range component.FirewallExampleRules {
@@ -384,7 +407,7 @@ func (t *FirewallEditTab) createExampleRulesUI() fyne.CanvasObject {
 	rulesBox := container.NewStack(border, paddedScroll)
 
 	return container.NewVBox(
-		exampleLabel,
+		headerRow,
 		rulesBox,
 	)
 }
