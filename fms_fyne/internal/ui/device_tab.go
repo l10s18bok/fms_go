@@ -23,7 +23,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
-	fynestorage "fyne.io/fyne/v2/storage"
+
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
@@ -909,7 +909,7 @@ func (d *DeviceTab) showAddEditDialog() {
 			}
 			popup.Show() // 부모 다이얼로그 다시 표시
 		}, d.window)
-		fileDialog.SetFilter(fynestorage.NewExtensionFileFilter([]string{".ppk", ".pem", ".key"}))
+
 		fileDialog.Show()
 	}
 
