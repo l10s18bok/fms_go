@@ -622,6 +622,7 @@ func (d *DeviceTab) showAddEditDialog() {
 			pwContainer.Show()
 			ppkContainer.Hide()
 		} else {
+			sshPWEntry.SetText("")
 			pwContainer.Hide()
 			ppkContainer.Show()
 		}
