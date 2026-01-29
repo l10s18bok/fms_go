@@ -97,7 +97,7 @@ func (t *ProgramTab) createUI() {
 			{Header: "로컬파일 경로", Width: 500},
 			{Header: "추가(수정)시간", Width: 150},
 		},
-		PageSize: 10,
+		PageSize: 15,
 		OnCellUpdate: func(row int, col int, cell fyne.CanvasObject) {
 			t.updateCell(row, col, cell)
 		},

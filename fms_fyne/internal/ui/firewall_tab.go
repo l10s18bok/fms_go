@@ -102,7 +102,7 @@ func (t *FirewallTab) createUI() {
 			{Header: "수정한 날짜", Width: 180},
 			{Header: "버전", Width: 100},
 		},
-		PageSize: 10,
+		PageSize: 15,
 		OnCellUpdate: func(row int, col int, cell fyne.CanvasObject) {
 			t.updateCell(row, col, cell)
 		},

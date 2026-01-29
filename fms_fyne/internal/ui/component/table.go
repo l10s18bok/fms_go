@@ -73,7 +73,9 @@ type PagedTable struct {
 	pageContent *fyne.Container
 
 	// 전체 컨테이너
-	content *fyne.Container
+	content          *fyne.Container
+	resizableContent *resizableContainer // 크기 변경 감지용 래퍼
+	resizeTimer      *time.Timer         // 리사이즈 디바운스 타이머
 }
 
 // NewPagedTable 새 페이지네이션 테이블 생성
@@ -84,7 +86,7 @@ func NewPagedTable(config PagedTableConfig) *PagedTable {
 // NewPagedTableWithWindow 윈도우와 함께 새 페이지네이션 테이블 생성 (인라인 편집 시 ESC 키 처리용)
 func NewPagedTableWithWindow(config PagedTableConfig, window fyne.Window) *PagedTable {
 	if config.PageSize <= 0 {
-		config.PageSize = 10 // 기본값
+		config.PageSize = 15 // 기본값
 	}
 
 	t := &PagedTable{
@@ -236,6 +238,38 @@ func (t *PagedTable) createUI() {
 		borderedTable,
 	)
 
+	// 크기 변경 감지 래퍼 생성
+	t.resizableContent = newResizableContainer(t.content, func(size fyne.Size) {
+		// 유효하지 않은 크기 무시 (탭 전환 시 숨겨진 테이블)
+		if size.Height < 200 {
+			return
+		}
+
+		// 디바운스: 크기 변경이 멈춘 후 50ms 뒤에 PageSize 업데이트
+		if t.resizeTimer != nil {
+			t.resizeTimer.Stop()
+		}
+		t.resizeTimer = time.AfterFunc(50*time.Millisecond, func() {
+			// 헤더(34) + 페이지네이션바(40) + 외곽선(2) + 여백 = 80px 오버헤드
+			availableHeight := size.Height - 80
+			rowHeight := float32(34) // 행 높이(30) + Fyne 내부 패딩
+
+			newPageSize := int(availableHeight / rowHeight)
+			if newPageSize < 5 {
+				newPageSize = 5
+			}
+			if newPageSize > 32 {
+				newPageSize = 32
+			}
+
+			if newPageSize != t.config.PageSize {
+				fyne.Do(func() {
+					t.SetPageSize(newPageSize)
+				})
+			}
+		})
+	})
+
 	t.updatePaginationUI()
 }
 
@@ -298,9 +332,6 @@ func (t *PagedTable) updateCell(id widget.TableCellID, cell fyne.CanvasObject) {
 		background.Refresh()
 		return
 	}
-
-	// 데이터 행 높이 고정 (텍스트 오버랩 방지)
-	t.table.SetRowHeight(id.Row, 30)
 
 	// 더블탭 콜백 설정 (OnRowDoubleClick이 설정된 경우)
 	if t.config.OnRowDoubleClick != nil {
@@ -687,14 +718,38 @@ func (t *PagedTable) SetColumnWidth(col int, width float32) {
 	t.table.SetColumnWidth(col, width)
 }
 
-// Content 컨텐츠 반환
+// Content 컨텐츠 반환 (크기 변경 감지 래퍼 포함)
 func (t *PagedTable) Content() fyne.CanvasObject {
-	return t.content
+	return t.resizableContent
 }
 
 // CreateRenderer 렌더러 생성
 func (t *PagedTable) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(t.content)
+}
+
+// resizableContainer 크기 변경 감지 컨테이너
+type resizableContainer struct {
+	widget.BaseWidget
+	wrapped  *fyne.Container
+	onResize func(fyne.Size)
+}
+
+func newResizableContainer(wrapped *fyne.Container, onResize func(fyne.Size)) *resizableContainer {
+	r := &resizableContainer{wrapped: wrapped, onResize: onResize}
+	r.ExtendBaseWidget(r)
+	return r
+}
+
+func (r *resizableContainer) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(r.wrapped)
+}
+
+func (r *resizableContainer) Resize(size fyne.Size) {
+	r.BaseWidget.Resize(size)
+	if r.onResize != nil {
+		r.onResize(size)
+	}
 }
 
 // GetPageSize 페이지 크기 반환
@@ -706,7 +761,14 @@ func (t *PagedTable) GetPageSize() int {
 func (t *PagedTable) SetPageSize(size int) {
 	if size > 0 {
 		t.config.PageSize = size
-		t.currentPage = 0
+		// 현재 페이지가 총 페이지 수를 초과하면 마지막 페이지로 이동
+		totalPages := t.getTotalPages()
+		if t.currentPage >= totalPages {
+			t.currentPage = totalPages - 1
+		}
+		if t.currentPage < 0 {
+			t.currentPage = 0
+		}
 		t.table.Refresh()
 		t.updatePaginationUI()
 	}
