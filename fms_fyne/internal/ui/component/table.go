@@ -3,6 +3,8 @@ package component
 import (
 	"fmt"
 	"image/color"
+	"log"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -60,6 +62,8 @@ type PagedTable struct {
 	// 인라인 편집 상태
 	editingCell    *widget.TableCellID // 현재 편집 중인 셀 (nil이면 편집 중 아님)
 	editingValue   string              // 편집 전 원본 값
+	isCancelling     bool // cancelEditing 중복 호출 방지
+	focusLostPending bool // FocusLost 대기 중
 	window         fyne.Window         // ESC 키 처리용 윈도우
 
 	// 페이지네이션 UI
@@ -154,6 +158,8 @@ func (t *PagedTable) createUI() {
 
 	// 셀 선택 이벤트 (클릭/Enter 키/방향키)
 	t.table.OnSelected = func(id widget.TableCellID) {
+		log.Printf("[PagedTable] OnSelected: row=%d, col=%d, editingCell=%v", id.Row, id.Col, t.editingCell)
+
 		if id.Row == 0 {
 			t.table.UnselectAll()
 			return // 헤더 클릭 무시
@@ -164,6 +170,12 @@ func (t *PagedTable) createUI() {
 		if dataIndex < 0 || dataIndex >= t.totalItems {
 			t.table.UnselectAll()
 			return
+		}
+
+		// 편집 중인 셀이 있으면 취소
+		if t.editingCell != nil {
+			log.Printf("[PagedTable] 편집 중 다른 셀 클릭 - cancelEditing 호출")
+			t.cancelEditing()
 		}
 
 		// 행 선택 상태 업데이트
@@ -356,10 +368,33 @@ func (t *PagedTable) updateCell(id widget.TableCellID, cell fyne.CanvasObject) {
 						t.finishEditing(dataIndex, id.Col, text, editConfig)
 					},
 					func() {
-						// ESC 키 또는 포커스 잃으면 취소
+						// ESC 키 취소
 						t.cancelEditing()
 					},
 				)
+				// 포커스 획득 시 대기 중인 취소 중단
+				entry.onFocusGained = func() {
+					t.focusLostPending = false
+				}
+				// 포커스 잃을 때 편집 취소
+				entry.onFocusLost = func() {
+					if t.isCancelling {
+						return
+					}
+					t.focusLostPending = true
+					go func() {
+						time.Sleep(300 * time.Millisecond)
+						if t.focusLostPending && t.editingCell != nil && !t.isCancelling {
+							log.Println("[PagedTable] FocusLost - cancelEditing 호출")
+							t.focusLostPending = false
+							t.isCancelling = true
+							fyne.Do(func() {
+								t.cancelEditing()
+								t.isCancelling = false
+							})
+						}
+					}()
+				}
 				customContainer.Objects = append(customContainer.Objects, entry)
 			}
 			customContainer.Show()
@@ -381,10 +416,17 @@ func (t *PagedTable) updateCell(id widget.TableCellID, cell fyne.CanvasObject) {
 				label.Show()
 			}
 
-			// 편집 가능 컬럼이면 클릭 시 편집 모드 진입
+			// 셀 클릭 시 처리
 			if isEditable {
 				dtCell.onTap = func() {
 					t.startEditing(id, dataIndex, editConfig)
+				}
+			} else {
+				// 편집 불가 셀 클릭 시 편집 중이면 취소
+				dtCell.onTap = func() {
+					if t.editingCell != nil {
+						t.cancelEditing()
+					}
 				}
 			}
 		}
@@ -766,7 +808,9 @@ func (t *PagedTable) cancelEditing() {
 // editableEntry ESC 키 처리가 가능한 Entry 확장
 type editableEntry struct {
 	widget.Entry
-	onCancel func()
+	onCancel      func()
+	onFocusLost   func()
+	onFocusGained func()
 }
 
 func newEditableEntry(text string, onSubmit func(string), onCancel func()) *editableEntry {
@@ -777,6 +821,20 @@ func newEditableEntry(text string, onSubmit func(string), onCancel func()) *edit
 	e.SetText(text)
 	e.OnSubmitted = onSubmit
 	return e
+}
+
+func (e *editableEntry) FocusGained() {
+	e.Entry.FocusGained()
+	if e.onFocusGained != nil {
+		e.onFocusGained()
+	}
+}
+
+func (e *editableEntry) FocusLost() {
+	e.Entry.FocusLost()
+	if e.onFocusLost != nil {
+		e.onFocusLost()
+	}
 }
 
 func (e *editableEntry) TypedKey(key *fyne.KeyEvent) {

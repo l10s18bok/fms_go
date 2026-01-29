@@ -2,6 +2,8 @@ package component
 
 import (
 	"image/color"
+	"log"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -13,13 +15,29 @@ import (
 // cellEntry Esc 키 처리가 가능한 커스텀 Entry
 type cellEntry struct {
 	widget.Entry
-	onEscape func() // Esc 키 콜백
+	onEscape      func() // Esc 키 콜백
+	onFocusLost   func() // 포커스 잃을 때 콜백
+	onFocusGained func() // 포커스 획득 시 콜백
 }
 
 func newCellEntry() *cellEntry {
 	e := &cellEntry{}
 	e.ExtendBaseWidget(e)
 	return e
+}
+
+func (e *cellEntry) FocusGained() {
+	e.Entry.FocusGained()
+	if e.onFocusGained != nil {
+		e.onFocusGained()
+	}
+}
+
+func (e *cellEntry) FocusLost() {
+	e.Entry.FocusLost()
+	if e.onFocusLost != nil {
+		e.onFocusLost()
+	}
 }
 
 func (e *cellEntry) TypedKey(key *fyne.KeyEvent) {
@@ -78,8 +96,10 @@ type EditableTable struct {
 	lastWidth     float32
 
 	// 편집 상태
-	editingCell  *widget.TableCellID // 현재 편집 중인 셀
-	isRefreshing bool                // Refresh 중복 방지
+	editingCell      *widget.TableCellID // 현재 편집 중인 셀
+	isRefreshing     bool                // Refresh 중복 방지
+	isCancelling     bool                // cancelEditing 중복 호출 방지
+	focusLostPending bool                // FocusLost 대기 중
 }
 
 // NewEditableTable 새 테이블 생성
@@ -159,14 +179,18 @@ func (t *EditableTable) createTable() {
 
 		cellConfig := t.config.GetCellConfig(id.Row, id.Col)
 
+		log.Printf("[EditableTable] OnSelected: row=%d, col=%d, type=%d, editingCell=%v", id.Row, id.Col, cellConfig.Type, t.editingCell)
+
 		// Entry와 Select 타입만 편집 모드 진입
 		if cellConfig.Type == CellTypeEntry || cellConfig.Type == CellTypeSelect {
 			// 이미 같은 셀을 편집 중이면 무시
 			if t.editingCell != nil && t.editingCell.Row == id.Row && t.editingCell.Col == id.Col {
+				log.Println("[EditableTable] 같은 셀 편집 중 - 무시")
 				t.table.UnselectAll()
 				return
 			}
 
+			log.Printf("[EditableTable] 편집 모드 진입: row=%d, col=%d", id.Row, id.Col)
 			// 편집 모드 설정
 			t.editingCell = &widget.TableCellID{Row: id.Row, Col: id.Col}
 			t.isRefreshing = true
@@ -174,7 +198,8 @@ func (t *EditableTable) createTable() {
 			t.table.Refresh()
 			t.isRefreshing = false
 		} else {
-			// 다른 타입은 선택만 해제
+			log.Printf("[EditableTable] 비편집 셀 클릭: type=%d, finishEditing 호출", cellConfig.Type)
+			t.finishEditing()
 			t.table.UnselectAll()
 		}
 	}
@@ -250,6 +275,32 @@ func (t *EditableTable) updateCell(id widget.TableCellID, obj fyne.CanvasObject)
 			// Esc 키 입력 시 편집 종료
 			entry.onEscape = func() {
 				t.finishEditing()
+			}
+			// 포커스 획득 시 대기 중인 취소 중단
+			entry.onFocusGained = func() {
+				t.focusLostPending = false
+			}
+			// 포커스 잃을 때 편집 종료
+			lostRow, lostCol := id.Row, id.Col
+			entry.onFocusLost = func() {
+				if t.isCancelling {
+					return
+				}
+				t.focusLostPending = true
+				go func() {
+					time.Sleep(300 * time.Millisecond)
+					// 편집 중인 셀이 FocusLost가 발생한 셀과 동일한 경우에만 종료
+					if t.focusLostPending && t.editingCell != nil && !t.isCancelling &&
+						t.editingCell.Row == lostRow && t.editingCell.Col == lostCol {
+						log.Println("[EditableTable] FocusLost - finishEditing 호출")
+						t.focusLostPending = false
+						t.isCancelling = true
+						fyne.Do(func() {
+							t.finishEditing()
+							t.isCancelling = false
+						})
+					}
+				}()
 			}
 			entry.Show()
 		} else {
