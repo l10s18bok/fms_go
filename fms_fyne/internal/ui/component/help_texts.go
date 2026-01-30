@@ -457,9 +457,11 @@ var FirewallExampleRules = []FirewallExampleRule{
 const FirewallFileHelpText = `
 [파일 추가]
 • 드래그 앤 드롭으로 파일을 테이블에 끌어다 놓으면
-  자동으로 추가됩니다.
-• 또한, "추가/수정" 버튼을 클릭하여 추가할 수도 
+  자동으로 추가됩니다.(저장위치: config/rule_files)
+• 또한, "추가/수정" 버튼을 클릭하여 추가할 수도
   있습니다.
+• config/rule_files 디렉토리의 파일 변경을 실시간
+  감지하여 테이블이 자동으로 갱신됩니다.
 
 [파일 편집]
 • 테이블 행(Row)을 더블클릭하면 방화벽 상세보기에서
