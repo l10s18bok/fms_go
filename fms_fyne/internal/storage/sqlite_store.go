@@ -438,7 +438,7 @@ func (s *SQLiteStore) GetHistoryPage(req model.PageRequest) (*model.PageResult[m
 	defer s.mu.RUnlock()
 
 	// 1단계: 필터/검색 조건으로 카운트 조회
-	whereClause, whereArgs := buildHistoryWhereClause(req.Filter, req.Keyword)
+	whereClause, whereArgs := buildHistoryWhereClause(req.Filter, req.Keyword, req.StartDate, req.EndDate)
 
 	var totalCount int
 	countQuery := "SELECT COUNT(*) FROM deploy_history" + whereClause
@@ -547,7 +547,7 @@ func (s *SQLiteStore) getRuleResultsBatch(historyIDs []int) (map[int][]model.Rul
 }
 
 // buildHistoryWhereClause 이력 조회용 WHERE 절을 빌드합니다.
-func buildHistoryWhereClause(filter, keyword string) (string, []interface{}) {
+func buildHistoryWhereClause(filter, keyword, startDate, endDate string) (string, []interface{}) {
 	var conditions []string
 	var args []interface{}
 
@@ -561,6 +561,16 @@ func buildHistoryWhereClause(filter, keyword string) (string, []interface{}) {
 			conditions = append(conditions, "type = ?")
 			args = append(args, filter)
 		}
+	}
+
+	// 날짜 범위 검색
+	if startDate != "" {
+		conditions = append(conditions, "timestamp >= ?")
+		args = append(args, startDate+" 00:00:00")
+	}
+	if endDate != "" {
+		conditions = append(conditions, "timestamp <= ?")
+		args = append(args, endDate+" 23:59:59")
 	}
 
 	// 키워드 검색 (LIKE)

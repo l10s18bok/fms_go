@@ -28,13 +28,16 @@ type HistoryTab struct {
 	// UI 컴포넌트
 	historyTable *component.PagedTable // 이력 테이블 (공통 컴포넌트)
 	typeFilter   *widget.Select        // 유형 필터
-	searchBox    *component.SearchBox  // 검색 컴포넌트 (공통)
+	searchBox   *component.SearchBox // 검색 컴포넌트 (공통)
+	calendarBtn *widget.Button       // 날짜 선택 아이콘 버튼
 
 	// 데이터 (DB 페이지네이션)
 	pageData      []*model.DeployHistory // 현재 페이지 데이터만
 	totalCount    int                    // 필터/검색 적용 후 전체 건수
 	currentFilter string                 // 현재 유형 필터값
 	searchKeyword string                 // 검색 키워드
+	startDate     string                 // 시작일 (YYYY-MM-DD)
+	endDate       string                 // 종료일 (YYYY-MM-DD)
 }
 
 // 새로운 배포 이력 탭을 생성합니다.
@@ -99,17 +102,36 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 		},
 	})
 
+	// 날짜 선택 아이콘 버튼 (Calendar 팝업)
+	h.calendarBtn = widget.NewButtonWithIcon("", theme.Icon(theme.IconNameCalendar), func() {
+		calendar := widget.NewCalendar(time.Now(), func(t time.Time) {
+			dateStr := t.Format("2006-01-02")
+			current := strings.TrimSpace(h.searchBox.GetText())
+			if current != "" && !strings.Contains(current, "~") {
+				h.searchBox.SetText(current + " ~ " + dateStr)
+			} else {
+				h.searchBox.SetText(dateStr)
+			}
+		})
+		c := fyne.CurrentApp().Driver().CanvasForObject(h.calendarBtn)
+		pop := widget.NewPopUp(calendar, c)
+		btnPos := fyne.CurrentApp().Driver().AbsolutePositionForObject(h.calendarBtn)
+		pop.ShowAtPosition(fyne.NewPos(btnPos.X, btnPos.Y+h.calendarBtn.Size().Height))
+	})
+	h.calendarBtn.Importance = widget.LowImportance
+
 	// 삭제 버튼 (휴지통 아이콘 + 삭제, 빨간 배경, 흰색 텍스트)
 	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
 		h.onDeleteHistory()
 	})
 
-	// 상단 헤더 (PRD 3.3.4: [유형선택 ▼] 검색: [____] [찾기] [선택삭제])
+	// 상단 헤더
 	headerLine := container.NewBorder(
 		nil, nil,
 		container.NewHBox(
 			h.typeFilter,
 			h.searchBox.Content(),
+			h.calendarBtn,
 		),
 		container.NewHBox(deleteBtn),
 		nil,
@@ -176,13 +198,36 @@ func (h *HistoryTab) onSearch() {
 	keyword := strings.TrimSpace(h.searchBox.GetText())
 
 	prevKeyword := h.searchKeyword
+	prevStartDate := h.startDate
+	prevEndDate := h.endDate
+
+	// 날짜 범위 파싱 (YYYY-MM-DD ~ YYYY-MM-DD)
+	h.startDate = ""
+	h.endDate = ""
 	h.searchKeyword = keyword
+	if strings.Contains(keyword, "~") {
+		parts := strings.SplitN(keyword, "~", 2)
+		sd := strings.TrimSpace(parts[0])
+		ed := strings.TrimSpace(parts[1])
+		if _, err := time.Parse("2006-01-02", sd); err == nil {
+			h.startDate = sd
+		}
+		if _, err := time.Parse("2006-01-02", ed); err == nil {
+			h.endDate = ed
+		}
+		// 날짜 범위 검색이면 keyword는 비움
+		if h.startDate != "" || h.endDate != "" {
+			h.searchKeyword = ""
+		}
+	}
 	total := h.loadPage(0, h.historyTable.GetPageSize())
 
 	// 검색 결과가 없으면 이전 상태 유지
 	if total == 0 && keyword != "" {
 		dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", h.window)
 		h.searchKeyword = prevKeyword
+		h.startDate = prevStartDate
+		h.endDate = prevEndDate
 		h.loadPage(0, h.historyTable.GetPageSize())
 	}
 
@@ -212,15 +257,17 @@ func (h *HistoryTab) applyFilter() {
 
 // GetExportData 현재 필터/검색 조건에 맞는 전체 배포이력을 반환합니다.
 func (h *HistoryTab) GetExportData() ([]*model.DeployHistory, error) {
-	if h.currentFilter == "" && h.searchKeyword == "" {
+	if h.currentFilter == "" && h.searchKeyword == "" && h.startDate == "" && h.endDate == "" {
 		return h.historyRepo.GetAll()
 	}
 	// 필터/검색 조건이 있으면 Limit을 크게 설정하여 전체 조회
 	req := model.PageRequest{
-		Offset:  0,
-		Limit:   100000,
-		Filter:  h.currentFilter,
-		Keyword: h.searchKeyword,
+		Offset:    0,
+		Limit:     100000,
+		Filter:    h.currentFilter,
+		Keyword:   h.searchKeyword,
+		StartDate: h.startDate,
+		EndDate:   h.endDate,
 	}
 	result, err := h.historyRepo.GetPage(req)
 	if err != nil {
@@ -231,7 +278,7 @@ func (h *HistoryTab) GetExportData() ([]*model.DeployHistory, error) {
 
 // IsFiltered 필터 또는 검색이 적용되어 있는지 반환합니다.
 func (h *HistoryTab) IsFiltered() bool {
-	return h.currentFilter != "" || h.searchKeyword != ""
+	return h.currentFilter != "" || h.searchKeyword != "" || h.startDate != "" || h.endDate != ""
 }
 
 // 탭의 컨텐츠를 반환합니다.
@@ -242,10 +289,12 @@ func (h *HistoryTab) Content() fyne.CanvasObject {
 // DB에서 해당 페이지 데이터를 조회합니다.
 func (h *HistoryTab) loadPage(page, pageSize int) int {
 	req := model.PageRequest{
-		Offset:  page * pageSize,
-		Limit:   pageSize,
-		Filter:  h.currentFilter,
-		Keyword: h.searchKeyword,
+		Offset:    page * pageSize,
+		Limit:     pageSize,
+		Filter:    h.currentFilter,
+		Keyword:   h.searchKeyword,
+		StartDate: h.startDate,
+		EndDate:   h.endDate,
 	}
 	result, err := h.historyRepo.GetPage(req)
 	if err != nil {
