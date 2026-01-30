@@ -1064,19 +1064,6 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 		ruleVersion = "-"
 	}
 
-	// 프로세스 정보 조회 (API 호출) - 임시 주석처리
-	// var processes []http.ProcessInfo
-	// if config != nil {
-	// 	httpClient := http.NewClient(config)
-	// 	report, err := httpClient.GetDeviceInfoDirect(fw)
-	// 	if err != nil {
-	// 		log.Printf("[DEBUG] showDetailDialog: 프로세스 정보 조회 실패 - %v", err)
-	// 	} else if report != nil {
-	// 		processes = report.Processes
-	// 		log.Printf("[DEBUG] showDetailDialog: 프로세스 정보 조회 성공 - %d개", len(processes))
-	// 	}
-	// }
-
 	// 커스텀 팝업 생성
 	var popup *widget.PopUp
 

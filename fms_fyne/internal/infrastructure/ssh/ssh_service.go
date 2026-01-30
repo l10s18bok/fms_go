@@ -45,7 +45,7 @@ func (c *DefaultSSHClient) Connect(host string, port int, user, password string)
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // 프로덕션에서는 적절한 호스트 키 검증 필요
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         c.timeout,
 	}
 
