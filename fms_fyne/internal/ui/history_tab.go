@@ -95,8 +95,8 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 
 	// 검색 컴포넌트 (공통)
 	h.searchBox = component.NewSearchBox(component.SearchBoxConfig{
-		Placeholder: "시간, 장비명, IP, 유형, 버전, 메시지 검색",
-		Width:       300,
+		Placeholder: "",
+		Width:       200,
 		OnSearch: func(text string) {
 			h.onSearch()
 		},
@@ -129,9 +129,9 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 	headerLine := container.NewBorder(
 		nil, nil,
 		container.NewHBox(
-			h.typeFilter,
 			h.searchBox.Content(),
 			h.calendarBtn,
+			h.typeFilter,
 		),
 		container.NewHBox(deleteBtn),
 		nil,
