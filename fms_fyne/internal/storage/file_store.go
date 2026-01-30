@@ -3,18 +3,25 @@ package storage
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"fms/internal/model"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 // FileStore rule_files 디렉토리의 파일들을 관리합니다.
 type FileStore struct {
-	dataDir string
-	mu      sync.RWMutex
+	dataDir   string
+	mu        sync.RWMutex
+	watcher   *fsnotify.Watcher
+	onChange  func() // 파일 변경 시 콜백
+	stopWatch chan struct{}
 }
 
 // NewFileStore 새로운 FileStore를 생성합니다.
@@ -209,4 +216,63 @@ func (s *FileStore) RenameFile(oldName, newName string) error {
 	newPath := filepath.Join(s.dataDir, newName)
 
 	return os.Rename(oldPath, newPath)
+}
+
+// StartWatch rule_files 디렉토리의 파일 변경을 감시합니다.
+func (s *FileStore) StartWatch(onChange func()) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("파일 감시 생성 실패: %w", err)
+	}
+
+	if err := watcher.Add(s.dataDir); err != nil {
+		watcher.Close()
+		return fmt.Errorf("디렉토리 감시 등록 실패: %w", err)
+	}
+
+	s.watcher = watcher
+	s.onChange = onChange
+	s.stopWatch = make(chan struct{})
+
+	go func() {
+		var debounce *time.Timer
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Op&(fsnotify.Create|fsnotify.Remove|fsnotify.Write|fsnotify.Rename) != 0 {
+					// 디바운스: 연속 이벤트를 300ms 내 하나로 처리
+					if debounce != nil {
+						debounce.Stop()
+					}
+					debounce = time.AfterFunc(300*time.Millisecond, func() {
+						if s.onChange != nil {
+							s.onChange()
+						}
+					})
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Printf("파일 감시 오류: %v", err)
+			case <-s.stopWatch:
+				return
+			}
+		}
+	}()
+
+	return nil
+}
+
+// StopWatch 파일 감시를 중지합니다.
+func (s *FileStore) StopWatch() {
+	if s.stopWatch != nil {
+		close(s.stopWatch)
+	}
+	if s.watcher != nil {
+		s.watcher.Close()
+	}
 }

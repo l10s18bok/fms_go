@@ -4,6 +4,7 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -120,6 +121,13 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.
 
 	// 저장된 설정에서 자동 상태 체크 활성화
 	ui.initAutoStatusCheck()
+
+	// rule_files 디렉토리 파일 변경 감시 시작
+	if err := fileStore.StartWatch(func() {
+		ui.firewallTab.RefreshFiles()
+	}); err != nil {
+		log.Printf("파일 감시 시작 실패: %v", err)
+	}
 
 	return ui
 }
