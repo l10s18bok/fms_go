@@ -210,6 +210,30 @@ func (h *HistoryTab) applyFilter() {
 	}
 }
 
+// GetExportData 현재 필터/검색 조건에 맞는 전체 배포이력을 반환합니다.
+func (h *HistoryTab) GetExportData() ([]*model.DeployHistory, error) {
+	if h.currentFilter == "" && h.searchKeyword == "" {
+		return h.historyRepo.GetAll()
+	}
+	// 필터/검색 조건이 있으면 Limit을 크게 설정하여 전체 조회
+	req := model.PageRequest{
+		Offset:  0,
+		Limit:   100000,
+		Filter:  h.currentFilter,
+		Keyword: h.searchKeyword,
+	}
+	result, err := h.historyRepo.GetPage(req)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
+}
+
+// IsFiltered 필터 또는 검색이 적용되어 있는지 반환합니다.
+func (h *HistoryTab) IsFiltered() bool {
+	return h.currentFilter != "" || h.searchKeyword != ""
+}
+
 // 탭의 컨텐츠를 반환합니다.
 func (h *HistoryTab) Content() fyne.CanvasObject {
 	return h.content

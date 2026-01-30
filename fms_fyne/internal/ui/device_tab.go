@@ -50,9 +50,11 @@ type DeviceTab struct {
 	statusYellowLabel *widget.Label
 	statusRedLabel    *widget.Label
 
-	// 데이터
-	firewalls         []*model.Firewall
-	filteredFirewalls []*model.Firewall // 검색 필터링된 목록
+	// 데이터 (DB 페이지네이션)
+	firewalls     []*model.Firewall // 전체 장비 (상태 체크용)
+	pageData      []*model.Firewall // 현재 페이지 데이터
+	totalCount    int               // 검색 적용 후 전체 건수
+	searchKeyword string            // 검색 키워드
 
 	// 새로고침 상태
 	isRefreshing bool
@@ -75,8 +77,8 @@ func NewDeviceTab(window fyne.Window, firewallRepo repository.FirewallRepository
 		programRepo:       programRepo,
 		configStore:       configStore,
 		firewallTab:       firewallTab,
-		firewalls:         []*model.Firewall{},
-		filteredFirewalls: []*model.Firewall{},
+		firewalls: []*model.Firewall{},
+		pageData:  []*model.Firewall{},
 	}
 	tab.createUI()
 	tab.loadFirewalls()
@@ -249,8 +251,8 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 		},
 		OnRowDoubleClick: func(row int) {
 			// 더블 클릭 - 상세보기
-			if row >= 0 && row < len(d.filteredFirewalls) {
-				d.showDetailDialog(d.filteredFirewalls[row])
+			if row >= 0 && row < len(d.pageData) {
+				d.showDetailDialog(d.pageData[row])
 			}
 		},
 		// 장비명(1), 장비 IP(2), 위치(3), OS정보(5) 컬럼 인라인 편집 설정
@@ -258,8 +260,8 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 			1: { // 장비명 컬럼
 				Type: component.EditTypeEntry,
 				GetValue: func(row int) string {
-					if row >= 0 && row < len(d.filteredFirewalls) {
-						fw := d.filteredFirewalls[row]
+					if row >= 0 && row < len(d.pageData) {
+						fw := d.pageData[row]
 						if fw.DeviceName != "" && fw.DeviceName != fw.DeviceIP {
 							return fw.DeviceName
 						}
@@ -267,8 +269,8 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 					return ""
 				},
 				OnEdit: func(row int, oldValue, newValue string) bool {
-					if row >= 0 && row < len(d.filteredFirewalls) {
-						fw := d.filteredFirewalls[row]
+					if row >= 0 && row < len(d.pageData) {
+						fw := d.pageData[row]
 						fw.DeviceName = newValue
 						// DeviceName이 비어있으면 IP 사용
 						if fw.DeviceName == "" {
@@ -286,8 +288,8 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 			2: { // 장비 IP 컬럼
 				Type: component.EditTypeEntry,
 				GetValue: func(row int) string {
-					if row >= 0 && row < len(d.filteredFirewalls) {
-						fw := d.filteredFirewalls[row]
+					if row >= 0 && row < len(d.pageData) {
+						fw := d.pageData[row]
 						if fw.DeviceIP != "" {
 							return fw.DeviceIP
 						}
@@ -296,13 +298,13 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 					return ""
 				},
 				OnEdit: func(row int, oldValue, newValue string) bool {
-					if row >= 0 && row < len(d.filteredFirewalls) {
+					if row >= 0 && row < len(d.pageData) {
 						// IP 형식 유효성 검사
 						if newValue != "" && !isValidIPOrHostPort(newValue) {
 							dialog.ShowError(fmt.Errorf("올바른 IP 주소 형식이 아닙니다"), d.window)
 							return false
 						}
-						fw := d.filteredFirewalls[row]
+						fw := d.pageData[row]
 						fw.DeviceIP = newValue
 						if err := d.firewallRepo.Save(fw); err != nil {
 							dialog.ShowError(err, d.window)
@@ -316,14 +318,14 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 			3: { // 위치 컬럼
 				Type: component.EditTypeEntry,
 				GetValue: func(row int) string {
-					if row >= 0 && row < len(d.filteredFirewalls) {
-						return d.filteredFirewalls[row].Location
+					if row >= 0 && row < len(d.pageData) {
+						return d.pageData[row].Location
 					}
 					return ""
 				},
 				OnEdit: func(row int, oldValue, newValue string) bool {
-					if row >= 0 && row < len(d.filteredFirewalls) {
-						fw := d.filteredFirewalls[row]
+					if row >= 0 && row < len(d.pageData) {
+						fw := d.pageData[row]
 						fw.Location = newValue
 						if err := d.firewallRepo.Save(fw); err != nil {
 							dialog.ShowError(err, d.window)
@@ -337,14 +339,14 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 			5: { // OS 정보 컬럼
 				Type: component.EditTypeEntry,
 				GetValue: func(row int) string {
-					if row >= 0 && row < len(d.filteredFirewalls) {
-						return d.filteredFirewalls[row].OSInfo
+					if row >= 0 && row < len(d.pageData) {
+						return d.pageData[row].OSInfo
 					}
 					return ""
 				},
 				OnEdit: func(row int, oldValue, newValue string) bool {
-					if row >= 0 && row < len(d.filteredFirewalls) {
-						fw := d.filteredFirewalls[row]
+					if row >= 0 && row < len(d.pageData) {
+						fw := d.pageData[row]
 						fw.OSInfo = newValue
 						if err := d.firewallRepo.Save(fw); err != nil {
 							dialog.ShowError(err, d.window)
@@ -356,6 +358,9 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 				},
 			},
 		},
+		OnPageLoad: func(page, pageSize int) int {
+			return d.loadPage(page, pageSize)
+		},
 	}, d.window)
 
 	return d.deviceTable.Content()
@@ -365,12 +370,12 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 func (d *DeviceTab) updateDeviceCell(row int, col int, cell fyne.CanvasObject) {
 	label := cell.(*widget.Label)
 
-	if row >= len(d.filteredFirewalls) {
+	if row >= len(d.pageData) {
 		label.SetText("")
 		return
 	}
 
-	fw := d.filteredFirewalls[row]
+	fw := d.pageData[row]
 
 	switch col {
 	case 1: // 장비명
@@ -439,11 +444,11 @@ func (d *DeviceTab) updateCustomCell(row int, col int, cont *fyne.Container) boo
 		return false
 	}
 
-	if row >= len(d.filteredFirewalls) {
+	if row >= len(d.pageData) {
 		return false
 	}
 
-	fw := d.filteredFirewalls[row]
+	fw := d.pageData[row]
 
 	// 색상 원 생성
 	var dotColor = themes.Colors["yellow"] // 기본: 알수없음
@@ -462,30 +467,64 @@ func (d *DeviceTab) updateCustomCell(row int, col int, cont *fyne.Container) boo
 	return true
 }
 
-// 검색 필터를 적용합니다.
+// 검색을 실행합니다.
 func (d *DeviceTab) applyFilter() {
-	searchText := strings.ToLower(strings.TrimSpace(d.searchBox.GetText()))
+	keyword := strings.TrimSpace(d.searchBox.GetText())
 
-	if searchText == "" {
-		d.filteredFirewalls = d.firewalls
-	} else {
-		filtered := []*model.Firewall{}
-		for _, fw := range d.firewalls {
-			// 장비명 또는 IP로 검색
-			if strings.Contains(strings.ToLower(fw.DeviceName), searchText) ||
-				strings.Contains(strings.ToLower(fw.DeviceIP), searchText) {
-				filtered = append(filtered, fw)
-			}
-		}
-		// 검색 결과가 없으면 이전 상태 유지
-		if len(filtered) == 0 {
-			dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", d.window)
-			return
-		}
-		d.filteredFirewalls = filtered
+	prevKeyword := d.searchKeyword
+	d.searchKeyword = keyword
+	total := d.loadPage(0, d.deviceTable.GetPageSize())
+
+	// 검색 결과가 없으면 이전 상태 유지
+	if total == 0 && keyword != "" {
+		dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", d.window)
+		d.searchKeyword = prevKeyword
+		d.loadPage(0, d.deviceTable.GetPageSize())
 	}
 
-	d.deviceTable.SetData(len(d.filteredFirewalls))
+	if d.deviceTable != nil {
+		d.deviceTable.SetData(d.totalCount)
+	}
+}
+
+// DB에서 해당 페이지 데이터를 조회합니다.
+func (d *DeviceTab) loadPage(page, pageSize int) int {
+	req := model.PageRequest{
+		Offset:  page * pageSize,
+		Limit:   pageSize,
+		Keyword: d.searchKeyword,
+	}
+	result, err := d.firewallRepo.GetPage(req)
+	if err != nil {
+		d.pageData = []*model.Firewall{}
+		d.totalCount = 0
+		return 0
+	}
+	d.pageData = result.Items
+	d.totalCount = result.TotalCount
+	return result.TotalCount
+}
+
+// GetExportData 현재 검색 조건에 맞는 전체 장비를 반환합니다.
+func (d *DeviceTab) GetExportData() ([]*model.Firewall, error) {
+	if d.searchKeyword == "" {
+		return d.firewallRepo.GetAll()
+	}
+	req := model.PageRequest{
+		Offset:  0,
+		Limit:   100000,
+		Keyword: d.searchKeyword,
+	}
+	result, err := d.firewallRepo.GetPage(req)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
+}
+
+// IsFiltered 검색 필터가 적용되어 있는지 반환합니다.
+func (d *DeviceTab) IsFiltered() bool {
+	return d.searchKeyword != ""
 }
 
 // 탭의 컨텐츠를 반환합니다.
@@ -495,12 +534,12 @@ func (d *DeviceTab) Content() fyne.CanvasObject {
 
 // 저장소에서 장비 목록을 로드합니다.
 func (d *DeviceTab) loadFirewalls() {
+	// 전체 장비 (상태 체크용)
 	firewalls, err := d.firewallRepo.GetAll()
 	if err != nil {
 		dialog.ShowError(err, d.window)
 		return
 	}
-
 	d.firewalls = firewalls
 
 	// Index 내림차순 정렬 (최신순 - Index가 클수록 최신)
@@ -508,8 +547,11 @@ func (d *DeviceTab) loadFirewalls() {
 		return d.firewalls[i].Index > d.firewalls[j].Index
 	})
 
-	// 필터 적용
-	d.applyFilter()
+	// 페이지 데이터 로드
+	total := d.loadPage(0, d.deviceTable.GetPageSize())
+	if d.deviceTable != nil {
+		d.deviceTable.SetData(total)
+	}
 
 	// 상태 요약 업데이트
 	d.updateStatusSummary()
@@ -528,8 +570,8 @@ func (d *DeviceTab) showAddEditDialog() {
 		return
 	}
 
-	if len(checkedRows) == 1 && checkedRows[0] < len(d.filteredFirewalls) {
-		editingFw = d.filteredFirewalls[checkedRows[0]]
+	if len(checkedRows) == 1 && checkedRows[0] < len(d.pageData) {
+		editingFw = d.pageData[checkedRows[0]]
 	}
 
 	// 입력 필드 너비
@@ -817,7 +859,6 @@ func (d *DeviceTab) showAddEditDialog() {
 			fw = editingFw
 		} else {
 			fw = model.NewFirewall("")
-			d.firewalls = append(d.firewalls, fw)
 		}
 
 		fw.DeviceName = deviceNameEntry.Text
@@ -1200,8 +1241,8 @@ func (d *DeviceTab) onDeploy() {
 	checkedFirewalls := []*model.Firewall{}
 	checkedIPs := []string{}
 	for _, row := range checkedRows {
-		if row < len(d.filteredFirewalls) {
-			fw := d.filteredFirewalls[row]
+		if row < len(d.pageData) {
+			fw := d.pageData[row]
 			checkedFirewalls = append(checkedFirewalls, fw)
 			if fw.DeviceIP != "" {
 				checkedIPs = append(checkedIPs, fw.DeviceIP)
@@ -1640,8 +1681,8 @@ func (d *DeviceTab) onDeleteDevices() {
 
 		// 체크된 장비 삭제
 		for _, row := range checkedRows {
-			if row < len(d.filteredFirewalls) {
-				fw := d.filteredFirewalls[row]
+			if row < len(d.pageData) {
+				fw := d.pageData[row]
 				if fw.Index > 0 {
 					d.firewallRepo.Delete(fw.Index)
 				}
@@ -1666,8 +1707,8 @@ func (d *DeviceTab) onRefreshAll() {
 	checkedRows := d.deviceTable.GetCheckedRows()
 	selectedFirewalls := make([]*model.Firewall, 0)
 	for _, row := range checkedRows {
-		if row < len(d.filteredFirewalls) {
-			selectedFirewalls = append(selectedFirewalls, d.filteredFirewalls[row])
+		if row < len(d.pageData) {
+			selectedFirewalls = append(selectedFirewalls, d.pageData[row])
 		}
 	}
 

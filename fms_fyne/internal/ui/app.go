@@ -679,16 +679,16 @@ func (m *MainUI) showExportDialog() {
 		return
 	}
 
-	// 배포 이력 탭은 Export 지원 안함 (SQLite DB)
-	if tabType == 2 {
-		dialog.ShowInformation("알림", "배포 이력 탭은 Export 기능을 지원하지 않습니다.", m.window)
-		return
-	}
+	// Export할 데이터 준비
+	var exportData interface{}
+	var exportCount int
+	var defaultFileName string
+	var isFiltered bool
 
-	// 데이터 확인
 	switch tabType {
 	case 1: // 장비 관리 탭
-		firewalls, err := m.firewallRepo.GetAll()
+		isFiltered = m.deviceTab.IsFiltered()
+		firewalls, err := m.deviceTab.GetExportData()
 		if err != nil {
 			dialog.ShowError(err, m.window)
 			return
@@ -697,86 +697,93 @@ func (m *MainUI) showExportDialog() {
 			dialog.ShowInformation("알림", "내보낼 장비 정보가 없습니다.", m.window)
 			return
 		}
+		exportData = firewalls
+		exportCount = len(firewalls)
+		defaultFileName = "firewallList.json"
+	case 2: // 배포 이력 탭
+		isFiltered = m.historyTab.IsFiltered()
+		histories, err := m.historyTab.GetExportData()
+		if err != nil {
+			dialog.ShowError(err, m.window)
+			return
+		}
+		if len(histories) == 0 {
+			dialog.ShowInformation("알림", "내보낼 배포 이력이 없습니다.", m.window)
+			return
+		}
+		exportData = histories
+		exportCount = len(histories)
+		defaultFileName = "deployHistory.json"
 	case 3: // 패키지 탭
-		programs, err := m.programRepo.GetAll()
+		isFiltered = m.programTab.IsFiltered()
+		programs, err := m.programTab.GetExportData()
 		if err != nil {
 			dialog.ShowError(err, m.window)
 			return
 		}
 		if len(programs) == 0 {
-			dialog.ShowInformation("알림", "내보낼 패키지이 없습니다.", m.window)
+			dialog.ShowInformation("알림", "내보낼 패키지가 없습니다.", m.window)
 			return
 		}
+		exportData = programs
+		exportCount = len(programs)
+		defaultFileName = "programList.json"
 	}
 
-	// 파일 저장 다이얼로그
-	saveDialog := dialog.NewFileSave(func(writer fyne.URIWriteCloser, err error) {
-		if err != nil {
-			dialog.ShowError(err, m.window)
+	// 검색 적용 시 안내 메시지
+	confirmMsg := fmt.Sprintf("%d건의 데이터를 내보내시겠습니까?", exportCount)
+	if isFiltered {
+		confirmMsg = fmt.Sprintf("검색 결과 %d건의 데이터를 내보내시겠습니까?", exportCount)
+	}
+
+	dialog.ShowConfirm("Export 확인", confirmMsg, func(confirmed bool) {
+		if !confirmed {
 			return
 		}
-		if writer == nil {
-			return
-		}
-		defer writer.Close()
 
-		var data []byte
-		var jsonErr error
-
-		// 현재 탭에 따라 처리
-		switch tabType {
-		case 1: // 장비 관리 탭
-			firewalls, err := m.firewallRepo.GetAll()
+		// 파일 저장 다이얼로그
+		saveDialog := dialog.NewFileSave(func(writer fyne.URIWriteCloser, err error) {
 			if err != nil {
 				dialog.ShowError(err, m.window)
 				return
 			}
-			data, jsonErr = json.MarshalIndent(firewalls, "", "  ")
-		case 3: // 패키지 탭
-			programs, err := m.programRepo.GetAll()
-			if err != nil {
+			if writer == nil {
+				return
+			}
+			defer writer.Close()
+
+			data, jsonErr := json.MarshalIndent(exportData, "", "  ")
+			if jsonErr != nil {
+				dialog.ShowError(jsonErr, m.window)
+				return
+			}
+
+			if _, err := writer.Write(data); err != nil {
 				dialog.ShowError(err, m.window)
 				return
 			}
-			data, jsonErr = json.MarshalIndent(programs, "", "  ")
-		}
 
-		if jsonErr != nil {
-			dialog.ShowError(jsonErr, m.window)
-			return
-		}
+			dialog.ShowInformation("성공", fmt.Sprintf("%d건의 데이터가 내보내기 되었습니다.", exportCount), m.window)
+		}, m.window)
 
-		if _, err := writer.Write(data); err != nil {
-			dialog.ShowError(err, m.window)
-			return
-		}
+		saveDialog.SetFileName(defaultFileName)
+		saveDialog.SetFilter(fynestorage.NewExtensionFileFilter([]string{".json"}))
 
-		dialog.ShowInformation("성공", "데이터가 내보내기 되었습니다.", m.window)
-	}, m.window)
-
-	// 기본 파일명 설정
-	switch tabType {
-	case 1:
-		saveDialog.SetFileName("firewallList.json")
-	case 3:
-		saveDialog.SetFileName("programList.json")
-	}
-
-	// 실행 파일 위치의 config 폴더를 시작 경로로 설정, 없으면 실행 파일 디렉토리
-	if exePath, err := os.Executable(); err == nil {
-		exeDir := filepath.Dir(exePath)
-		configDir := filepath.Join(exeDir, "config")
-		if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(configDir)); err == nil {
-			saveDialog.SetLocation(uri)
-		} else {
-			// config 폴더가 없으면 실행 파일 디렉토리로 설정
-			if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(exeDir)); err == nil {
+		// 실행 파일 위치의 config 폴더를 시작 경로로 설정, 없으면 실행 파일 디렉토리
+		if exePath, err := os.Executable(); err == nil {
+			exeDir := filepath.Dir(exePath)
+			configDir := filepath.Join(exeDir, "config")
+			if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(configDir)); err == nil {
 				saveDialog.SetLocation(uri)
+			} else {
+				if uri, err := fynestorage.ListerForURI(fynestorage.NewFileURI(exeDir)); err == nil {
+					saveDialog.SetLocation(uri)
+				}
 			}
 		}
-	}
 
-	saveDialog.Show()
+		saveDialog.Show()
+	}, m.window)
 }
 
 // 데이터 초기화 다이얼로그를 표시합니다.

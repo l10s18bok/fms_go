@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -30,9 +29,10 @@ type ProgramTab struct {
 	searchBox    *component.SearchBox // 검색 컴포넌트 (공통)
 	programTable *component.PagedTable
 
-	// 데이터
-	programs         []*model.ProcessInfo
-	filteredPrograms []*model.ProcessInfo
+	// 데이터 (DB 페이지네이션)
+	pageData      []*model.ProcessInfo // 현재 페이지 데이터
+	totalCount    int                  // 검색 적용 후 전체 건수
+	searchKeyword string               // 검색 키워드
 }
 
 // NewProgramTab 새로운 패키지 탭을 생성합니다.
@@ -40,7 +40,7 @@ func NewProgramTab(window fyne.Window, programRepo repository.ProgramRepository)
 	tab := &ProgramTab{
 		window:      window,
 		programRepo: programRepo,
-		programs:    []*model.ProcessInfo{},
+		pageData:    []*model.ProcessInfo{},
 	}
 	tab.createUI()
 	tab.loadPrograms()
@@ -109,18 +109,18 @@ func (t *ProgramTab) createUI() {
 			1: { // 패키지명 컬럼
 				Type: component.EditTypeEntry,
 				GetValue: func(row int) string {
-					if row >= 0 && row < len(t.filteredPrograms) {
-						return t.filteredPrograms[row].ProcessName
+					if row >= 0 && row < len(t.pageData) {
+						return t.pageData[row].ProcessName
 					}
 					return ""
 				},
 				OnEdit: func(row int, oldValue, newValue string) bool {
-					if row >= 0 && row < len(t.filteredPrograms) {
+					if row >= 0 && row < len(t.pageData) {
 						if newValue == "" {
 							dialog.ShowError(fmt.Errorf("패키지명을 입력해주세요"), t.window)
 							return false
 						}
-						p := t.filteredPrograms[row]
+						p := t.pageData[row]
 						p.ProcessName = newValue
 						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
 						if err := t.programRepo.Save(p); err != nil {
@@ -135,18 +135,18 @@ func (t *ProgramTab) createUI() {
 			2: { // 버전 컬럼
 				Type: component.EditTypeEntry,
 				GetValue: func(row int) string {
-					if row >= 0 && row < len(t.filteredPrograms) {
-						return t.filteredPrograms[row].ProcessVersion
+					if row >= 0 && row < len(t.pageData) {
+						return t.pageData[row].ProcessVersion
 					}
 					return ""
 				},
 				OnEdit: func(row int, oldValue, newValue string) bool {
-					if row >= 0 && row < len(t.filteredPrograms) {
+					if row >= 0 && row < len(t.pageData) {
 						if newValue == "" {
 							dialog.ShowError(fmt.Errorf("버전을 입력해주세요"), t.window)
 							return false
 						}
-						p := t.filteredPrograms[row]
+						p := t.pageData[row]
 						p.ProcessVersion = newValue
 						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
 						if err := t.programRepo.Save(p); err != nil {
@@ -158,6 +158,9 @@ func (t *ProgramTab) createUI() {
 					return false
 				},
 			},
+		},
+		OnPageLoad: func(page, pageSize int) int {
+			return t.loadPage(page, pageSize)
 		},
 	}, t.window)
 
@@ -171,20 +174,10 @@ func (t *ProgramTab) createUI() {
 
 // loadPrograms 패키지 목록을 로드합니다.
 func (t *ProgramTab) loadPrograms() {
-	programs, err := t.programRepo.GetAll()
-	if err != nil {
-		dialog.ShowError(err, t.window)
-		return
+	total := t.loadPage(0, t.programTable.GetPageSize())
+	if t.programTable != nil {
+		t.programTable.SetData(total)
 	}
-
-	// ID 내림차순 정렬 (최신순 - ID가 클수록 최신)
-	sort.Slice(programs, func(i, j int) bool {
-		return programs[i].ID > programs[j].ID
-	})
-
-	t.programs = programs
-	t.filteredPrograms = programs
-	t.programTable.SetData(len(t.filteredPrograms))
 }
 
 // RefreshPrograms 패키지 목록을 새로고침합니다.
@@ -192,36 +185,72 @@ func (t *ProgramTab) RefreshPrograms() {
 	t.loadPrograms()
 }
 
-// filterPrograms 검색어로 패키지을 필터링합니다.
-func (t *ProgramTab) filterPrograms(query string) {
-	if query == "" {
-		t.filteredPrograms = t.programs
-	} else {
-		query = strings.ToLower(query)
-		filtered := []*model.ProcessInfo{}
-		for _, p := range t.programs {
-			if strings.Contains(strings.ToLower(p.ProcessName), query) ||
-				strings.Contains(strings.ToLower(p.ProcessVersion), query) ||
-				strings.Contains(strings.ToLower(p.ProcessFilePath), query) {
-				filtered = append(filtered, p)
-			}
-		}
-		// 검색 결과가 없으면 이전 상태 유지
-		if len(filtered) == 0 {
-			dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", t.window)
-			return
-		}
-		t.filteredPrograms = filtered
+// DB에서 해당 페이지 데이터를 조회합니다.
+func (t *ProgramTab) loadPage(page, pageSize int) int {
+	req := model.PageRequest{
+		Offset:  page * pageSize,
+		Limit:   pageSize,
+		Keyword: t.searchKeyword,
 	}
-	t.programTable.SetData(len(t.filteredPrograms))
+	result, err := t.programRepo.GetPage(req)
+	if err != nil {
+		t.pageData = []*model.ProcessInfo{}
+		t.totalCount = 0
+		return 0
+	}
+	t.pageData = result.Items
+	t.totalCount = result.TotalCount
+	return result.TotalCount
+}
+
+// filterPrograms 검색어로 패키지를 필터링합니다.
+func (t *ProgramTab) filterPrograms(query string) {
+	keyword := strings.TrimSpace(query)
+
+	prevKeyword := t.searchKeyword
+	t.searchKeyword = keyword
+	total := t.loadPage(0, t.programTable.GetPageSize())
+
+	// 검색 결과가 없으면 이전 상태 유지
+	if total == 0 && keyword != "" {
+		dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", t.window)
+		t.searchKeyword = prevKeyword
+		t.loadPage(0, t.programTable.GetPageSize())
+	}
+
+	if t.programTable != nil {
+		t.programTable.SetData(t.totalCount)
+	}
+}
+
+// GetExportData 현재 검색 조건에 맞는 전체 패키지를 반환합니다.
+func (t *ProgramTab) GetExportData() ([]*model.ProcessInfo, error) {
+	if t.searchKeyword == "" {
+		return t.programRepo.GetAll()
+	}
+	req := model.PageRequest{
+		Offset:  0,
+		Limit:   100000,
+		Keyword: t.searchKeyword,
+	}
+	result, err := t.programRepo.GetPage(req)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
+}
+
+// IsFiltered 검색 필터가 적용되어 있는지 반환합니다.
+func (t *ProgramTab) IsFiltered() bool {
+	return t.searchKeyword != ""
 }
 
 // updateCell 테이블 셀을 업데이트합니다.
 func (t *ProgramTab) updateCell(row int, col int, cell fyne.CanvasObject) {
-	if row >= len(t.filteredPrograms) {
+	if row >= len(t.pageData) {
 		return
 	}
-	p := t.filteredPrograms[row]
+	p := t.pageData[row]
 
 	switch col {
 	case 0: // 선택 (체크박스)
@@ -247,10 +276,10 @@ func (t *ProgramTab) updateCell(row int, col int, cell fyne.CanvasObject) {
 
 // onRowDoubleClick 행 더블클릭 시 수정 다이얼로그를 표시합니다.
 func (t *ProgramTab) onRowDoubleClick(row int) {
-	if row >= len(t.filteredPrograms) {
+	if row >= len(t.pageData) {
 		return
 	}
-	t.showEditDialog(t.filteredPrograms[row])
+	t.showEditDialog(t.pageData[row])
 }
 
 // onDeleteSelected 선택된 패키지을 삭제합니다.
@@ -269,8 +298,8 @@ func (t *ProgramTab) onDeleteSelected() {
 
 			// 삭제 실행
 			for _, row := range checkedRows {
-				if row < len(t.filteredPrograms) {
-					p := t.filteredPrograms[row]
+				if row < len(t.pageData) {
+					p := t.pageData[row]
 					if err := t.programRepo.Delete(p.ID); err != nil {
 						dialog.ShowError(err, t.window)
 						return
@@ -298,8 +327,8 @@ func (t *ProgramTab) onAddOrEdit() {
 		t.showEditDialog(nil)
 	} else {
 		// 수정 모드
-		if checkedRows[0] < len(t.filteredPrograms) {
-			t.showEditDialog(t.filteredPrograms[checkedRows[0]])
+		if checkedRows[0] < len(t.pageData) {
+			t.showEditDialog(t.pageData[checkedRows[0]])
 		}
 	}
 }
@@ -467,5 +496,9 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 
 // GetAllPrograms 모든 패키지 목록을 반환합니다.
 func (t *ProgramTab) GetAllPrograms() []*model.ProcessInfo {
-	return t.programs
+	programs, err := t.programRepo.GetAll()
+	if err != nil {
+		return []*model.ProcessInfo{}
+	}
+	return programs
 }
