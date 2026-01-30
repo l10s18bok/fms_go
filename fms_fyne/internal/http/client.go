@@ -90,8 +90,14 @@ func (c *Client) CheckHealthDirect(fw *model.Firewall) (bool, error) {
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[ERROR] CheckHealthDirect: 응답 읽기 실패 - %v", err)
+		return false, fmt.Errorf("응답 읽기 실패: %v", err)
+	}
+
 	success := resp.StatusCode == http.StatusOK
-	log.Printf("[DEBUG] CheckHealthDirect: IP=%s, StatusCode=%d, 성공=%v", ip, resp.StatusCode, success)
+	log.Printf("[DEBUG] CheckHealthDirect: IP=%s, StatusCode=%d, 성공=%v\n[BODY START]\n%s\n[BODY END]", ip, resp.StatusCode, success, string(body))
 	return success, nil
 }
 
@@ -156,7 +162,7 @@ func (c *Client) DeployDirect(fw *model.Firewall, template string) (*model.Deplo
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[ERROR] DeployDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", ip, resp.StatusCode, string(body))
+		log.Printf("[ERROR] DeployDirect: 장비 응답 오류 - IP=%s, StatusCode=%d\n[BODY START]\n%s\n[BODY END]", ip, resp.StatusCode, string(body))
 		return nil, fmt.Errorf("장비 응답 오류: %d", resp.StatusCode)
 	}
 
@@ -165,7 +171,7 @@ func (c *Client) DeployDirect(fw *model.Firewall, template string) (*model.Deplo
 		Data []model.DeployResult `json:"data"`
 	}
 	if err := json.Unmarshal(body, &response); err != nil {
-		log.Printf("[ERROR] DeployDirect: 응답 파싱 실패 - %v, body=%s", err, string(body))
+		log.Printf("[ERROR] DeployDirect: 응답 파싱 실패 - %v\n[BODY START]\n%s\n[BODY END]", err, string(body))
 		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
 	}
 
@@ -272,17 +278,17 @@ func (c *Client) GetDeviceInfoDirect(fw *model.Firewall) (*DeviceReportResponse,
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[ERROR] GetDeviceInfoDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", ip, resp.StatusCode, string(body))
+		log.Printf("[ERROR] GetDeviceInfoDirect: 장비 응답 오류 - IP=%s, StatusCode=%d\n[BODY START]\n%s\n[BODY END]", ip, resp.StatusCode, string(body))
 		return nil, fmt.Errorf("장비 응답 오류: %d - %s", resp.StatusCode, string(body))
 	}
 
 	var report DeviceReportResponse
 	if err := json.Unmarshal(body, &report); err != nil {
-		log.Printf("[ERROR] GetDeviceInfoDirect: 응답 파싱 실패 - %v, body=%s", err, string(body))
+		log.Printf("[ERROR] GetDeviceInfoDirect: 응답 파싱 실패 - %v\n[BODY START]\n%s\n[BODY END]", err, string(body))
 		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
 	}
 
-	log.Printf("[DEBUG] GetDeviceInfoDirect: 성공 - IP=%s, processes=%+v", ip, report.Processes)
+	log.Printf("[DEBUG] GetDeviceInfoDirect: 성공 - IP=%s\n[BODY START]\n%s\n[BODY END]", ip, string(body))
 	return &report, nil
 }
 
@@ -343,10 +349,10 @@ func (c *Client) ProgramUpdateDirect(fw *model.Firewall, req *ProgramUpdateReque
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("[ERROR] ProgramUpdateDirect: 장비 응답 오류 - IP=%s, StatusCode=%d, body=%s", ip, resp.StatusCode, string(body))
+		log.Printf("[ERROR] ProgramUpdateDirect: 장비 응답 오류 - IP=%s, StatusCode=%d\n[BODY START]\n%s\n[BODY END]", ip, resp.StatusCode, string(body))
 		return fmt.Errorf("장비 응답 오류: %d - %s", resp.StatusCode, string(body))
 	}
 
-	log.Printf("[DEBUG] ProgramUpdateDirect: 성공 - IP=%s, response=%s", ip, string(body))
+	log.Printf("[DEBUG] ProgramUpdateDirect: 성공 - IP=%s\n[BODY START]\n%s\n[BODY END]", ip, string(body))
 	return nil
 }

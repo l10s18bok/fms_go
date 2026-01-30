@@ -61,8 +61,13 @@ const AppHelpText = `FMS - Firewall Management System
 • 배포 결과를 확인할 수 있습니다
 • 규칙별 성공/실패 상태를 확인합니다
 
-[Import/Export]
-• 현재 탭의 데이터를 JSON 파일로 내보내거나 가져옵니다`
+[Import]
+• 파일 > Import 메뉴에서 JSON 파일을 선택하여
+  현재 탭(패키지관리,장비관리)의 데이터를 가져옵니다.
+
+[Export]
+• 파일 > Export 메뉴에서 현재 탭(패키지관리,장비관리,배포이력)의 
+  테이블에 표시된 데이터를 JSON 파일로 내보냅니다.`
 
 // TCPFlagsHelpText TCP Flags 옵션 도움말
 const TCPFlagsHelpText = `TCP Flags 옵션 설명:
