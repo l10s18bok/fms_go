@@ -11,19 +11,19 @@ import (
 	"fms/internal/model"
 )
 
-// FileStore data 디렉토리의 파일들을 관리합니다.
+// FileStore rule_files 디렉토리의 파일들을 관리합니다.
 type FileStore struct {
 	dataDir string
 	mu      sync.RWMutex
 }
 
 // NewFileStore 새로운 FileStore를 생성합니다.
-func NewFileStore(baseDir string) (*FileStore, error) {
-	dataDir := filepath.Join(baseDir, "data")
+func NewFileStore(configDir string) (*FileStore, error) {
+	dataDir := filepath.Join(configDir, "rule_files")
 
-	// data 디렉토리 생성
+	// rule_files 디렉토리 생성
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		return nil, fmt.Errorf("data 디렉토리 생성 실패: %v", err)
+		return nil, fmt.Errorf("rule_files 디렉토리 생성 실패: %v", err)
 	}
 
 	return &FileStore{dataDir: dataDir}, nil

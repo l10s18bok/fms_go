@@ -26,7 +26,7 @@ import (
 type MainUI struct {
 	window       fyne.Window
 	store        *storage.JSONStore
-	fileStore    *storage.FileStore           // 파일 저장소 (data 디렉토리)
+	fileStore    *storage.FileStore           // 파일 저장소 (config/rule_files 디렉토리)
 	historyRepo  repository.HistoryRepository // 배포 이력 저장소 (SQLite)
 	firewallRepo repository.FirewallRepository
 	programRepo  repository.ProgramRepository
@@ -675,7 +675,7 @@ func (m *MainUI) showExportDialog() {
 
 	// 방화벽 관리 탭은 Export 지원 안함 (파일 기반)
 	if tabType == 0 {
-		dialog.ShowInformation("알림", "방화벽 관리 탭은 Export 기능을 지원하지 않습니다.\ndata 디렉토리에서 파일을 직접 복사해주세요.", m.window)
+		dialog.ShowInformation("알림", "방화벽 관리 탭은 Export 기능을 지원하지 않습니다.\nconfig/rule_files 디렉토리에서 파일을 직접 복사해주세요.", m.window)
 		return
 	}
 

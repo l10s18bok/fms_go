@@ -51,8 +51,8 @@ func main() {
 	firewallRepo := repository.NewSQLiteFirewallRepository(sqliteStore)
 	programRepo := repository.NewSQLiteProgramRepository(sqliteStore)
 
-	// 파일 저장소 초기화 (data 디렉토리)
-	fileStore, err := storage.NewFileStore(execDir)
+	// 파일 저장소 초기화 (config/rule_files 디렉토리)
+	fileStore, err := storage.NewFileStore(configDir)
 	if err != nil {
 		log.Fatalf("파일 저장소 초기화 실패: %v", err)
 	}

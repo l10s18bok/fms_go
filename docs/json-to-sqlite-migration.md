@@ -434,11 +434,11 @@ func (h *HistoryTab) IsFiltered() bool {
 ```
 {실행파일 경로}/
 ├── fms_fyne.exe
-├── config/
-│   ├── fms.db              ← SQLite 데이터베이스 (장비, 패키지, 배포이력)
-│   └── config.json         ← 설정 (JSON 유지)
-└── data/
-    └── *.rules             ← 방화벽 규칙 파일
+└── config/
+    ├── fms.db              ← SQLite 데이터베이스 (장비, 패키지, 배포이력)
+    ├── config.json         ← 설정 (JSON 유지)
+    └── rule_files/
+        └── *.rules         ← 방화벽 규칙 파일
 ```
 
 - `fms.db`는 앱 최초 실행 시 자동 생성됩니다.
