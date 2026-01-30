@@ -57,7 +57,7 @@ func main() {
 		log.Fatalf("파일 저장소 초기화 실패: %v", err)
 	}
 
-	// 한국어 번역 등록 (시스템 로캘과 무관하게 강제 적용)
+	// 달력 한국어 번역 등록
 	if err := lang.AddTranslationsForLocale(translations.KoJSON, lang.SystemLocale()); err != nil {
 		log.Printf("한국어 번역 로드 실패: %v", err)
 	}
