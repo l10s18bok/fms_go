@@ -43,6 +43,7 @@ type DeviceTab struct {
 
 	// UI 컴포넌트
 	searchBox   *component.SearchBox  // 검색 컴포넌트 (공통)
+	calendarBtn *ttwidget.Button      // 날짜 선택 아이콘 버튼
 	deviceTable *component.PagedTable // 장비 테이블 (공통 컴포넌트)
 
 	// 상태 요약 표시
@@ -55,6 +56,8 @@ type DeviceTab struct {
 	pageData      []*model.Firewall // 현재 페이지 데이터
 	totalCount    int               // 검색 적용 후 전체 건수
 	searchKeyword string            // 검색 키워드
+	startDate     string            // 시작일
+	endDate       string            // 종료일
 
 	// 새로고침 상태
 	isRefreshing bool
@@ -110,12 +113,31 @@ func (d *DeviceTab) createUI() {
 func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 	// 검색 컴포넌트 (공통)
 	d.searchBox = component.NewSearchBox(component.SearchBoxConfig{
-		Placeholder: "장비명/IP 검색...",
+		Placeholder: "",
 		Width:       200,
 		OnSearch: func(text string) {
 			d.applyFilter()
 		},
 	})
+
+	// 날짜 선택 아이콘 버튼 (Calendar 팝업)
+	d.calendarBtn = ttwidget.NewButtonWithIcon("", theme.Icon(theme.IconNameCalendar), func() {
+		calendar := widget.NewCalendar(time.Now(), func(t time.Time) {
+			dateStr := t.Format("2006-01-02")
+			current := strings.TrimSpace(d.searchBox.GetText())
+			if current != "" && !strings.Contains(current, "~") {
+				d.searchBox.SetText(current + " ~ " + dateStr)
+			} else {
+				d.searchBox.SetText(dateStr)
+			}
+		})
+		c := fyne.CurrentApp().Driver().CanvasForObject(d.calendarBtn)
+		pop := widget.NewPopUp(calendar, c)
+		btnPos := fyne.CurrentApp().Driver().AbsolutePositionForObject(d.calendarBtn)
+		pop.ShowAtPosition(fyne.NewPos(btnPos.X, btnPos.Y+d.calendarBtn.Size().Height))
+	})
+	d.calendarBtn.Importance = widget.LowImportance
+	d.calendarBtn.SetToolTip("기간검색")
 
 	// 상태 요약 레이블
 	d.statusGreenLabel = widget.NewLabel("0")
@@ -194,7 +216,7 @@ func (d *DeviceTab) createTopPanel() fyne.CanvasObject {
 	)
 
 	// 헤더 라인 (위아래 패딩 10px, 오른쪽 마진 10px) - 상태 요약 중앙 배치
-	headerLine := container.NewBorder(nil, nil, d.searchBox.Content(), buttonArea, container.NewCenter(statusSummary))
+	headerLine := container.NewBorder(nil, nil, container.NewHBox(d.searchBox.Content(), d.calendarBtn), buttonArea, container.NewCenter(statusSummary))
 	paddedHeader := container.New(layout.NewCustomPaddedLayout(10, 10, 0, 10), headerLine)
 
 	return paddedHeader
@@ -472,13 +494,39 @@ func (d *DeviceTab) applyFilter() {
 	keyword := strings.TrimSpace(d.searchBox.GetText())
 
 	prevKeyword := d.searchKeyword
+	prevStartDate := d.startDate
+	prevEndDate := d.endDate
+
+	// 날짜 파싱 (단일: YYYY-MM-DD, 범위: YYYY-MM-DD ~ YYYY-MM-DD)
+	d.startDate = ""
+	d.endDate = ""
 	d.searchKeyword = keyword
+	if strings.Contains(keyword, "~") {
+		parts := strings.SplitN(keyword, "~", 2)
+		sd := strings.TrimSpace(parts[0])
+		ed := strings.TrimSpace(parts[1])
+		if _, err := time.Parse("2006-01-02", sd); err == nil {
+			d.startDate = sd
+		}
+		if _, err := time.Parse("2006-01-02", ed); err == nil {
+			d.endDate = ed
+		}
+		if d.startDate != "" || d.endDate != "" {
+			d.searchKeyword = ""
+		}
+	} else if _, err := time.Parse("2006-01-02", keyword); err == nil {
+		d.startDate = keyword
+		d.endDate = keyword
+		d.searchKeyword = ""
+	}
 	total := d.loadPage(0, d.deviceTable.GetPageSize())
 
 	// 검색 결과가 없으면 이전 상태 유지
 	if total == 0 && keyword != "" {
 		dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", d.window)
 		d.searchKeyword = prevKeyword
+		d.startDate = prevStartDate
+		d.endDate = prevEndDate
 		d.loadPage(0, d.deviceTable.GetPageSize())
 	}
 
@@ -490,9 +538,11 @@ func (d *DeviceTab) applyFilter() {
 // DB에서 해당 페이지 데이터를 조회합니다.
 func (d *DeviceTab) loadPage(page, pageSize int) int {
 	req := model.PageRequest{
-		Offset:  page * pageSize,
-		Limit:   pageSize,
-		Keyword: d.searchKeyword,
+		Offset:    page * pageSize,
+		Limit:     pageSize,
+		Keyword:   d.searchKeyword,
+		StartDate: d.startDate,
+		EndDate:   d.endDate,
 	}
 	result, err := d.firewallRepo.GetPage(req)
 	if err != nil {

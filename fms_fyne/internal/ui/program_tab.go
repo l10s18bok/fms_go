@@ -17,6 +17,7 @@ import (
 	fynestorage "fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 )
 
 // ProgramTab 패키지 관리 탭
@@ -27,12 +28,15 @@ type ProgramTab struct {
 
 	// UI 컴포넌트
 	searchBox    *component.SearchBox // 검색 컴포넌트 (공통)
+	calendarBtn  *ttwidget.Button     // 날짜 선택 아이콘 버튼
 	programTable *component.PagedTable
 
 	// 데이터 (DB 페이지네이션)
 	pageData      []*model.ProcessInfo // 현재 페이지 데이터
 	totalCount    int                  // 검색 적용 후 전체 건수
 	searchKeyword string               // 검색 키워드
+	startDate     string               // 시작일
+	endDate       string               // 종료일
 }
 
 // NewProgramTab 새로운 패키지 탭을 생성합니다.
@@ -56,12 +60,31 @@ func (t *ProgramTab) Content() fyne.CanvasObject {
 func (t *ProgramTab) createUI() {
 	// 검색 컴포넌트 (공통)
 	t.searchBox = component.NewSearchBox(component.SearchBoxConfig{
-		Placeholder: "검색...",
+		Placeholder: "",
 		Width:       200,
 		OnSearch: func(text string) {
 			t.filterPrograms(text)
 		},
 	})
+
+	// 날짜 선택 아이콘 버튼 (Calendar 팝업)
+	t.calendarBtn = ttwidget.NewButtonWithIcon("", theme.Icon(theme.IconNameCalendar), func() {
+		calendar := widget.NewCalendar(time.Now(), func(tt time.Time) {
+			dateStr := tt.Format("2006-01-02")
+			current := strings.TrimSpace(t.searchBox.GetText())
+			if current != "" && !strings.Contains(current, "~") {
+				t.searchBox.SetText(current + " ~ " + dateStr)
+			} else {
+				t.searchBox.SetText(dateStr)
+			}
+		})
+		c := fyne.CurrentApp().Driver().CanvasForObject(t.calendarBtn)
+		pop := widget.NewPopUp(calendar, c)
+		btnPos := fyne.CurrentApp().Driver().AbsolutePositionForObject(t.calendarBtn)
+		pop.ShowAtPosition(fyne.NewPos(btnPos.X, btnPos.Y+t.calendarBtn.Size().Height))
+	})
+	t.calendarBtn.Importance = widget.LowImportance
+	t.calendarBtn.SetToolTip("기간검색")
 
 	// 삭제 버튼 (빨간 배경, 흰색 텍스트)
 	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
@@ -76,7 +99,7 @@ func (t *ProgramTab) createUI() {
 	// 상단 영역 (버튼 간격 추가)
 	topBarLine := container.NewBorder(
 		nil, nil,
-		t.searchBox.Content(),
+		container.NewHBox(t.searchBox.Content(), t.calendarBtn),
 		container.NewHBox(
 			deleteBtn,
 			widget.NewLabel("  "), // 버튼 간격
@@ -188,9 +211,11 @@ func (t *ProgramTab) RefreshPrograms() {
 // DB에서 해당 페이지 데이터를 조회합니다.
 func (t *ProgramTab) loadPage(page, pageSize int) int {
 	req := model.PageRequest{
-		Offset:  page * pageSize,
-		Limit:   pageSize,
-		Keyword: t.searchKeyword,
+		Offset:    page * pageSize,
+		Limit:     pageSize,
+		Keyword:   t.searchKeyword,
+		StartDate: t.startDate,
+		EndDate:   t.endDate,
 	}
 	result, err := t.programRepo.GetPage(req)
 	if err != nil {
@@ -208,13 +233,39 @@ func (t *ProgramTab) filterPrograms(query string) {
 	keyword := strings.TrimSpace(query)
 
 	prevKeyword := t.searchKeyword
+	prevStartDate := t.startDate
+	prevEndDate := t.endDate
+
+	// 날짜 파싱 (단일: YYYY-MM-DD, 범위: YYYY-MM-DD ~ YYYY-MM-DD)
+	t.startDate = ""
+	t.endDate = ""
 	t.searchKeyword = keyword
+	if strings.Contains(keyword, "~") {
+		parts := strings.SplitN(keyword, "~", 2)
+		sd := strings.TrimSpace(parts[0])
+		ed := strings.TrimSpace(parts[1])
+		if _, err := time.Parse("2006-01-02", sd); err == nil {
+			t.startDate = sd
+		}
+		if _, err := time.Parse("2006-01-02", ed); err == nil {
+			t.endDate = ed
+		}
+		if t.startDate != "" || t.endDate != "" {
+			t.searchKeyword = ""
+		}
+	} else if _, err := time.Parse("2006-01-02", keyword); err == nil {
+		t.startDate = keyword
+		t.endDate = keyword
+		t.searchKeyword = ""
+	}
 	total := t.loadPage(0, t.programTable.GetPageSize())
 
 	// 검색 결과가 없으면 이전 상태 유지
 	if total == 0 && keyword != "" {
 		dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", t.window)
 		t.searchKeyword = prevKeyword
+		t.startDate = prevStartDate
+		t.endDate = prevEndDate
 		t.loadPage(0, t.programTable.GetPageSize())
 	}
 

@@ -942,7 +942,7 @@ func (s *SQLiteStore) GetFirewallPage(req model.PageRequest) (*model.PageResult[
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	whereClause, whereArgs := buildFirewallWhereClause(req.Keyword)
+	whereClause, whereArgs := buildFirewallWhereClause(req.Keyword, req.StartDate, req.EndDate)
 
 	var totalCount int
 	countQuery := "SELECT COUNT(*) FROM firewalls" + whereClause
@@ -1196,13 +1196,28 @@ func (s *SQLiteStore) getProgramVersionsBatch(firewallIDs []int) (map[int]map[st
 }
 
 // buildFirewallWhereClause 장비 조회용 WHERE 절을 빌드합니다.
-func buildFirewallWhereClause(keyword string) (string, []interface{}) {
-	if keyword == "" {
+func buildFirewallWhereClause(keyword, startDate, endDate string) (string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		conditions = append(conditions, "(device_name LIKE ? OR device_ip LIKE ? OR location LIKE ? OR os_info LIKE ?)")
+		args = append(args, like, like, like, like)
+	}
+	if startDate != "" {
+		conditions = append(conditions, "last_checked_at >= ?")
+		args = append(args, startDate+" 00:00:00")
+	}
+	if endDate != "" {
+		conditions = append(conditions, "last_checked_at <= ?")
+		args = append(args, endDate+" 23:59:59")
+	}
+
+	if len(conditions) == 0 {
 		return "", nil
 	}
-	like := "%" + keyword + "%"
-	return " WHERE (device_name LIKE ? OR device_ip LIKE ? OR location LIKE ? OR os_info LIKE ?)",
-		[]interface{}{like, like, like, like}
+	return " WHERE " + strings.Join(conditions, " AND "), args
 }
 
 // ========== 패키지(Program) 관련 메서드 ==========
@@ -1340,7 +1355,7 @@ func (s *SQLiteStore) GetProgramPage(req model.PageRequest) (*model.PageResult[m
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	whereClause, whereArgs := buildProgramWhereClause(req.Keyword)
+	whereClause, whereArgs := buildProgramWhereClause(req.Keyword, req.StartDate, req.EndDate)
 
 	var totalCount int
 	countQuery := "SELECT COUNT(*) FROM programs" + whereClause
@@ -1406,13 +1421,28 @@ func (s *SQLiteStore) scanProgramRow(row *sql.Row) (*model.ProcessInfo, error) {
 }
 
 // buildProgramWhereClause 패키지 조회용 WHERE 절을 빌드합니다.
-func buildProgramWhereClause(keyword string) (string, []interface{}) {
-	if keyword == "" {
+func buildProgramWhereClause(keyword, startDate, endDate string) (string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		conditions = append(conditions, "(process_name LIKE ? OR process_version LIKE ? OR process_file_path LIKE ?)")
+		args = append(args, like, like, like)
+	}
+	if startDate != "" {
+		conditions = append(conditions, "process_created_at >= ?")
+		args = append(args, startDate+" 00:00:00")
+	}
+	if endDate != "" {
+		conditions = append(conditions, "process_created_at <= ?")
+		args = append(args, endDate+" 23:59:59")
+	}
+
+	if len(conditions) == 0 {
 		return "", nil
 	}
-	like := "%" + keyword + "%"
-	return " WHERE (process_name LIKE ? OR process_version LIKE ? OR process_file_path LIKE ?)",
-		[]interface{}{like, like, like}
+	return " WHERE " + strings.Join(conditions, " AND "), args
 }
 
 // ========== 내부 헬퍼 메서드 ==========

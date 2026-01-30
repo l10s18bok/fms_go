@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 )
 
 // 배포 이력 탭을 구현합니다. (PRD 3.3.4 기준)
@@ -29,7 +30,7 @@ type HistoryTab struct {
 	historyTable *component.PagedTable // 이력 테이블 (공통 컴포넌트)
 	typeFilter   *widget.Select        // 유형 필터
 	searchBox   *component.SearchBox // 검색 컴포넌트 (공통)
-	calendarBtn *widget.Button       // 날짜 선택 아이콘 버튼
+	calendarBtn *ttwidget.Button     // 날짜 선택 아이콘 버튼
 
 	// 데이터 (DB 페이지네이션)
 	pageData      []*model.DeployHistory // 현재 페이지 데이터만
@@ -103,7 +104,7 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 	})
 
 	// 날짜 선택 아이콘 버튼 (Calendar 팝업)
-	h.calendarBtn = widget.NewButtonWithIcon("", theme.Icon(theme.IconNameCalendar), func() {
+	h.calendarBtn = ttwidget.NewButtonWithIcon("", theme.Icon(theme.IconNameCalendar), func() {
 		calendar := widget.NewCalendar(time.Now(), func(t time.Time) {
 			dateStr := t.Format("2006-01-02")
 			current := strings.TrimSpace(h.searchBox.GetText())
@@ -119,6 +120,7 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 		pop.ShowAtPosition(fyne.NewPos(btnPos.X, btnPos.Y+h.calendarBtn.Size().Height))
 	})
 	h.calendarBtn.Importance = widget.LowImportance
+	h.calendarBtn.SetToolTip("기간검색")
 
 	// 삭제 버튼 (휴지통 아이콘 + 삭제, 빨간 배경, 흰색 텍스트)
 	deleteBtn := component.NewCustomButton("삭제", theme.DeleteIcon(), nil, themes.Colors["red"], func() {
@@ -201,7 +203,7 @@ func (h *HistoryTab) onSearch() {
 	prevStartDate := h.startDate
 	prevEndDate := h.endDate
 
-	// 날짜 범위 파싱 (YYYY-MM-DD ~ YYYY-MM-DD)
+	// 날짜 파싱 (단일: YYYY-MM-DD, 범위: YYYY-MM-DD ~ YYYY-MM-DD)
 	h.startDate = ""
 	h.endDate = ""
 	h.searchKeyword = keyword
@@ -215,10 +217,13 @@ func (h *HistoryTab) onSearch() {
 		if _, err := time.Parse("2006-01-02", ed); err == nil {
 			h.endDate = ed
 		}
-		// 날짜 범위 검색이면 keyword는 비움
 		if h.startDate != "" || h.endDate != "" {
 			h.searchKeyword = ""
 		}
+	} else if _, err := time.Parse("2006-01-02", keyword); err == nil {
+		h.startDate = keyword
+		h.endDate = keyword
+		h.searchKeyword = ""
 	}
 	total := h.loadPage(0, h.historyTable.GetPageSize())
 
