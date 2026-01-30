@@ -13,6 +13,7 @@ import (
 	"fms/internal/deploy"
 	// "fms/internal/http" // 임시 주석처리 - 프로세스 리스트 기능 비활성화
 	"fms/internal/model"
+	"fms/internal/repository"
 	"fms/internal/storage"
 	"fms/internal/themes"
 	"fms/internal/ui/component"
@@ -31,12 +32,14 @@ import (
 
 // 장비 관리 탭을 구현합니다. (PRD 3.3.3 기준)
 type DeviceTab struct {
-	window      fyne.Window
-	store       *storage.JSONStore
-	firewallTab *FirewallTab
-	historyTab  *HistoryTab
-	programTab  *ProgramTab
-	content     fyne.CanvasObject
+	window       fyne.Window
+	firewallRepo repository.FirewallRepository
+	programRepo  repository.ProgramRepository
+	configStore  *storage.JSONStore // Config 접근용
+	firewallTab  *FirewallTab
+	historyTab   *HistoryTab
+	programTab   *ProgramTab
+	content      fyne.CanvasObject
 
 	// UI 컴포넌트
 	searchBox   *component.SearchBox  // 검색 컴포넌트 (공통)
@@ -65,10 +68,12 @@ type DeviceTab struct {
 }
 
 // 새로운 장비 관리 탭을 생성합니다.
-func NewDeviceTab(window fyne.Window, store *storage.JSONStore, firewallTab *FirewallTab) *DeviceTab {
+func NewDeviceTab(window fyne.Window, firewallRepo repository.FirewallRepository, programRepo repository.ProgramRepository, configStore *storage.JSONStore, firewallTab *FirewallTab) *DeviceTab {
 	tab := &DeviceTab{
 		window:            window,
-		store:             store,
+		firewallRepo:      firewallRepo,
+		programRepo:       programRepo,
+		configStore:       configStore,
 		firewallTab:       firewallTab,
 		firewalls:         []*model.Firewall{},
 		filteredFirewalls: []*model.Firewall{},
@@ -269,7 +274,7 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 						if fw.DeviceName == "" {
 							fw.DeviceName = fw.DeviceIP
 						}
-						if err := d.store.SaveFirewall(fw); err != nil {
+						if err := d.firewallRepo.Save(fw); err != nil {
 							dialog.ShowError(err, d.window)
 							return false
 						}
@@ -299,7 +304,7 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 						}
 						fw := d.filteredFirewalls[row]
 						fw.DeviceIP = newValue
-						if err := d.store.SaveFirewall(fw); err != nil {
+						if err := d.firewallRepo.Save(fw); err != nil {
 							dialog.ShowError(err, d.window)
 							return false
 						}
@@ -320,7 +325,7 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 					if row >= 0 && row < len(d.filteredFirewalls) {
 						fw := d.filteredFirewalls[row]
 						fw.Location = newValue
-						if err := d.store.SaveFirewall(fw); err != nil {
+						if err := d.firewallRepo.Save(fw); err != nil {
 							dialog.ShowError(err, d.window)
 							return false
 						}
@@ -341,7 +346,7 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 					if row >= 0 && row < len(d.filteredFirewalls) {
 						fw := d.filteredFirewalls[row]
 						fw.OSInfo = newValue
-						if err := d.store.SaveFirewall(fw); err != nil {
+						if err := d.firewallRepo.Save(fw); err != nil {
 							dialog.ShowError(err, d.window)
 							return false
 						}
@@ -490,7 +495,7 @@ func (d *DeviceTab) Content() fyne.CanvasObject {
 
 // 저장소에서 장비 목록을 로드합니다.
 func (d *DeviceTab) loadFirewalls() {
-	firewalls, err := d.store.GetAllFirewalls()
+	firewalls, err := d.firewallRepo.GetAll()
 	if err != nil {
 		dialog.ShowError(err, d.window)
 		return
@@ -672,7 +677,7 @@ func (d *DeviceTab) showAddEditDialog() {
 	} else {
 		// 새 장비 추가 시 전역 설정에서 기본값 가져오기
 		programUploadPathEntry.SetText(model.DefaultRemotePath) // 기본 업로드 경로
-		config, err := d.store.GetConfig()
+		config, err := d.configStore.GetConfig()
 		if err == nil {
 			programUpdateSchemeSelect.SetSelected(config.GetProgramUpdateScheme())
 			programUpdatePathEntry.SetText(config.ProgramUpdatePath)
@@ -859,7 +864,7 @@ func (d *DeviceTab) showAddEditDialog() {
 			}
 		}
 
-		if err := d.store.SaveFirewall(fw); err != nil {
+		if err := d.firewallRepo.Save(fw); err != nil {
 			dialog.ShowError(err, d.window)
 			return
 		}
@@ -984,7 +989,7 @@ func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
 	}
 
 	// config 가져오기
-	config, _ := d.store.GetConfig()
+	config, _ := d.configStore.GetConfig()
 
 	// API 경로 값 (비어있으면 전역 설정 -> 기본값 순으로 표시)
 	uploadPath := fw.ProgramUploadPath
@@ -1246,7 +1251,7 @@ func (d *DeviceTab) onDeploy() {
 	// 방화벽 룰 파일 목록
 	fileNames := d.firewallTab.GetFileNames()
 	// 패키지 목록
-	programs, _ := d.store.GetAllPrograms()
+	programs, _ := d.programRepo.GetAll()
 	programItems := make([]string, len(programs))
 	for i, p := range programs {
 		programItems[i] = fmt.Sprintf("%s %s", p.ProcessName, p.ProcessVersion)
@@ -1382,7 +1387,7 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName 
 	progressDialog.Show()
 
 	go func() {
-		config, err := d.store.GetConfig()
+		config, err := d.configStore.GetConfig()
 		if err != nil {
 			fyne.Do(func() {
 				progressDialog.Hide()
@@ -1454,7 +1459,7 @@ func (d *DeviceTab) executeFirewallDeploy(firewalls []*model.Firewall, fileName 
 				failCount++
 			}
 
-			d.store.SaveFirewall(fw)
+			d.firewallRepo.Save(fw)
 
 			if d.historyTab != nil && result.History != nil {
 				d.historyTab.AddHistory(result.History)
@@ -1518,7 +1523,7 @@ func (d *DeviceTab) executeProgramUpdate(devices []*model.Firewall, program *mod
 	progressDialog.Show()
 
 	go func() {
-		config, _ := d.store.GetConfig()
+		config, _ := d.configStore.GetConfig()
 		timeoutSeconds := 30 // 기본값
 		if config != nil {
 			timeoutSeconds = config.GetTimeoutSeconds()
@@ -1582,7 +1587,7 @@ func (d *DeviceTab) executeProgramUpdate(devices []*model.Firewall, program *mod
 
 			if result.Success {
 				successCount++
-				d.store.SaveFirewall(device)
+				d.firewallRepo.Save(device)
 			} else {
 				failCount++
 			}
@@ -1638,7 +1643,7 @@ func (d *DeviceTab) onDeleteDevices() {
 			if row < len(d.filteredFirewalls) {
 				fw := d.filteredFirewalls[row]
 				if fw.Index > 0 {
-					d.store.DeleteFirewall(fw.Index)
+					d.firewallRepo.Delete(fw.Index)
 				}
 			}
 		}
@@ -1683,7 +1688,7 @@ func (d *DeviceTab) onRefreshAll() {
 	progressDialog.Show()
 
 	go func() {
-		config, err := d.store.GetConfig()
+		config, err := d.configStore.GetConfig()
 		if err != nil {
 			fyne.Do(func() {
 				progressDialog.Hide()
@@ -1702,7 +1707,7 @@ func (d *DeviceTab) onRefreshAll() {
 		now := time.Now().Format("2006-01-02 15:04:05")
 		for _, fw := range selectedFirewalls {
 			fw.LastCheckedAt = now
-			d.store.SaveFirewall(fw)
+			d.firewallRepo.Save(fw)
 		}
 
 		fyne.Do(func() {
@@ -1759,7 +1764,7 @@ func (d *DeviceTab) ResetDeviceDeployStatus(deviceIP string) {
 		if fw.DeviceName == deviceIP || fw.DeviceIP == deviceIP {
 			fw.DeployStatus = model.DeployStatusUnknown
 			fw.Version = "-"
-			d.store.SaveFirewall(fw)
+			d.firewallRepo.Save(fw)
 			break
 		}
 	}
@@ -1856,7 +1861,7 @@ func (d *DeviceTab) performAutoStatusCheck() {
 	d.isRefreshing = true
 
 	go func() {
-		config, err := d.store.GetConfig()
+		config, err := d.configStore.GetConfig()
 		if err != nil {
 			log.Printf("[ERROR] performAutoStatusCheck: config 로드 실패 - %v", err)
 			d.isRefreshing = false
@@ -1870,7 +1875,7 @@ func (d *DeviceTab) performAutoStatusCheck() {
 		now := time.Now().Format("2006-01-02 15:04:05")
 		for _, fw := range d.firewalls {
 			fw.LastCheckedAt = now
-			d.store.SaveFirewall(fw)
+			d.firewallRepo.Save(fw)
 		}
 
 		fyne.Do(func() {
@@ -1883,7 +1888,7 @@ func (d *DeviceTab) performAutoStatusCheck() {
 
 // 자동 상태 체크 토글 버튼 클릭 핸들러
 func (d *DeviceTab) onToggleAutoCheck() {
-	config, err := d.store.GetConfig()
+	config, err := d.configStore.GetConfig()
 	if err != nil {
 		dialog.ShowError(err, d.window)
 		return
@@ -1894,7 +1899,7 @@ func (d *DeviceTab) onToggleAutoCheck() {
 	config.AutoStatusCheck = newEnabled
 
 	// config 저장
-	if err := d.store.SaveConfig(config); err != nil {
+	if err := d.configStore.SaveConfig(config); err != nil {
 		dialog.ShowError(err, d.window)
 		return
 	}
@@ -1927,7 +1932,7 @@ func (d *DeviceTab) updateAutoCheckButton(enabled bool) {
 
 // 설정에서 자동 상태 체크 상태를 동기화합니다.
 func (d *DeviceTab) SyncAutoCheckFromConfig() {
-	config, err := d.store.GetConfig()
+	config, err := d.configStore.GetConfig()
 	if err != nil {
 		return
 	}

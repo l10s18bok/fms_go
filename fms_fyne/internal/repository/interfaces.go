@@ -11,6 +11,8 @@ type FirewallRepository interface {
 	GetByIndex(index int) (*model.Firewall, error)
 	// GetByIP IP 주소로 장비를 조회합니다.
 	GetByIP(ip string) (*model.Firewall, error)
+	// GetPage 페이지네이션 조회합니다. (검색 포함, LIMIT/OFFSET 기반)
+	GetPage(req model.PageRequest) (*model.PageResult[model.Firewall], error)
 	// Save 장비를 저장합니다. (신규 생성 또는 업데이트)
 	Save(fw *model.Firewall) error
 	// Delete 장비를 삭제합니다.
@@ -21,19 +23,21 @@ type FirewallRepository interface {
 	Count() int
 }
 
-// ProgramRepository 패키지 저장소 인터페이스 (신규)
+// ProgramRepository 패키지 저장소 인터페이스
 type ProgramRepository interface {
-	// GetAll 모든 패키지을 조회합니다.
+	// GetAll 모든 패키지를 조회합니다.
 	GetAll() ([]*model.ProcessInfo, error)
-	// GetByID ID로 패키지을 조회합니다.
+	// GetByID ID로 패키지를 조회합니다.
 	GetByID(id int) (*model.ProcessInfo, error)
-	// GetByName 이름으로 패키지을 조회합니다.
+	// GetByName 이름으로 패키지를 조회합니다.
 	GetByName(name string) (*model.ProcessInfo, error)
-	// Save 패키지을 저장합니다. (신규 생성 또는 업데이트)
+	// GetPage 페이지네이션 조회합니다. (검색 포함, LIMIT/OFFSET 기반)
+	GetPage(req model.PageRequest) (*model.PageResult[model.ProcessInfo], error)
+	// Save 패키지를 저장합니다. (신규 생성 또는 업데이트)
 	Save(p *model.ProcessInfo) error
-	// Delete 패키지을 삭제합니다.
+	// Delete 패키지를 삭제합니다.
 	Delete(id int) error
-	// Clear 모든 패키지을 삭제합니다.
+	// Clear 모든 패키지를 삭제합니다.
 	Clear() error
 	// Count 패키지 수를 반환합니다.
 	Count() int

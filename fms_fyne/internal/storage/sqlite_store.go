@@ -3,9 +3,11 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -114,21 +116,85 @@ func (s *SQLiteStore) initSchema() error {
 		FOREIGN KEY (history_id) REFERENCES deploy_history(id) ON DELETE CASCADE
 	);`
 
+	// 장비 테이블
+	createFirewallsTable := `
+	CREATE TABLE IF NOT EXISTS firewalls (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		device_name TEXT NOT NULL,
+		device_ip TEXT,
+		server_status TEXT DEFAULT '-',
+		deploy_status TEXT DEFAULT '-',
+		version TEXT DEFAULT '-',
+		deploy_result TEXT,
+		device_id TEXT,
+		device_pw TEXT,
+		device_ppk TEXT,
+		last_checked_at TEXT,
+		location TEXT,
+		os_info TEXT,
+		cpu_usage REAL DEFAULT 0,
+		memory_usage REAL DEFAULT 0,
+		disk_usage REAL DEFAULT 0,
+		network_usage REAL DEFAULT 0,
+		program_upload_path TEXT,
+		program_update_scheme TEXT,
+		program_update_path TEXT,
+		program_update_port INTEGER DEFAULT 0,
+		firewall_deploy_scheme TEXT,
+		firewall_deploy_path TEXT,
+		firewall_deploy_port INTEGER DEFAULT 0,
+		device_info_scheme TEXT,
+		device_info_path TEXT,
+		device_info_port INTEGER DEFAULT 0
+	);`
+
+	// 장비 패키지 버전 테이블
+	createFirewallProgramVersionsTable := `
+	CREATE TABLE IF NOT EXISTS firewall_program_versions (
+		firewall_id INTEGER NOT NULL,
+		program_name TEXT NOT NULL,
+		version TEXT,
+		PRIMARY KEY (firewall_id, program_name),
+		FOREIGN KEY (firewall_id) REFERENCES firewalls(id) ON DELETE CASCADE
+	);`
+
+	// 패키지 테이블
+	createProgramsTable := `
+	CREATE TABLE IF NOT EXISTS programs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		process_name TEXT NOT NULL,
+		process_file_path TEXT NOT NULL,
+		process_version TEXT NOT NULL,
+		process_created_at TEXT
+	);`
+
 	// 인덱스 생성
 	createIndexes := []string{
 		"CREATE INDEX IF NOT EXISTS idx_history_type ON deploy_history(type);",
 		"CREATE INDEX IF NOT EXISTS idx_history_device_ip ON deploy_history(device_ip);",
 		"CREATE INDEX IF NOT EXISTS idx_history_timestamp ON deploy_history(timestamp);",
 		"CREATE INDEX IF NOT EXISTS idx_rule_results_history_id ON rule_results(history_id);",
+		"CREATE INDEX IF NOT EXISTS idx_firewalls_device_ip ON firewalls(device_ip);",
+		"CREATE INDEX IF NOT EXISTS idx_firewalls_device_name ON firewalls(device_name);",
+		"CREATE INDEX IF NOT EXISTS idx_programs_name ON programs(process_name);",
 	}
 
 	// 테이블 생성
-	if _, err := s.db.Exec(createDeployHistoryTable); err != nil {
-		return fmt.Errorf("deploy_history 테이블 생성 실패: %w", err)
+	tables := []struct {
+		name string
+		sql  string
+	}{
+		{"deploy_history", createDeployHistoryTable},
+		{"rule_results", createRuleResultsTable},
+		{"firewalls", createFirewallsTable},
+		{"firewall_program_versions", createFirewallProgramVersionsTable},
+		{"programs", createProgramsTable},
 	}
 
-	if _, err := s.db.Exec(createRuleResultsTable); err != nil {
-		return fmt.Errorf("rule_results 테이블 생성 실패: %w", err)
+	for _, t := range tables {
+		if _, err := s.db.Exec(t.sql); err != nil {
+			return fmt.Errorf("%s 테이블 생성 실패: %w", t.name, err)
+		}
 	}
 
 	// 인덱스 생성
@@ -630,6 +696,716 @@ func (s *SQLiteStore) getRuleResults(historyID int) ([]model.RuleResult, error) 
 
 	return results, nil
 }
+
+// ========== 장비(Firewall) 관련 메서드 ==========
+
+// GetAllFirewalls 모든 장비를 조회합니다.
+func (s *SQLiteStore) GetAllFirewalls() ([]*model.Firewall, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	rows, err := s.db.Query(`SELECT id, device_name, device_ip, server_status, deploy_status,
+		version, deploy_result, device_id, device_pw, device_ppk, last_checked_at,
+		location, os_info, cpu_usage, memory_usage, disk_usage, network_usage,
+		program_upload_path, program_update_scheme, program_update_path, program_update_port,
+		firewall_deploy_scheme, firewall_deploy_path, firewall_deploy_port,
+		device_info_scheme, device_info_path, device_info_port
+		FROM firewalls ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("장비 조회 실패: %w", err)
+	}
+	defer rows.Close()
+
+	var firewalls []*model.Firewall
+	var firewallIDs []int
+	for rows.Next() {
+		fw, err := s.scanFirewall(rows)
+		if err != nil {
+			return nil, err
+		}
+		firewalls = append(firewalls, fw)
+		firewallIDs = append(firewallIDs, fw.Index)
+	}
+
+	// ProgramVersions 배치 조회
+	if len(firewallIDs) > 0 {
+		pvMap, err := s.getProgramVersionsBatch(firewallIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, fw := range firewalls {
+			if pv, ok := pvMap[fw.Index]; ok {
+				fw.ProgramVersions = pv
+			}
+		}
+	}
+
+	return firewalls, nil
+}
+
+// GetFirewall ID로 장비를 조회합니다.
+func (s *SQLiteStore) GetFirewall(id int) (*model.Firewall, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	row := s.db.QueryRow(`SELECT id, device_name, device_ip, server_status, deploy_status,
+		version, deploy_result, device_id, device_pw, device_ppk, last_checked_at,
+		location, os_info, cpu_usage, memory_usage, disk_usage, network_usage,
+		program_upload_path, program_update_scheme, program_update_path, program_update_port,
+		firewall_deploy_scheme, firewall_deploy_path, firewall_deploy_port,
+		device_info_scheme, device_info_path, device_info_port
+		FROM firewalls WHERE id = ?`, id)
+
+	fw, err := s.scanFirewallRow(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("장비를 찾을 수 없습니다: %d", id)
+		}
+		return nil, fmt.Errorf("장비 조회 실패: %w", err)
+	}
+
+	// ProgramVersions 조회
+	pv, err := s.getProgramVersions(fw.Index)
+	if err != nil {
+		return nil, err
+	}
+	fw.ProgramVersions = pv
+
+	return fw, nil
+}
+
+// GetFirewallByIP IP로 장비를 조회합니다.
+func (s *SQLiteStore) GetFirewallByIP(ip string) (*model.Firewall, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	row := s.db.QueryRow(`SELECT id, device_name, device_ip, server_status, deploy_status,
+		version, deploy_result, device_id, device_pw, device_ppk, last_checked_at,
+		location, os_info, cpu_usage, memory_usage, disk_usage, network_usage,
+		program_upload_path, program_update_scheme, program_update_path, program_update_port,
+		firewall_deploy_scheme, firewall_deploy_path, firewall_deploy_port,
+		device_info_scheme, device_info_path, device_info_port
+		FROM firewalls WHERE device_ip = ?`, ip)
+
+	fw, err := s.scanFirewallRow(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("장비를 찾을 수 없습니다: %s", ip)
+		}
+		return nil, fmt.Errorf("장비 조회 실패: %w", err)
+	}
+
+	// ProgramVersions 조회
+	pv, err := s.getProgramVersions(fw.Index)
+	if err != nil {
+		return nil, err
+	}
+	fw.ProgramVersions = pv
+
+	return fw, nil
+}
+
+// SaveFirewall 장비를 저장합니다. (신규 생성 또는 업데이트)
+func (s *SQLiteStore) SaveFirewall(fw *model.Firewall) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("트랜잭션 시작 실패: %w", err)
+	}
+	defer tx.Rollback()
+
+	// DeployResult JSON 직렬화
+	var deployResultJSON sql.NullString
+	if fw.DeployResult != nil {
+		data, err := json.Marshal(fw.DeployResult)
+		if err != nil {
+			return fmt.Errorf("DeployResult 직렬화 실패: %w", err)
+		}
+		deployResultJSON = sql.NullString{String: string(data), Valid: true}
+	}
+
+	if fw.Index < 0 {
+		// 신규 삽입
+		result, err := tx.Exec(`INSERT INTO firewalls
+			(device_name, device_ip, server_status, deploy_status, version, deploy_result,
+			 device_id, device_pw, device_ppk, last_checked_at, location, os_info,
+			 cpu_usage, memory_usage, disk_usage, network_usage,
+			 program_upload_path, program_update_scheme, program_update_path, program_update_port,
+			 firewall_deploy_scheme, firewall_deploy_path, firewall_deploy_port,
+			 device_info_scheme, device_info_path, device_info_port)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			fw.DeviceName, fw.DeviceIP, fw.ServerStatus, fw.DeployStatus, fw.Version, deployResultJSON,
+			fw.DeviceID, fw.DevicePW, fw.DevicePPK, fw.LastCheckedAt, fw.Location, fw.OSInfo,
+			fw.CPUUsage, fw.MemoryUsage, fw.DiskUsage, fw.NetworkUsage,
+			fw.ProgramUploadPath, fw.ProgramUpdateScheme, fw.ProgramUpdatePath, fw.ProgramUpdatePort,
+			fw.FirewallDeployScheme, fw.FirewallDeployPath, fw.FirewallDeployPort,
+			fw.DeviceInfoScheme, fw.DeviceInfoPath, fw.DeviceInfoPort)
+		if err != nil {
+			return fmt.Errorf("장비 삽입 실패: %w", err)
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("ID 조회 실패: %w", err)
+		}
+		fw.Index = int(id)
+	} else {
+		// 기존 업데이트
+		_, err := tx.Exec(`UPDATE firewalls SET
+			device_name = ?, device_ip = ?, server_status = ?, deploy_status = ?, version = ?, deploy_result = ?,
+			device_id = ?, device_pw = ?, device_ppk = ?, last_checked_at = ?, location = ?, os_info = ?,
+			cpu_usage = ?, memory_usage = ?, disk_usage = ?, network_usage = ?,
+			program_upload_path = ?, program_update_scheme = ?, program_update_path = ?, program_update_port = ?,
+			firewall_deploy_scheme = ?, firewall_deploy_path = ?, firewall_deploy_port = ?,
+			device_info_scheme = ?, device_info_path = ?, device_info_port = ?
+			WHERE id = ?`,
+			fw.DeviceName, fw.DeviceIP, fw.ServerStatus, fw.DeployStatus, fw.Version, deployResultJSON,
+			fw.DeviceID, fw.DevicePW, fw.DevicePPK, fw.LastCheckedAt, fw.Location, fw.OSInfo,
+			fw.CPUUsage, fw.MemoryUsage, fw.DiskUsage, fw.NetworkUsage,
+			fw.ProgramUploadPath, fw.ProgramUpdateScheme, fw.ProgramUpdatePath, fw.ProgramUpdatePort,
+			fw.FirewallDeployScheme, fw.FirewallDeployPath, fw.FirewallDeployPort,
+			fw.DeviceInfoScheme, fw.DeviceInfoPath, fw.DeviceInfoPort,
+			fw.Index)
+		if err != nil {
+			return fmt.Errorf("장비 업데이트 실패: %w", err)
+		}
+
+		// 기존 ProgramVersions 삭제
+		if _, err := tx.Exec("DELETE FROM firewall_program_versions WHERE firewall_id = ?", fw.Index); err != nil {
+			return fmt.Errorf("패키지 버전 삭제 실패: %w", err)
+		}
+	}
+
+	// ProgramVersions 삽입
+	if len(fw.ProgramVersions) > 0 {
+		for name, ver := range fw.ProgramVersions {
+			if _, err := tx.Exec(`INSERT INTO firewall_program_versions (firewall_id, program_name, version)
+				VALUES (?, ?, ?)`, fw.Index, name, ver); err != nil {
+				return fmt.Errorf("패키지 버전 삽입 실패: %w", err)
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
+// DeleteFirewall 장비를 삭제합니다.
+func (s *SQLiteStore) DeleteFirewall(id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result, err := s.db.Exec("DELETE FROM firewalls WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("장비 삭제 실패: %w", err)
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return fmt.Errorf("장비를 찾을 수 없습니다: %d", id)
+	}
+	return nil
+}
+
+// ClearFirewalls 모든 장비를 삭제합니다.
+func (s *SQLiteStore) ClearFirewalls() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, err := s.db.Exec("DELETE FROM firewalls"); err != nil {
+		return fmt.Errorf("장비 전체 삭제 실패: %w", err)
+	}
+	return nil
+}
+
+// CountFirewalls 장비 수를 반환합니다.
+func (s *SQLiteStore) CountFirewalls() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var count int
+	s.db.QueryRow("SELECT COUNT(*) FROM firewalls").Scan(&count)
+	return count
+}
+
+// GetFirewallPage 페이지네이션 기반 장비를 조회합니다.
+func (s *SQLiteStore) GetFirewallPage(req model.PageRequest) (*model.PageResult[model.Firewall], error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	whereClause, whereArgs := buildFirewallWhereClause(req.Keyword)
+
+	var totalCount int
+	countQuery := "SELECT COUNT(*) FROM firewalls" + whereClause
+	if err := s.db.QueryRow(countQuery, whereArgs...).Scan(&totalCount); err != nil {
+		return nil, fmt.Errorf("장비 카운트 조회 실패: %w", err)
+	}
+
+	result := &model.PageResult[model.Firewall]{TotalCount: totalCount}
+	if totalCount == 0 {
+		result.Items = []*model.Firewall{}
+		return result, nil
+	}
+
+	dataQuery := `SELECT id, device_name, device_ip, server_status, deploy_status,
+		version, deploy_result, device_id, device_pw, device_ppk, last_checked_at,
+		location, os_info, cpu_usage, memory_usage, disk_usage, network_usage,
+		program_upload_path, program_update_scheme, program_update_path, program_update_port,
+		firewall_deploy_scheme, firewall_deploy_path, firewall_deploy_port,
+		device_info_scheme, device_info_path, device_info_port
+		FROM firewalls` + whereClause + ` ORDER BY id LIMIT ? OFFSET ?`
+
+	dataArgs := append(whereArgs, req.Limit, req.Offset)
+	rows, err := s.db.Query(dataQuery, dataArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("장비 페이지 조회 실패: %w", err)
+	}
+	defer rows.Close()
+
+	var firewalls []*model.Firewall
+	var firewallIDs []int
+	for rows.Next() {
+		fw, err := s.scanFirewall(rows)
+		if err != nil {
+			return nil, err
+		}
+		firewalls = append(firewalls, fw)
+		firewallIDs = append(firewallIDs, fw.Index)
+	}
+
+	// ProgramVersions 배치 조회
+	if len(firewallIDs) > 0 {
+		pvMap, err := s.getProgramVersionsBatch(firewallIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, fw := range firewalls {
+			if pv, ok := pvMap[fw.Index]; ok {
+				fw.ProgramVersions = pv
+			}
+		}
+	}
+
+	result.Items = firewalls
+	return result, nil
+}
+
+// scanFirewall rows에서 Firewall을 스캔합니다.
+func (s *SQLiteStore) scanFirewall(rows *sql.Rows) (*model.Firewall, error) {
+	var fw model.Firewall
+	var deployResult, deviceID, devicePW, devicePPK, lastCheckedAt sql.NullString
+	var location, osInfo sql.NullString
+	var programUploadPath, programUpdateScheme, programUpdatePath sql.NullString
+	var firewallDeployScheme, firewallDeployPath sql.NullString
+	var deviceInfoScheme, deviceInfoPath sql.NullString
+
+	err := rows.Scan(
+		&fw.Index, &fw.DeviceName, &fw.DeviceIP, &fw.ServerStatus, &fw.DeployStatus,
+		&fw.Version, &deployResult, &deviceID, &devicePW, &devicePPK, &lastCheckedAt,
+		&location, &osInfo, &fw.CPUUsage, &fw.MemoryUsage, &fw.DiskUsage, &fw.NetworkUsage,
+		&programUploadPath, &programUpdateScheme, &programUpdatePath, &fw.ProgramUpdatePort,
+		&firewallDeployScheme, &firewallDeployPath, &fw.FirewallDeployPort,
+		&deviceInfoScheme, &deviceInfoPath, &fw.DeviceInfoPort)
+	if err != nil {
+		return nil, fmt.Errorf("장비 스캔 실패: %w", err)
+	}
+
+	// NULL 처리
+	if deployResult.Valid && deployResult.String != "" {
+		var dr model.DeployResult
+		if err := json.Unmarshal([]byte(deployResult.String), &dr); err == nil {
+			fw.DeployResult = &dr
+		}
+	}
+	if deviceID.Valid {
+		fw.DeviceID = deviceID.String
+	}
+	if devicePW.Valid {
+		fw.DevicePW = devicePW.String
+	}
+	if devicePPK.Valid {
+		fw.DevicePPK = devicePPK.String
+	}
+	if lastCheckedAt.Valid {
+		fw.LastCheckedAt = lastCheckedAt.String
+	}
+	if location.Valid {
+		fw.Location = location.String
+	}
+	if osInfo.Valid {
+		fw.OSInfo = osInfo.String
+	}
+	if programUploadPath.Valid {
+		fw.ProgramUploadPath = programUploadPath.String
+	}
+	if programUpdateScheme.Valid {
+		fw.ProgramUpdateScheme = programUpdateScheme.String
+	}
+	if programUpdatePath.Valid {
+		fw.ProgramUpdatePath = programUpdatePath.String
+	}
+	if firewallDeployScheme.Valid {
+		fw.FirewallDeployScheme = firewallDeployScheme.String
+	}
+	if firewallDeployPath.Valid {
+		fw.FirewallDeployPath = firewallDeployPath.String
+	}
+	if deviceInfoScheme.Valid {
+		fw.DeviceInfoScheme = deviceInfoScheme.String
+	}
+	if deviceInfoPath.Valid {
+		fw.DeviceInfoPath = deviceInfoPath.String
+	}
+
+	return &fw, nil
+}
+
+// scanFirewallRow QueryRow에서 Firewall을 스캔합니다.
+func (s *SQLiteStore) scanFirewallRow(row *sql.Row) (*model.Firewall, error) {
+	var fw model.Firewall
+	var deployResult, deviceID, devicePW, devicePPK, lastCheckedAt sql.NullString
+	var location, osInfo sql.NullString
+	var programUploadPath, programUpdateScheme, programUpdatePath sql.NullString
+	var firewallDeployScheme, firewallDeployPath sql.NullString
+	var deviceInfoScheme, deviceInfoPath sql.NullString
+
+	err := row.Scan(
+		&fw.Index, &fw.DeviceName, &fw.DeviceIP, &fw.ServerStatus, &fw.DeployStatus,
+		&fw.Version, &deployResult, &deviceID, &devicePW, &devicePPK, &lastCheckedAt,
+		&location, &osInfo, &fw.CPUUsage, &fw.MemoryUsage, &fw.DiskUsage, &fw.NetworkUsage,
+		&programUploadPath, &programUpdateScheme, &programUpdatePath, &fw.ProgramUpdatePort,
+		&firewallDeployScheme, &firewallDeployPath, &fw.FirewallDeployPort,
+		&deviceInfoScheme, &deviceInfoPath, &fw.DeviceInfoPort)
+	if err != nil {
+		return nil, err
+	}
+
+	// NULL 처리 (scanFirewall과 동일)
+	if deployResult.Valid && deployResult.String != "" {
+		var dr model.DeployResult
+		if err := json.Unmarshal([]byte(deployResult.String), &dr); err == nil {
+			fw.DeployResult = &dr
+		}
+	}
+	if deviceID.Valid {
+		fw.DeviceID = deviceID.String
+	}
+	if devicePW.Valid {
+		fw.DevicePW = devicePW.String
+	}
+	if devicePPK.Valid {
+		fw.DevicePPK = devicePPK.String
+	}
+	if lastCheckedAt.Valid {
+		fw.LastCheckedAt = lastCheckedAt.String
+	}
+	if location.Valid {
+		fw.Location = location.String
+	}
+	if osInfo.Valid {
+		fw.OSInfo = osInfo.String
+	}
+	if programUploadPath.Valid {
+		fw.ProgramUploadPath = programUploadPath.String
+	}
+	if programUpdateScheme.Valid {
+		fw.ProgramUpdateScheme = programUpdateScheme.String
+	}
+	if programUpdatePath.Valid {
+		fw.ProgramUpdatePath = programUpdatePath.String
+	}
+	if firewallDeployScheme.Valid {
+		fw.FirewallDeployScheme = firewallDeployScheme.String
+	}
+	if firewallDeployPath.Valid {
+		fw.FirewallDeployPath = firewallDeployPath.String
+	}
+	if deviceInfoScheme.Valid {
+		fw.DeviceInfoScheme = deviceInfoScheme.String
+	}
+	if deviceInfoPath.Valid {
+		fw.DeviceInfoPath = deviceInfoPath.String
+	}
+
+	return &fw, nil
+}
+
+// getProgramVersions 특정 장비의 패키지 버전을 조회합니다.
+func (s *SQLiteStore) getProgramVersions(firewallID int) (map[string]string, error) {
+	rows, err := s.db.Query(`SELECT program_name, version FROM firewall_program_versions WHERE firewall_id = ?`, firewallID)
+	if err != nil {
+		return nil, fmt.Errorf("패키지 버전 조회 실패: %w", err)
+	}
+	defer rows.Close()
+
+	pv := make(map[string]string)
+	for rows.Next() {
+		var name, version string
+		if err := rows.Scan(&name, &version); err != nil {
+			return nil, fmt.Errorf("패키지 버전 스캔 실패: %w", err)
+		}
+		pv[name] = version
+	}
+	return pv, nil
+}
+
+// getProgramVersionsBatch 여러 장비의 패키지 버전을 한번에 조회합니다.
+func (s *SQLiteStore) getProgramVersionsBatch(firewallIDs []int) (map[int]map[string]string, error) {
+	if len(firewallIDs) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(firewallIDs))
+	args := make([]interface{}, len(firewallIDs))
+	for i, id := range firewallIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := `SELECT firewall_id, program_name, version FROM firewall_program_versions
+		WHERE firewall_id IN (` + strings.Join(placeholders, ",") + `)`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("패키지 버전 배치 조회 실패: %w", err)
+	}
+	defer rows.Close()
+
+	pvMap := make(map[int]map[string]string)
+	for rows.Next() {
+		var firewallID int
+		var name, version string
+		if err := rows.Scan(&firewallID, &name, &version); err != nil {
+			return nil, fmt.Errorf("패키지 버전 배치 스캔 실패: %w", err)
+		}
+		if pvMap[firewallID] == nil {
+			pvMap[firewallID] = make(map[string]string)
+		}
+		pvMap[firewallID][name] = version
+	}
+	return pvMap, nil
+}
+
+// buildFirewallWhereClause 장비 조회용 WHERE 절을 빌드합니다.
+func buildFirewallWhereClause(keyword string) (string, []interface{}) {
+	if keyword == "" {
+		return "", nil
+	}
+	like := "%" + keyword + "%"
+	return " WHERE (device_name LIKE ? OR device_ip LIKE ? OR location LIKE ? OR os_info LIKE ?)",
+		[]interface{}{like, like, like, like}
+}
+
+// ========== 패키지(Program) 관련 메서드 ==========
+
+// GetAllPrograms 모든 패키지를 조회합니다.
+func (s *SQLiteStore) GetAllPrograms() ([]*model.ProcessInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	rows, err := s.db.Query(`SELECT id, process_name, process_file_path, process_version, process_created_at
+		FROM programs ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("패키지 조회 실패: %w", err)
+	}
+	defer rows.Close()
+
+	var programs []*model.ProcessInfo
+	for rows.Next() {
+		p, err := s.scanProgram(rows)
+		if err != nil {
+			return nil, err
+		}
+		programs = append(programs, p)
+	}
+	return programs, nil
+}
+
+// GetProgram ID로 패키지를 조회합니다.
+func (s *SQLiteStore) GetProgram(id int) (*model.ProcessInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	row := s.db.QueryRow(`SELECT id, process_name, process_file_path, process_version, process_created_at
+		FROM programs WHERE id = ?`, id)
+
+	p, err := s.scanProgramRow(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("패키지를 찾을 수 없습니다: %d", id)
+		}
+		return nil, fmt.Errorf("패키지 조회 실패: %w", err)
+	}
+	return p, nil
+}
+
+// GetProgramByName 이름으로 패키지를 조회합니다.
+func (s *SQLiteStore) GetProgramByName(name string) (*model.ProcessInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	row := s.db.QueryRow(`SELECT id, process_name, process_file_path, process_version, process_created_at
+		FROM programs WHERE process_name = ?`, name)
+
+	p, err := s.scanProgramRow(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("패키지를 찾을 수 없습니다: %s", name)
+		}
+		return nil, fmt.Errorf("패키지 조회 실패: %w", err)
+	}
+	return p, nil
+}
+
+// SaveProgram 패키지를 저장합니다. (신규 생성 또는 업데이트)
+func (s *SQLiteStore) SaveProgram(p *model.ProcessInfo) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if p.ID < 0 {
+		// 신규 삽입
+		result, err := s.db.Exec(`INSERT INTO programs
+			(process_name, process_file_path, process_version, process_created_at)
+			VALUES (?, ?, ?, ?)`,
+			p.ProcessName, p.ProcessFilePath, p.ProcessVersion, p.ProcessCreatedAt)
+		if err != nil {
+			return fmt.Errorf("패키지 삽입 실패: %w", err)
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("ID 조회 실패: %w", err)
+		}
+		p.ID = int(id)
+	} else {
+		// 기존 업데이트
+		_, err := s.db.Exec(`UPDATE programs SET
+			process_name = ?, process_file_path = ?, process_version = ?, process_created_at = ?
+			WHERE id = ?`,
+			p.ProcessName, p.ProcessFilePath, p.ProcessVersion, p.ProcessCreatedAt, p.ID)
+		if err != nil {
+			return fmt.Errorf("패키지 업데이트 실패: %w", err)
+		}
+	}
+	return nil
+}
+
+// DeleteProgram 패키지를 삭제합니다.
+func (s *SQLiteStore) DeleteProgram(id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result, err := s.db.Exec("DELETE FROM programs WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("패키지 삭제 실패: %w", err)
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return fmt.Errorf("패키지를 찾을 수 없습니다: %d", id)
+	}
+	return nil
+}
+
+// ClearPrograms 모든 패키지를 삭제합니다.
+func (s *SQLiteStore) ClearPrograms() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, err := s.db.Exec("DELETE FROM programs"); err != nil {
+		return fmt.Errorf("패키지 전체 삭제 실패: %w", err)
+	}
+	return nil
+}
+
+// CountPrograms 패키지 수를 반환합니다.
+func (s *SQLiteStore) CountPrograms() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var count int
+	s.db.QueryRow("SELECT COUNT(*) FROM programs").Scan(&count)
+	return count
+}
+
+// GetProgramPage 페이지네이션 기반 패키지를 조회합니다.
+func (s *SQLiteStore) GetProgramPage(req model.PageRequest) (*model.PageResult[model.ProcessInfo], error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	whereClause, whereArgs := buildProgramWhereClause(req.Keyword)
+
+	var totalCount int
+	countQuery := "SELECT COUNT(*) FROM programs" + whereClause
+	if err := s.db.QueryRow(countQuery, whereArgs...).Scan(&totalCount); err != nil {
+		return nil, fmt.Errorf("패키지 카운트 조회 실패: %w", err)
+	}
+
+	result := &model.PageResult[model.ProcessInfo]{TotalCount: totalCount}
+	if totalCount == 0 {
+		result.Items = []*model.ProcessInfo{}
+		return result, nil
+	}
+
+	dataQuery := `SELECT id, process_name, process_file_path, process_version, process_created_at
+		FROM programs` + whereClause + ` ORDER BY id LIMIT ? OFFSET ?`
+
+	dataArgs := append(whereArgs, req.Limit, req.Offset)
+	rows, err := s.db.Query(dataQuery, dataArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("패키지 페이지 조회 실패: %w", err)
+	}
+	defer rows.Close()
+
+	var programs []*model.ProcessInfo
+	for rows.Next() {
+		p, err := s.scanProgram(rows)
+		if err != nil {
+			return nil, err
+		}
+		programs = append(programs, p)
+	}
+
+	result.Items = programs
+	return result, nil
+}
+
+// scanProgram rows에서 ProcessInfo를 스캔합니다.
+func (s *SQLiteStore) scanProgram(rows *sql.Rows) (*model.ProcessInfo, error) {
+	var p model.ProcessInfo
+	var createdAt sql.NullString
+	err := rows.Scan(&p.ID, &p.ProcessName, &p.ProcessFilePath, &p.ProcessVersion, &createdAt)
+	if err != nil {
+		return nil, fmt.Errorf("패키지 스캔 실패: %w", err)
+	}
+	if createdAt.Valid {
+		p.ProcessCreatedAt = createdAt.String
+	}
+	return &p, nil
+}
+
+// scanProgramRow QueryRow에서 ProcessInfo를 스캔합니다.
+func (s *SQLiteStore) scanProgramRow(row *sql.Row) (*model.ProcessInfo, error) {
+	var p model.ProcessInfo
+	var createdAt sql.NullString
+	err := row.Scan(&p.ID, &p.ProcessName, &p.ProcessFilePath, &p.ProcessVersion, &createdAt)
+	if err != nil {
+		return nil, err
+	}
+	if createdAt.Valid {
+		p.ProcessCreatedAt = createdAt.String
+	}
+	return &p, nil
+}
+
+// buildProgramWhereClause 패키지 조회용 WHERE 절을 빌드합니다.
+func buildProgramWhereClause(keyword string) (string, []interface{}) {
+	if keyword == "" {
+		return "", nil
+	}
+	like := "%" + keyword + "%"
+	return " WHERE (process_name LIKE ? OR process_version LIKE ? OR process_file_path LIKE ?)",
+		[]interface{}{like, like, like}
+}
+
+// ========== 내부 헬퍼 메서드 ==========
 
 // parseTimestamp 여러 시간 포맷을 지원하는 파싱 함수
 func parseTimestamp(timestamp string) (time.Time, error) {

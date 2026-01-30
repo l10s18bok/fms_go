@@ -30,6 +30,27 @@ func (r *JSONProgramRepository) GetByName(name string) (*model.ProcessInfo, erro
 	return r.store.GetProgramByName(name)
 }
 
+// GetPage 페이지네이션 기반 패키지를 조회합니다. (JSON 저장소는 메모리 내 필터링)
+func (r *JSONProgramRepository) GetPage(req model.PageRequest) (*model.PageResult[model.ProcessInfo], error) {
+	all, err := r.store.GetAllPrograms()
+	if err != nil {
+		return nil, err
+	}
+	total := len(all)
+	start := req.Offset
+	if start > total {
+		start = total
+	}
+	end := start + req.Limit
+	if end > total {
+		end = total
+	}
+	return &model.PageResult[model.ProcessInfo]{
+		Items:      all[start:end],
+		TotalCount: total,
+	}, nil
+}
+
 // Save 패키지을 저장합니다.
 func (r *JSONProgramRepository) Save(p *model.ProcessInfo) error {
 	return r.store.SaveProgram(p)

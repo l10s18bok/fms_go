@@ -24,12 +24,14 @@ import (
 
 // 메인 애플리케이션 UI를 관리합니다.
 type MainUI struct {
-	window      fyne.Window
-	store       *storage.JSONStore
-	fileStore   *storage.FileStore           // 파일 저장소 (data 디렉토리)
-	historyRepo repository.HistoryRepository // 배포 이력 저장소 (SQLite)
-	tabs        *container.DocTabs           // 닫기 버튼이 있는 탭
-	leftMenu    *fyne.Container              // 왼쪽 메뉴
+	window       fyne.Window
+	store        *storage.JSONStore
+	fileStore    *storage.FileStore           // 파일 저장소 (data 디렉토리)
+	historyRepo  repository.HistoryRepository // 배포 이력 저장소 (SQLite)
+	firewallRepo repository.FirewallRepository
+	programRepo  repository.ProgramRepository
+	tabs         *container.DocTabs  // 닫기 버튼이 있는 탭
+	leftMenu     *fyne.Container     // 왼쪽 메뉴
 
 	// 탭
 	firewallTab *FirewallTab // 방화벽 관리 탭
@@ -51,20 +53,25 @@ type MainUI struct {
 }
 
 // 새로운 메인 UI 인스턴스를 생성합니다.
-func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.FileStore, historyRepo repository.HistoryRepository) *MainUI {
+func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.FileStore,
+	historyRepo repository.HistoryRepository,
+	firewallRepo repository.FirewallRepository,
+	programRepo repository.ProgramRepository) *MainUI {
 	ui := &MainUI{
-		window:      window,
-		store:       store,
-		fileStore:   fileStore,
-		historyRepo: historyRepo,
-		editTabs:    make(map[string]*container.TabItem),
+		window:       window,
+		store:        store,
+		fileStore:    fileStore,
+		historyRepo:  historyRepo,
+		firewallRepo: firewallRepo,
+		programRepo:  programRepo,
+		editTabs:     make(map[string]*container.TabItem),
 	}
 
 	// 각 탭 생성
 	ui.firewallTab = NewFirewallTab(window, fileStore, ui)
-	ui.deviceTab = NewDeviceTab(window, store, ui.firewallTab)
+	ui.deviceTab = NewDeviceTab(window, firewallRepo, programRepo, store, ui.firewallTab)
 	ui.historyTab = NewHistoryTab(window, historyRepo)
-	ui.programTab = NewProgramTab(window, store)
+	ui.programTab = NewProgramTab(window, programRepo)
 
 	// 탭 간 참조 설정
 	ui.deviceTab.SetHistoryTab(ui.historyTab)
@@ -492,80 +499,150 @@ func (m *MainUI) showImportDialog() {
 			return
 		}
 
-		// 확인 팝업 표시
-		dialog.ShowConfirm("Import 확인",
-			fmt.Sprintf("기존 %s 데이터가 모두 삭제되고 새로운 데이터로 교체됩니다.\n계속 진행하시겠습니까?", tabName),
-			func(confirmed bool) {
-				if !confirmed {
+		// 기존 데이터 존재 여부 확인
+		hasExistingData := false
+		switch tabType {
+		case 1:
+			hasExistingData = m.firewallRepo.Count() > 0
+		case 3:
+			hasExistingData = m.programRepo.Count() > 0
+		}
+
+		// Import 실행 함수 (isMerge: true=병합, false=교체)
+		doImport := func(isMerge bool) {
+			switch tabType {
+			case 1: // 장비 관리 탭
+				var firewalls []*model.Firewall
+				if err := json.Unmarshal(data, &firewalls); err != nil {
+					dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
 					return
 				}
 
-				// 현재 탭에 따라 처리
-				switch tabType {
-				case 1: // 장비 관리 탭
-					var firewalls []*model.Firewall
-					if err := json.Unmarshal(data, &firewalls); err != nil {
-						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
-						return
-					}
-
-					// 기존 데이터 모두 삭제
-					if err := m.store.ClearFirewalls(); err != nil {
+				// 교체 모드: 기존 데이터 모두 삭제
+				if !isMerge {
+					if err := m.firewallRepo.Clear(); err != nil {
 						dialog.ShowError(err, m.window)
 						return
 					}
-
-					// 장비 형식 검증: deviceName이 유효한지 확인
-					validCount := 0
-					for _, fw := range firewalls {
-						if fw.DeviceName == "" || fw.DeviceName == "-" {
-							continue // 유효하지 않은 장비는 건너뜀
-						}
-						if err := m.store.SaveFirewall(fw); err != nil {
-							dialog.ShowError(err, m.window)
-							return
-						}
-						validCount++
-					}
-					if validCount == 0 {
-						dialog.ShowError(fmt.Errorf("유효한 장비 데이터가 없습니다. 장비 형식의 JSON 파일을 선택해주세요."), m.window)
-						return
-					}
-					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 장비 정보가 가져오기 되었습니다.", validCount), m.window)
-					m.deviceTab.ReloadDevices()
-				case 3: // 패키지 탭
-					var programs []*model.ProcessInfo
-					if err := json.Unmarshal(data, &programs); err != nil {
-						dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
-						return
-					}
-
-					// 기존 데이터 모두 삭제
-					if err := m.store.ClearPrograms(); err != nil {
-						dialog.ShowError(err, m.window)
-						return
-					}
-
-					// 패키지 형식 검증: ProcessName이 유효한지 확인
-					validCount := 0
-					for _, p := range programs {
-						if p.ProcessName == "" || p.ProcessName == "-" {
-							continue // 유효하지 않은 패키지은 건너뜀
-						}
-						if err := m.store.SaveProgram(p); err != nil {
-							dialog.ShowError(err, m.window)
-							return
-						}
-						validCount++
-					}
-					if validCount == 0 {
-						dialog.ShowError(fmt.Errorf("유효한 패키지 데이터가 없습니다. 패키지 형식의 JSON 파일을 선택해주세요."), m.window)
-						return
-					}
-					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 패키지이 가져오기 되었습니다.", validCount), m.window)
-					m.programTab.RefreshPrograms()
 				}
-			}, m.window)
+
+				validCount := 0
+				updatedCount := 0
+				for _, fw := range firewalls {
+					if fw.DeviceName == "" || fw.DeviceName == "-" {
+						continue
+					}
+
+					if isMerge && fw.DeviceIP != "" {
+						// 병합 모드: IP 기준으로 기존 장비 확인
+						existing, err := m.firewallRepo.GetByIP(fw.DeviceIP)
+						if err == nil && existing != nil {
+							fw.Index = existing.Index
+							updatedCount++
+						} else {
+							fw.Index = -1
+						}
+					} else {
+						fw.Index = -1
+					}
+
+					if err := m.firewallRepo.Save(fw); err != nil {
+						dialog.ShowError(err, m.window)
+						return
+					}
+					validCount++
+				}
+				if validCount == 0 {
+					dialog.ShowError(fmt.Errorf("유효한 장비 데이터가 없습니다. 장비 형식의 JSON 파일을 선택해주세요."), m.window)
+					return
+				}
+				if isMerge {
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 장비 정보가 가져오기 되었습니다.\n(신규: %d, 업데이트: %d)", validCount, validCount-updatedCount, updatedCount), m.window)
+				} else {
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 장비 정보가 가져오기 되었습니다.", validCount), m.window)
+				}
+				m.deviceTab.ReloadDevices()
+
+			case 3: // 패키지 탭
+				var programs []*model.ProcessInfo
+				if err := json.Unmarshal(data, &programs); err != nil {
+					dialog.ShowError(fmt.Errorf("JSON 형태의 파일이 아닙니다: %v", err), m.window)
+					return
+				}
+
+				// 교체 모드: 기존 데이터 모두 삭제
+				if !isMerge {
+					if err := m.programRepo.Clear(); err != nil {
+						dialog.ShowError(err, m.window)
+						return
+					}
+				}
+
+				validCount := 0
+				updatedCount := 0
+				for _, p := range programs {
+					if p.ProcessName == "" || p.ProcessName == "-" {
+						continue
+					}
+
+					if isMerge {
+						// 병합 모드: 이름 기준으로 기존 패키지 확인
+						existing, err := m.programRepo.GetByName(p.ProcessName)
+						if err == nil && existing != nil {
+							p.ID = existing.ID
+							updatedCount++
+						} else {
+							p.ID = -1
+						}
+					} else {
+						p.ID = -1
+					}
+
+					if err := m.programRepo.Save(p); err != nil {
+						dialog.ShowError(err, m.window)
+						return
+					}
+					validCount++
+				}
+				if validCount == 0 {
+					dialog.ShowError(fmt.Errorf("유효한 패키지 데이터가 없습니다. 패키지 형식의 JSON 파일을 선택해주세요."), m.window)
+					return
+				}
+				if isMerge {
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 패키지가 가져오기 되었습니다.\n(신규: %d, 업데이트: %d)", validCount, validCount-updatedCount, updatedCount), m.window)
+				} else {
+					dialog.ShowInformation("성공", fmt.Sprintf("%d개의 패키지가 가져오기 되었습니다.", validCount), m.window)
+				}
+				m.programTab.RefreshPrograms()
+			}
+		}
+
+		if hasExistingData {
+			// 기존 데이터가 있으면 교체/병합 선택 다이얼로그 표시
+			replaceBtn := widget.NewButton("교체", nil)
+			mergeBtn := widget.NewButton("병합", nil)
+			cancelBtn := widget.NewButton("취소", nil)
+
+			importModeDialog := dialog.NewCustomWithoutButtons(
+				"Import 방식 선택",
+				container.NewVBox(
+					widget.NewLabel(fmt.Sprintf("%s 데이터를 어떤 방식으로 가져오시겠습니까?", tabName)),
+					widget.NewLabel("교체: 기존 데이터를 삭제하고 새로운 데이터로 교체"),
+					widget.NewLabel("병합: 기존 데이터를 유지하고 중복 항목은 덮어쓰기"),
+					container.NewHBox(replaceBtn, mergeBtn, cancelBtn),
+				),
+				m.window,
+			)
+
+			replaceBtn.OnTapped = func() { importModeDialog.Hide(); doImport(false) }
+			mergeBtn.OnTapped = func() { importModeDialog.Hide(); doImport(true) }
+			cancelBtn.OnTapped = func() { importModeDialog.Hide() }
+
+			importModeDialog.Show()
+		} else {
+			// 기존 데이터가 없으면 바로 Import
+			doImport(false)
+		}
 	}, m.window)
 
 	openDialog.SetFilter(fynestorage.NewExtensionFileFilter([]string{".json"}))
@@ -611,7 +688,7 @@ func (m *MainUI) showExportDialog() {
 	// 데이터 확인
 	switch tabType {
 	case 1: // 장비 관리 탭
-		firewalls, err := m.store.GetAllFirewalls()
+		firewalls, err := m.firewallRepo.GetAll()
 		if err != nil {
 			dialog.ShowError(err, m.window)
 			return
@@ -621,7 +698,7 @@ func (m *MainUI) showExportDialog() {
 			return
 		}
 	case 3: // 패키지 탭
-		programs, err := m.store.GetAllPrograms()
+		programs, err := m.programRepo.GetAll()
 		if err != nil {
 			dialog.ShowError(err, m.window)
 			return
@@ -649,14 +726,14 @@ func (m *MainUI) showExportDialog() {
 		// 현재 탭에 따라 처리
 		switch tabType {
 		case 1: // 장비 관리 탭
-			firewalls, err := m.store.GetAllFirewalls()
+			firewalls, err := m.firewallRepo.GetAll()
 			if err != nil {
 				dialog.ShowError(err, m.window)
 				return
 			}
 			data, jsonErr = json.MarshalIndent(firewalls, "", "  ")
 		case 3: // 패키지 탭
-			programs, err := m.store.GetAllPrograms()
+			programs, err := m.programRepo.GetAll()
 			if err != nil {
 				dialog.ShowError(err, m.window)
 				return
@@ -719,7 +796,7 @@ func (m *MainUI) showResetDialog() {
 			}
 
 			// 모든 장비 삭제
-			if err := m.store.ClearFirewalls(); err != nil {
+			if err := m.firewallRepo.Clear(); err != nil {
 				dialog.ShowError(err, m.window)
 				return
 			}
@@ -731,7 +808,7 @@ func (m *MainUI) showResetDialog() {
 			}
 
 			// 모든 패키지 삭제
-			if err := m.store.ClearPrograms(); err != nil {
+			if err := m.programRepo.Clear(); err != nil {
 				dialog.ShowError(err, m.window)
 				return
 			}

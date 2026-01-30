@@ -44,8 +44,10 @@ func main() {
 	}
 	defer sqliteStore.Close()
 
-	// History Repository 생성 (SQLite 사용)
+	// Repository 생성 (SQLite 사용)
 	historyRepo := repository.NewSQLiteHistoryRepository(sqliteStore)
+	firewallRepo := repository.NewSQLiteFirewallRepository(sqliteStore)
+	programRepo := repository.NewSQLiteProgramRepository(sqliteStore)
 
 	// 파일 저장소 초기화 (data 디렉토리)
 	fileStore, err := storage.NewFileStore(execDir)
@@ -69,7 +71,7 @@ func main() {
 	w.Resize(fyne.NewSize(1400, 800))
 
 	// 메인 UI 생성 및 설정
-	mainUI := ui.NewMainUI(w, jsonStore, fileStore, historyRepo)
+	mainUI := ui.NewMainUI(w, jsonStore, fileStore, historyRepo, firewallRepo, programRepo)
 	w.SetContent(fynetooltip.AddWindowToolTipLayer(mainUI.Content(), w.Canvas()))
 
 	// 윈도우 표시 및 실행

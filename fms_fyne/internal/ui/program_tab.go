@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"fms/internal/model"
-	"fms/internal/storage"
+	"fms/internal/repository"
 	"fms/internal/themes"
 	"fms/internal/ui/component"
 
@@ -22,9 +22,9 @@ import (
 
 // ProgramTab 패키지 관리 탭
 type ProgramTab struct {
-	window  fyne.Window
-	store   *storage.JSONStore
-	content fyne.CanvasObject
+	window      fyne.Window
+	programRepo repository.ProgramRepository
+	content     fyne.CanvasObject
 
 	// UI 컴포넌트
 	searchBox    *component.SearchBox // 검색 컴포넌트 (공통)
@@ -36,11 +36,11 @@ type ProgramTab struct {
 }
 
 // NewProgramTab 새로운 패키지 탭을 생성합니다.
-func NewProgramTab(window fyne.Window, store *storage.JSONStore) *ProgramTab {
+func NewProgramTab(window fyne.Window, programRepo repository.ProgramRepository) *ProgramTab {
 	tab := &ProgramTab{
-		window:   window,
-		store:    store,
-		programs: []*model.ProcessInfo{},
+		window:      window,
+		programRepo: programRepo,
+		programs:    []*model.ProcessInfo{},
 	}
 	tab.createUI()
 	tab.loadPrograms()
@@ -123,7 +123,7 @@ func (t *ProgramTab) createUI() {
 						p := t.filteredPrograms[row]
 						p.ProcessName = newValue
 						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
-						if err := t.store.SaveProgram(p); err != nil {
+						if err := t.programRepo.Save(p); err != nil {
 							dialog.ShowError(err, t.window)
 							return false
 						}
@@ -149,7 +149,7 @@ func (t *ProgramTab) createUI() {
 						p := t.filteredPrograms[row]
 						p.ProcessVersion = newValue
 						p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
-						if err := t.store.SaveProgram(p); err != nil {
+						if err := t.programRepo.Save(p); err != nil {
 							dialog.ShowError(err, t.window)
 							return false
 						}
@@ -171,7 +171,7 @@ func (t *ProgramTab) createUI() {
 
 // loadPrograms 패키지 목록을 로드합니다.
 func (t *ProgramTab) loadPrograms() {
-	programs, err := t.store.GetAllPrograms()
+	programs, err := t.programRepo.GetAll()
 	if err != nil {
 		dialog.ShowError(err, t.window)
 		return
@@ -271,7 +271,7 @@ func (t *ProgramTab) onDeleteSelected() {
 			for _, row := range checkedRows {
 				if row < len(t.filteredPrograms) {
 					p := t.filteredPrograms[row]
-					if err := t.store.DeleteProgram(p.ID); err != nil {
+					if err := t.programRepo.Delete(p.ID); err != nil {
 						dialog.ShowError(err, t.window)
 						return
 					}
@@ -400,7 +400,7 @@ func (t *ProgramTab) showEditDialog(program *model.ProcessInfo) {
 		p.ProcessFilePath = filePath
 		p.ProcessCreatedAt = time.Now().Format("2006-01-02 15:04:05")
 
-		if err := t.store.SaveProgram(p); err != nil {
+		if err := t.programRepo.Save(p); err != nil {
 			dialog.ShowError(err, t.window)
 			return
 		}

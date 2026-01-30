@@ -30,6 +30,28 @@ func (r *JSONFirewallRepository) GetByIP(ip string) (*model.Firewall, error) {
 	return r.store.GetFirewallByIP(ip)
 }
 
+// GetPage 페이지네이션 기반 장비를 조회합니다. (JSON 저장소는 메모리 내 필터링)
+func (r *JSONFirewallRepository) GetPage(req model.PageRequest) (*model.PageResult[model.Firewall], error) {
+	all, err := r.store.GetAllFirewalls()
+	if err != nil {
+		return nil, err
+	}
+	// 간단한 메모리 내 페이지네이션
+	total := len(all)
+	start := req.Offset
+	if start > total {
+		start = total
+	}
+	end := start + req.Limit
+	if end > total {
+		end = total
+	}
+	return &model.PageResult[model.Firewall]{
+		Items:      all[start:end],
+		TotalCount: total,
+	}, nil
+}
+
 // Save 장비를 저장합니다.
 func (r *JSONFirewallRepository) Save(fw *model.Firewall) error {
 	return r.store.SaveFirewall(fw)
