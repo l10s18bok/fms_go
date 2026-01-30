@@ -366,6 +366,161 @@ func (s *SQLiteStore) CountHistory() int {
 	return count
 }
 
+// GetHistoryPage 페이지네이션 기반 배포 이력을 조회합니다. (필터/검색/LIMIT/OFFSET)
+func (s *SQLiteStore) GetHistoryPage(req model.PageRequest) (*model.PageResult[model.DeployHistory], error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// 1단계: 필터/검색 조건으로 카운트 조회
+	whereClause, whereArgs := buildHistoryWhereClause(req.Filter, req.Keyword)
+
+	var totalCount int
+	countQuery := "SELECT COUNT(*) FROM deploy_history" + whereClause
+	if err := s.db.QueryRow(countQuery, whereArgs...).Scan(&totalCount); err != nil {
+		return nil, fmt.Errorf("이력 카운트 조회 실패: %w", err)
+	}
+
+	result := &model.PageResult[model.DeployHistory]{
+		TotalCount: totalCount,
+	}
+
+	if totalCount == 0 {
+		result.Items = []*model.DeployHistory{}
+		return result, nil
+	}
+
+	// 2단계: 해당 페이지 history 조회 (LIMIT/OFFSET)
+	dataQuery := `SELECT id, type, timestamp, device_name, device_ip,
+		template_version, program_name, program_version, message, status
+		FROM deploy_history` + whereClause + ` ORDER BY id DESC LIMIT ? OFFSET ?`
+
+	dataArgs := append(whereArgs, req.Limit, req.Offset)
+	rows, err := s.db.Query(dataQuery, dataArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("이력 페이지 조회 실패: %w", err)
+	}
+	defer rows.Close()
+
+	var histories []*model.DeployHistory
+	var historyIDs []int
+	for rows.Next() {
+		h, err := s.scanHistory(rows)
+		if err != nil {
+			return nil, err
+		}
+		histories = append(histories, h)
+		historyIDs = append(historyIDs, h.ID)
+	}
+
+	// 3단계: rule_results 배치 조회 (N+1 해결)
+	if len(historyIDs) > 0 {
+		ruleMap, err := s.getRuleResultsBatch(historyIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, h := range histories {
+			if results, ok := ruleMap[h.ID]; ok {
+				h.Results = results
+			}
+		}
+	}
+
+	result.Items = histories
+	return result, nil
+}
+
+// getRuleResultsBatch 여러 이력의 규칙 결과를 한번에 배치 조회합니다. (N+1 해결)
+func (s *SQLiteStore) getRuleResultsBatch(historyIDs []int) (map[int][]model.RuleResult, error) {
+	if len(historyIDs) == 0 {
+		return nil, nil
+	}
+
+	// IN 절 플레이스홀더 생성
+	placeholders := make([]byte, 0, len(historyIDs)*2)
+	args := make([]interface{}, len(historyIDs))
+	for i, id := range historyIDs {
+		if i > 0 {
+			placeholders = append(placeholders, ',')
+		}
+		placeholders = append(placeholders, '?')
+		args[i] = id
+	}
+
+	query := `SELECT history_id, rule, text, status, reason
+		FROM rule_results
+		WHERE history_id IN (` + string(placeholders) + `)
+		ORDER BY id`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("규칙 결과 배치 조회 실패: %w", err)
+	}
+	defer rows.Close()
+
+	ruleMap := make(map[int][]model.RuleResult)
+	for rows.Next() {
+		var historyID int
+		var r model.RuleResult
+		var text, reason sql.NullString
+
+		if err := rows.Scan(&historyID, &r.Rule, &text, &r.Status, &reason); err != nil {
+			return nil, fmt.Errorf("규칙 결과 배치 스캔 실패: %w", err)
+		}
+
+		if text.Valid {
+			r.Text = text.String
+		}
+		if reason.Valid {
+			r.Reason = reason.String
+		}
+
+		ruleMap[historyID] = append(ruleMap[historyID], r)
+	}
+
+	return ruleMap, nil
+}
+
+// buildHistoryWhereClause 이력 조회용 WHERE 절을 빌드합니다.
+func buildHistoryWhereClause(filter, keyword string) (string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	// 유형 필터
+	if filter != "" {
+		if filter == model.HistoryTypeFirewall {
+			// 레거시 타입 호환: "firewall", "template", ""
+			conditions = append(conditions, "(type = ? OR type = ? OR type = ?)")
+			args = append(args, model.HistoryTypeFirewall, "template", "")
+		} else {
+			conditions = append(conditions, "type = ?")
+			args = append(args, filter)
+		}
+	}
+
+	// 키워드 검색 (LIKE)
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		conditions = append(conditions,
+			`(device_name LIKE ? OR device_ip LIKE ? OR
+			template_version LIKE ? OR program_version LIKE ? OR
+			message LIKE ? OR type LIKE ?)`)
+		args = append(args, like, like, like, like, like, like)
+	}
+
+	if len(conditions) == 0 {
+		return "", nil
+	}
+
+	whereClause := " WHERE "
+	for i, cond := range conditions {
+		if i > 0 {
+			whereClause += " AND "
+		}
+		whereClause += cond
+	}
+	return whereClause, args
+}
+
 // ========== 내부 헬퍼 메서드 ==========
 
 // scanHistory rows에서 DeployHistory를 스캔합니다.

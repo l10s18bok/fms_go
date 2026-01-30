@@ -47,6 +47,8 @@ type HistoryRepository interface {
 	GetByID(id int) (*model.DeployHistory, error)
 	// GetByType 이력 유형으로 조회합니다.
 	GetByType(historyType string) ([]*model.DeployHistory, error)
+	// GetPage 페이지네이션 조회합니다. (필터/검색 포함, LIMIT/OFFSET 기반)
+	GetPage(req model.PageRequest) (*model.PageResult[model.DeployHistory], error)
 	// Save 이력을 저장합니다.
 	Save(h *model.DeployHistory) error
 	// Delete 이력을 삭제합니다.

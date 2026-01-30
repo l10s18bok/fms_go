@@ -45,6 +45,7 @@ type PagedTableConfig struct {
 	OnRowDoubleClick func(row int)                                  // 행 더블클릭 콜백
 	OnCheckChange    func(row int, checked bool)                    // 체크 변경 콜백
 	EditableColumns  map[int]EditColumnConfig                       // 인라인 편집 가능 컬럼 (컬럼 인덱스 → 설정)
+	OnPageLoad       func(page, pageSize int) int                  // 페이지 변경 시 데이터 로드 콜백 (DB 페이지네이션 모드, 반환값: 전체 항목 수)
 }
 
 // PagedTable 페이지네이션 지원 테이블
@@ -591,6 +592,14 @@ func (t *PagedTable) SetData(totalItems int) {
 	t.updatePaginationUI()
 }
 
+// SetTotalItems 전체 항목 수만 갱신합니다. (페이지 리셋 없음, DB 페이지네이션 모드용)
+func (t *PagedTable) SetTotalItems(totalItems int) {
+	t.totalItems = totalItems
+	t.applyColumnWidths()
+	t.table.Refresh()
+	t.updatePaginationUI()
+}
+
 // Refresh 테이블 새로고침
 func (t *PagedTable) Refresh() {
 	t.applyColumnWidths()
@@ -612,6 +621,9 @@ func (t *PagedTable) NextPage() {
 	if t.currentPage < t.getTotalPages()-1 {
 		t.currentPage++
 		t.selectedRow = -1
+		if t.config.OnPageLoad != nil {
+			t.totalItems = t.config.OnPageLoad(t.currentPage, t.config.PageSize)
+		}
 		t.table.Refresh()
 		t.updatePaginationUI()
 	}
@@ -622,6 +634,9 @@ func (t *PagedTable) PrevPage() {
 	if t.currentPage > 0 {
 		t.selectedRow = -1
 		t.currentPage--
+		if t.config.OnPageLoad != nil {
+			t.totalItems = t.config.OnPageLoad(t.currentPage, t.config.PageSize)
+		}
 		t.table.Refresh()
 		t.updatePaginationUI()
 	}
@@ -637,6 +652,9 @@ func (t *PagedTable) GoToPage(page int) {
 	}
 	t.currentPage = page
 	t.selectedRow = -1
+	if t.config.OnPageLoad != nil {
+		t.totalItems = t.config.OnPageLoad(t.currentPage, t.config.PageSize)
+	}
 	t.table.Refresh()
 	t.updatePaginationUI()
 }
@@ -768,6 +786,10 @@ func (t *PagedTable) SetPageSize(size int) {
 		}
 		if t.currentPage < 0 {
 			t.currentPage = 0
+		}
+		// DB 모드: 변경된 PageSize로 현재 페이지 재조회
+		if t.config.OnPageLoad != nil {
+			t.totalItems = t.config.OnPageLoad(t.currentPage, t.config.PageSize)
 		}
 		t.table.Refresh()
 		t.updatePaginationUI()

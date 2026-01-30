@@ -49,3 +49,8 @@ func (r *SQLiteHistoryRepository) Clear() error {
 func (r *SQLiteHistoryRepository) Count() int {
 	return r.store.CountHistory()
 }
+
+// GetPage 페이지네이션 기반 이력을 조회합니다.
+func (r *SQLiteHistoryRepository) GetPage(req model.PageRequest) (*model.PageResult[model.DeployHistory], error) {
+	return r.store.GetHistoryPage(req)
+}

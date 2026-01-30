@@ -61,3 +61,37 @@ func (r *JSONHistoryRepository) Clear() error {
 func (r *JSONHistoryRepository) Count() int {
 	return r.store.CountHistory()
 }
+
+// GetPage 페이지네이션 기반 이력을 조회합니다. (인메모리 슬라이싱)
+func (r *JSONHistoryRepository) GetPage(req model.PageRequest) (*model.PageResult[model.DeployHistory], error) {
+	all, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
+
+	// 필터 적용
+	var filtered []*model.DeployHistory
+	for _, h := range all {
+		if req.Filter != "" && h.Type != req.Filter {
+			continue
+		}
+		filtered = append(filtered, h)
+	}
+
+	totalCount := len(filtered)
+
+	// OFFSET/LIMIT 슬라이싱
+	start := req.Offset
+	if start > totalCount {
+		start = totalCount
+	}
+	end := start + req.Limit
+	if end > totalCount {
+		end = totalCount
+	}
+
+	return &model.PageResult[model.DeployHistory]{
+		Items:      filtered[start:end],
+		TotalCount: totalCount,
+	}, nil
+}

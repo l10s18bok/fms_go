@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -31,10 +30,11 @@ type HistoryTab struct {
 	typeFilter   *widget.Select        // 유형 필터
 	searchBox    *component.SearchBox  // 검색 컴포넌트 (공통)
 
-	// 데이터
-	histories         []*model.DeployHistory
-	filteredHistories []*model.DeployHistory // 필터링된 이력
-	searchKeyword     string                 // 검색 키워드
+	// 데이터 (DB 페이지네이션)
+	pageData      []*model.DeployHistory // 현재 페이지 데이터만
+	totalCount    int                    // 필터/검색 적용 후 전체 건수
+	currentFilter string                 // 현재 유형 필터값
+	searchKeyword string                 // 검색 키워드
 }
 
 // 새로운 배포 이력 탭을 생성합니다.
@@ -42,7 +42,7 @@ func NewHistoryTab(window fyne.Window, historyRepo repository.HistoryRepository)
 	tab := &HistoryTab{
 		window:      window,
 		historyRepo: historyRepo,
-		histories:   []*model.DeployHistory{},
+		pageData:    []*model.DeployHistory{},
 	}
 	tab.createUI()
 	tab.loadHistory()
@@ -79,6 +79,9 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 		},
 		OnRowSelected:    func(row int) {},
 		OnRowDoubleClick: func(row int) {},
+		OnPageLoad: func(page, pageSize int) int {
+			return h.loadPage(page, pageSize)
+		},
 	})
 
 	// 유형 필터 드롭다운 (전체, 패키지, 방화벽 룰)
@@ -127,12 +130,15 @@ func (h *HistoryTab) createHistoryTablePanel() fyne.CanvasObject {
 func (h *HistoryTab) updateHistoryCell(row int, col int, cell fyne.CanvasObject) {
 	label := cell.(*widget.Label)
 
-	if row >= len(h.filteredHistories) {
+	// row는 전체 데이터 인덱스 (dataIndex = currentPage * pageSize + pageRow)
+	// pageData는 현재 페이지 데이터만 보유하므로 페이지 내 인덱스로 변환
+	pageRow := row - h.historyTable.GetCurrentPage()*h.historyTable.GetPageSize()
+	if pageRow < 0 || pageRow >= len(h.pageData) {
 		label.SetText("")
 		return
 	}
 
-	history := h.filteredHistories[row]
+	history := h.pageData[pageRow]
 
 	switch col {
 	case 1: // 시간
@@ -169,71 +175,38 @@ func (h *HistoryTab) updateHistoryCell(row int, col int, cell fyne.CanvasObject)
 func (h *HistoryTab) onSearch() {
 	keyword := strings.TrimSpace(h.searchBox.GetText())
 
-	// 이전 키워드와 필터된 목록 저장
 	prevKeyword := h.searchKeyword
-	prevFiltered := h.filteredHistories
-
 	h.searchKeyword = keyword
-	h.applyFilter()
+	total := h.loadPage(0, h.historyTable.GetPageSize())
 
 	// 검색 결과가 없으면 이전 상태 유지
-	if len(h.filteredHistories) == 0 && keyword != "" {
+	if total == 0 && keyword != "" {
 		dialog.ShowInformation("검색 결과", "검색 결과가 없습니다.", h.window)
 		h.searchKeyword = prevKeyword
-		h.filteredHistories = prevFiltered
-		if h.historyTable != nil {
-			h.historyTable.SetData(len(h.filteredHistories))
-		}
-	}
-}
-
-// 필터와 검색을 적용합니다.
-func (h *HistoryTab) applyFilter() {
-	selected := h.typeFilter.Selected
-
-	// 1단계: 유형 필터 적용
-	var typeFiltered []*model.DeployHistory
-	if selected == "전체" || selected == "" {
-		// 전체: 모든 이력 표시
-		typeFiltered = h.histories
-	} else if selected == "방화벽 룰" {
-		for _, history := range h.histories {
-			// 방화벽 룰: "firewall", "template"(레거시), 빈 문자열(레거시)
-			if history.Type == model.HistoryTypeFirewall || history.Type == "template" || history.Type == "" {
-				typeFiltered = append(typeFiltered, history)
-			}
-		}
-	} else { // 패키지
-		for _, history := range h.histories {
-			if history.Type == model.HistoryTypeProgram {
-				typeFiltered = append(typeFiltered, history)
-			}
-		}
-	}
-
-	// 2단계: 검색 키워드 적용
-	if h.searchKeyword == "" {
-		h.filteredHistories = typeFiltered
-	} else {
-		keyword := strings.ToLower(h.searchKeyword)
-		h.filteredHistories = []*model.DeployHistory{}
-		for _, history := range typeFiltered {
-			// 검색 대상: 시간, 장비명, 장비 IP, 유형, 버전, 메시지 (부분 일치)
-			typeText := model.GetHistoryTypeText(history.Type)
-			if strings.Contains(strings.ToLower(history.GetTimestampString()), keyword) ||
-				strings.Contains(strings.ToLower(history.DeviceName), keyword) ||
-				strings.Contains(strings.ToLower(history.DeviceIP), keyword) ||
-				strings.Contains(strings.ToLower(typeText), keyword) ||
-				strings.Contains(strings.ToLower(history.TemplateVer), keyword) ||
-				strings.Contains(strings.ToLower(history.ProgramVer), keyword) ||
-				strings.Contains(strings.ToLower(history.Message), keyword) {
-				h.filteredHistories = append(h.filteredHistories, history)
-			}
-		}
+		h.loadPage(0, h.historyTable.GetPageSize())
 	}
 
 	if h.historyTable != nil {
-		h.historyTable.SetData(len(h.filteredHistories))
+		h.historyTable.SetData(h.totalCount)
+	}
+}
+
+// 필터와 검색을 적용합니다. (DB WHERE 절로 처리)
+func (h *HistoryTab) applyFilter() {
+	selected := h.typeFilter.Selected
+
+	switch selected {
+	case "방화벽 룰":
+		h.currentFilter = model.HistoryTypeFirewall
+	case "패키지":
+		h.currentFilter = model.HistoryTypeProgram
+	default:
+		h.currentFilter = ""
+	}
+
+	total := h.loadPage(0, h.historyTable.GetPageSize())
+	if h.historyTable != nil {
+		h.historyTable.SetData(total)
 	}
 }
 
@@ -242,27 +215,30 @@ func (h *HistoryTab) Content() fyne.CanvasObject {
 	return h.content
 }
 
-// 저장소에서 배포 이력을 로드합니다.
-func (h *HistoryTab) loadHistory() {
-	histories, err := h.historyRepo.GetAll()
-	if err != nil {
-		fyne.Do(func() {
-			dialog.ShowError(err, h.window)
-		})
-		return
+// DB에서 해당 페이지 데이터를 조회합니다.
+func (h *HistoryTab) loadPage(page, pageSize int) int {
+	req := model.PageRequest{
+		Offset:  page * pageSize,
+		Limit:   pageSize,
+		Filter:  h.currentFilter,
+		Keyword: h.searchKeyword,
 	}
+	result, err := h.historyRepo.GetPage(req)
+	if err != nil {
+		h.pageData = []*model.DeployHistory{}
+		h.totalCount = 0
+		return 0
+	}
+	h.pageData = result.Items
+	h.totalCount = result.TotalCount
+	return result.TotalCount
+}
 
-	h.histories = histories
-
-	// ID 내림차순 정렬 (최신순 - ID가 클수록 최신)
-	sort.Slice(h.histories, func(i, j int) bool {
-		return h.histories[i].ID > h.histories[j].ID
-	})
-
-	// UI 업데이트는 메인 스레드에서 실행
+// 저장소에서 배포 이력을 로드합니다. (첫 페이지부터)
+func (h *HistoryTab) loadHistory() {
+	total := h.loadPage(0, h.historyTable.GetPageSize())
 	fyne.Do(func() {
-		// 필터 적용
-		h.applyFilter()
+		h.historyTable.SetData(total)
 	})
 }
 
@@ -301,9 +277,11 @@ func (h *HistoryTab) onDeleteHistory() {
 
 		// 삭제할 이력의 장비 IP 수집
 		deviceIPs := make(map[string]bool)
+		pageOffset := h.historyTable.GetCurrentPage() * h.historyTable.GetPageSize()
 		for _, row := range checkedRows {
-			if row < len(h.filteredHistories) {
-				history := h.filteredHistories[row]
+			pageRow := row - pageOffset
+			if pageRow >= 0 && pageRow < len(h.pageData) {
+				history := h.pageData[pageRow]
 				deviceIPs[history.DeviceIP] = true
 				if err := h.historyRepo.Delete(history.ID); err != nil {
 					dialog.ShowError(err, h.window)
