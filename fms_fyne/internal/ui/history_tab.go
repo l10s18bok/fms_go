@@ -251,7 +251,14 @@ func (h *HistoryTab) applyFilter() {
 	case "패키지":
 		h.currentFilter = model.HistoryTypeProgram
 	default:
+		// "전체" 선택 시 모든 필터 조건 초기화
 		h.currentFilter = ""
+		h.searchKeyword = ""
+		h.startDate = ""
+		h.endDate = ""
+		if h.searchBox != nil {
+			h.searchBox.SetText("")
+		}
 	}
 
 	total := h.loadPage(0, h.historyTable.GetPageSize())
