@@ -37,6 +37,7 @@ const (
 	ActionIDS    Action = 2
 	ActionIPS    Action = 3
 	ActionNAT    Action = 4 // NAT 액션 추가
+	ActionREJECT Action = 5 // REJECT 액션
 )
 
 // Command 명령 타입 (Insert/Delete)
@@ -226,6 +227,8 @@ func ActionToString(a Action) string {
 		return "IPS"
 	case ActionNAT:
 		return "NAT"
+	case ActionREJECT:
+		return "REJECT"
 	default:
 		return "DROP"
 	}
@@ -244,6 +247,8 @@ func StringToAction(s string) Action {
 		return ActionIPS
 	case "NAT":
 		return ActionNAT
+	case "REJECT":
+		return ActionREJECT
 	default:
 		return ActionDROP
 	}
@@ -343,7 +348,7 @@ func GetIPSTypeDefaults(ipsType string) string {
 
 // GetActionOptions UI Select용 Action 옵션 목록
 func GetActionOptions() []string {
-	return []string{"DROP", "ACCEPT", "IDS", "IPS", "NAT"}
+	return []string{"DROP", "ACCEPT", "REJECT", "IDS", "IPS", "NAT"}
 }
 
 // TCPFlagsPreset TCP Flags 프리셋 정의
