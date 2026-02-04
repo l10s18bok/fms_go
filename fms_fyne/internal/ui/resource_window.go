@@ -328,7 +328,6 @@ func (rw *ResourceWindow) createCPUSection() fyne.CanvasObject {
 	// CPU 테이블 (헤더 포함)
 	cpuHeaders := []string{"User", "Kernel", "Idle", "IOWait", "Nice", "HW IRQ", "SW IRQ", "Avg1", "Avg5", "Avg15"}
 	rw.cpuData = [][]string{make([]string, len(cpuHeaders))}
-	headerBgColor := color.RGBA{R: 230, G: 230, B: 230, A: 255}
 
 	rw.cpuTable = widget.NewTable(
 		func() (int, int) { return len(rw.cpuData) + 1, len(cpuHeaders) }, // +1 for header
@@ -343,8 +342,8 @@ func (rw *ResourceWindow) createCPUSection() fyne.CanvasObject {
 			bg := stack.Objects[0].(*canvas.Rectangle)
 			label := stack.Objects[1].(*fyne.Container).Objects[0].(*widget.Label)
 			if id.Row == 0 {
-				// 헤더 행
-				bg.FillColor = headerBgColor
+				// 헤더 행 - 테마에 맞는 색상 사용
+				bg.FillColor = theme.Color(theme.ColorNameDisabled)
 				label.SetText(cpuHeaders[id.Col])
 			} else {
 				bg.FillColor = color.Transparent
@@ -381,7 +380,6 @@ func (rw *ResourceWindow) createCPUSection() fyne.CanvasObject {
 func (rw *ResourceWindow) createMemorySection() fyne.CanvasObject {
 	memHeaders := []string{"Total", "Used", "Free", "Available", "Buff/Cache", "Swap Total", "Swap Used", "Swap Free"}
 	rw.memoryData = [][]string{make([]string, len(memHeaders))}
-	headerBgColor := color.RGBA{R: 230, G: 230, B: 230, A: 255}
 
 	rw.memoryTable = widget.NewTable(
 		func() (int, int) { return len(rw.memoryData) + 1, len(memHeaders) }, // +1 for header
@@ -396,7 +394,8 @@ func (rw *ResourceWindow) createMemorySection() fyne.CanvasObject {
 			bg := stack.Objects[0].(*canvas.Rectangle)
 			label := stack.Objects[1].(*fyne.Container).Objects[0].(*widget.Label)
 			if id.Row == 0 {
-				bg.FillColor = headerBgColor
+				// 헤더 행 - 테마에 맞는 색상 사용
+				bg.FillColor = theme.Color(theme.ColorNameDisabled)
 				label.SetText(memHeaders[id.Col])
 			} else {
 				bg.FillColor = color.Transparent
@@ -426,7 +425,6 @@ func (rw *ResourceWindow) createMemorySection() fyne.CanvasObject {
 func (rw *ResourceWindow) createDiskSection() fyne.CanvasObject {
 	diskHeaders := []string{"파티션", "마운트", "전체", "사용", "여유", "사용률"}
 	rw.diskData = [][]string{}
-	headerBgColor := color.RGBA{R: 230, G: 230, B: 230, A: 255}
 
 	rw.diskTable = widget.NewTable(
 		func() (int, int) {
@@ -447,7 +445,8 @@ func (rw *ResourceWindow) createDiskSection() fyne.CanvasObject {
 			bg := stack.Objects[0].(*canvas.Rectangle)
 			label := stack.Objects[1].(*fyne.Container).Objects[0].(*widget.Label)
 			if id.Row == 0 {
-				bg.FillColor = headerBgColor
+				// 헤더 행 - 테마에 맞는 색상 사용
+				bg.FillColor = theme.Color(theme.ColorNameDisabled)
 				label.SetText(diskHeaders[id.Col])
 			} else {
 				bg.FillColor = color.Transparent
@@ -483,7 +482,6 @@ func (rw *ResourceWindow) createDiskSection() fyne.CanvasObject {
 func (rw *ResourceWindow) createNetworkSection() fyne.CanvasObject {
 	netHeaders := []string{"인터페이스", "IP", "RX 속도", "TX 속도", "RX 누적", "TX 누적", "에러"}
 	rw.networkData = [][]string{}
-	headerBgColor := color.RGBA{R: 230, G: 230, B: 230, A: 255}
 
 	rw.networkTable = widget.NewTable(
 		func() (int, int) {
@@ -504,7 +502,8 @@ func (rw *ResourceWindow) createNetworkSection() fyne.CanvasObject {
 			bg := stack.Objects[0].(*canvas.Rectangle)
 			label := stack.Objects[1].(*fyne.Container).Objects[0].(*widget.Label)
 			if id.Row == 0 {
-				bg.FillColor = headerBgColor
+				// 헤더 행 - 테마에 맞는 색상 사용
+				bg.FillColor = theme.Color(theme.ColorNameDisabled)
 				label.SetText(netHeaders[id.Col])
 			} else {
 				bg.FillColor = color.Transparent
@@ -541,7 +540,6 @@ func (rw *ResourceWindow) createNetworkSection() fyne.CanvasObject {
 func (rw *ResourceWindow) createProcessSection() fyne.CanvasObject {
 	procHeaders := []string{"이름", "버전", "CPU%", "MEM%", "메모리", "상태", "실행시간"}
 	rw.processData = [][]string{}
-	headerBgColor := color.RGBA{R: 230, G: 230, B: 230, A: 255}
 
 	rw.processTable = widget.NewTable(
 		func() (int, int) {
@@ -562,7 +560,8 @@ func (rw *ResourceWindow) createProcessSection() fyne.CanvasObject {
 			bg := stack.Objects[0].(*canvas.Rectangle)
 			label := stack.Objects[1].(*fyne.Container).Objects[0].(*widget.Label)
 			if id.Row == 0 {
-				bg.FillColor = headerBgColor
+				// 헤더 행 - 테마에 맞는 색상 사용
+				bg.FillColor = theme.Color(theme.ColorNameDisabled)
 				label.SetText(procHeaders[id.Col])
 			} else {
 				bg.FillColor = color.Transparent
