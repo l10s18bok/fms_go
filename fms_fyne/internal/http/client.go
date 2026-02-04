@@ -48,7 +48,7 @@ func NewClient(config *model.Config) *Client {
 	}
 }
 
-// 직접 연결로 장비 상태를 확인합니다.
+// 직접 연결로 장비 상태를 확인하고 리소스 정보를 파싱합니다.
 func (c *Client) CheckHealthDirect(fw *model.Firewall) (bool, error) {
 	// IP 결정
 	ip := fw.DeviceIP
@@ -86,6 +86,11 @@ func (c *Client) CheckHealthDirect(fw *model.Firewall) (bool, error) {
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
 		log.Printf("[ERROR] CheckHealthDirect: 장비 연결 실패 - IP=%s, err=%v", ip, err)
+		// 연결 실패 시 리소스 정보 초기화
+		fw.CPUUsage = 0
+		fw.MemoryUsage = 0
+		fw.DiskUsage = 0
+		fw.NetworkUsage = 0
 		return false, fmt.Errorf("장비 연결 실패: %v", err)
 	}
 	defer resp.Body.Close()
@@ -97,8 +102,89 @@ func (c *Client) CheckHealthDirect(fw *model.Firewall) (bool, error) {
 	}
 
 	success := resp.StatusCode == http.StatusOK
-	log.Printf("[DEBUG] CheckHealthDirect: IP=%s, StatusCode=%d, 성공=%v\n[BODY START]\n%s\n[BODY END]", ip, resp.StatusCode, success, string(body))
+	log.Printf("[DEBUG] CheckHealthDirect: IP=%s, StatusCode=%d, 성공=%v", ip, resp.StatusCode, success)
+
+	// 응답 성공 시 totalUsed 파싱하여 Firewall에 저장
+	if success {
+		var report model.DeviceReport
+		if err := json.Unmarshal(body, &report); err != nil {
+			log.Printf("[WARN] CheckHealthDirect: 리소스 정보 파싱 실패 - %v", err)
+		} else {
+			fw.CPUUsage = report.TotalUsed.CPU
+			fw.MemoryUsage = report.TotalUsed.Memory
+			fw.DiskUsage = report.TotalUsed.Disk
+			// 네트워크: RX + TX 합산 후 MB/s로 변환
+			fw.NetworkUsage = (report.TotalUsed.RxBps + report.TotalUsed.TxBps) / 1024 / 1024
+			log.Printf("[DEBUG] CheckHealthDirect: 리소스 파싱 완료 - CPU=%.1f%%, MEM=%.1f%%, DISK=%.1f%%, NET=%.2f MB/s",
+				fw.CPUUsage, fw.MemoryUsage, fw.DiskUsage, fw.NetworkUsage)
+		}
+	}
+
 	return success, nil
+}
+
+// GetDeviceReport는 장비의 상세 리소스 정보를 조회합니다.
+func (c *Client) GetDeviceReport(fw *model.Firewall) (*model.DeviceReport, error) {
+	// IP 결정
+	ip := fw.DeviceIP
+	if ip == "" {
+		ip = fw.DeviceName
+	}
+
+	// 스킴 결정 (장비별 설정 > 전역 설정 > 기본값)
+	scheme := fw.DeviceInfoScheme
+	if scheme == "" {
+		scheme = c.config.GetDeviceInfoScheme()
+	}
+
+	// 포트 결정 (장비별 설정 > 전역 설정 > 기본값)
+	port := fw.DeviceInfoPort
+	if port == 0 {
+		port = c.config.DeviceInfoPort
+	}
+	if port == 0 {
+		port = model.DefaultAPIPort
+	}
+
+	// 경로 결정 (장비별 설정 > 전역 설정 > 기본값)
+	path := fw.DeviceInfoPath
+	if path == "" {
+		path = c.config.DeviceInfoPath
+	}
+	if path == "" {
+		path = model.DefaultDeviceInfoPath
+	}
+
+	url := fmt.Sprintf("%s://%s:%d%s", scheme, ip, port, path)
+	log.Printf("[DEBUG] GetDeviceReport: URL=%s", url)
+
+	resp, err := c.httpClient.Get(url)
+	if err != nil {
+		log.Printf("[ERROR] GetDeviceReport: 장비 연결 실패 - IP=%s, err=%v", ip, err)
+		return nil, fmt.Errorf("장비 연결 실패: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[ERROR] GetDeviceReport: 응답 읽기 실패 - %v", err)
+		return nil, fmt.Errorf("응답 읽기 실패: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[ERROR] GetDeviceReport: 장비 응답 오류 - IP=%s, StatusCode=%d", ip, resp.StatusCode)
+		return nil, fmt.Errorf("장비 응답 오류: %d", resp.StatusCode)
+	}
+
+	var report model.DeviceReport
+	if err := json.Unmarshal(body, &report); err != nil {
+		log.Printf("[ERROR] GetDeviceReport: 응답 파싱 실패 - %v\n[BODY START]\n%s\n[BODY END]", err, string(body))
+		return nil, fmt.Errorf("응답 파싱 실패: %v", err)
+	}
+
+	log.Printf("[DEBUG] GetDeviceReport: 성공 - IP=%s, CPU=%.1f%%, MEM=%.1f%%, DISK=%.1f%%\n[BODY START]\n%s\n[BODY END]",
+		ip, report.TotalUsed.CPU, report.TotalUsed.Memory, report.TotalUsed.Disk, string(body))
+	return &report, nil
 }
 
 // 직접 연결로 방화벽 룰을 배포합니다.

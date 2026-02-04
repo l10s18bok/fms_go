@@ -31,8 +31,8 @@ type MainUI struct {
 	historyRepo  repository.HistoryRepository // 배포 이력 저장소 (SQLite)
 	firewallRepo repository.FirewallRepository
 	programRepo  repository.ProgramRepository
-	tabs         *container.DocTabs  // 닫기 버튼이 있는 탭
-	leftMenu     *fyne.Container     // 왼쪽 메뉴
+	tabs         *container.DocTabs // 닫기 버튼이 있는 탭
+	leftMenu     *fyne.Container    // 왼쪽 메뉴
 
 	// 탭
 	firewallTab *FirewallTab // 방화벽 관리 탭
@@ -118,9 +118,6 @@ func NewMainUI(window fyne.Window, store *storage.JSONStore, fileStore *storage.
 
 	// 초기 탭 열기: 방화벽 관리
 	ui.openTab(ui.firewallTabItem)
-
-	// 저장된 설정에서 자동 상태 체크 활성화
-	ui.initAutoStatusCheck()
 
 	// rule_files 디렉토리 파일 변경 감시 시작
 	if err := fileStore.StartWatch(func() {
@@ -278,17 +275,6 @@ func (m *MainUI) setupMainMenu() {
 	// 네이티브 메뉴바 생성 및 설정
 	mainMenu := fyne.NewMainMenu(fileMenu, toolsMenu, helpMenu)
 	m.window.SetMainMenu(mainMenu)
-}
-
-// 앱 시작 시 저장된 설정에서 자동 상태 체크를 초기화합니다.
-func (m *MainUI) initAutoStatusCheck() {
-	config, err := m.store.GetConfig()
-	if err != nil {
-		return
-	}
-	if config.AutoStatusCheck {
-		m.deviceTab.SetAutoStatusCheck(true, config.GetStatusCheckInterval())
-	}
 }
 
 // 설정 다이얼로그를 표시합니다.
@@ -981,4 +967,12 @@ func (m *MainUI) updateStatusBar(tab *container.TabItem) {
 
 	// 기본 탭인 경우 빈 문자열
 	m.statusLabel.SetText("")
+}
+
+// Cleanup 앱 종료 시 리소스를 정리합니다.
+func (m *MainUI) Cleanup() {
+	// 리소스 모니터링 창 모두 닫기
+	if m.deviceTab != nil {
+		m.deviceTab.CloseAllResourceWindows()
+	}
 }

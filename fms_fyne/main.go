@@ -81,6 +81,11 @@ func main() {
 	mainUI := ui.NewMainUI(w, jsonStore, fileStore, historyRepo, firewallRepo, programRepo)
 	w.SetContent(fynetooltip.AddWindowToolTipLayer(mainUI.Content(), w.Canvas()))
 
+	// 메인 창 닫기 시 모든 리소스 창 닫기
+	w.SetOnClosed(func() {
+		mainUI.Cleanup()
+	})
+
 	// 윈도우 표시 및 실행
 	w.ShowAndRun()
 }

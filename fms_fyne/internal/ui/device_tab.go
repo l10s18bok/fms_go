@@ -32,14 +32,15 @@ import (
 
 // 장비 관리 탭을 구현합니다. (PRD 3.3.3 기준)
 type DeviceTab struct {
-	window       fyne.Window
-	firewallRepo repository.FirewallRepository
-	programRepo  repository.ProgramRepository
-	configStore  *storage.JSONStore // Config 접근용
-	firewallTab  *FirewallTab
-	historyTab   *HistoryTab
-	programTab   *ProgramTab
-	content      fyne.CanvasObject
+	window          fyne.Window
+	firewallRepo    repository.FirewallRepository
+	programRepo     repository.ProgramRepository
+	configStore     *storage.JSONStore // Config 접근용
+	firewallTab     *FirewallTab
+	historyTab      *HistoryTab
+	programTab      *ProgramTab
+	resourceManager *ResourceWindowManager // 리소스 모니터링 창 관리자
+	content         fyne.CanvasObject
 
 	// UI 컴포넌트
 	searchBox   *component.SearchBox  // 검색 컴포넌트 (공통)
@@ -75,13 +76,14 @@ type DeviceTab struct {
 // 새로운 장비 관리 탭을 생성합니다.
 func NewDeviceTab(window fyne.Window, firewallRepo repository.FirewallRepository, programRepo repository.ProgramRepository, configStore *storage.JSONStore, firewallTab *FirewallTab) *DeviceTab {
 	tab := &DeviceTab{
-		window:            window,
-		firewallRepo:      firewallRepo,
-		programRepo:       programRepo,
-		configStore:       configStore,
-		firewallTab:       firewallTab,
-		firewalls: []*model.Firewall{},
-		pageData:  []*model.Firewall{},
+		window:          window,
+		firewallRepo:    firewallRepo,
+		programRepo:     programRepo,
+		configStore:     configStore,
+		firewallTab:     firewallTab,
+		resourceManager: NewResourceWindowManager(fyne.CurrentApp(), configStore),
+		firewalls:       []*model.Firewall{},
+		pageData:        []*model.Firewall{},
 	}
 	tab.createUI()
 	tab.loadFirewalls()
@@ -272,9 +274,15 @@ func (d *DeviceTab) createDeviceTablePanel() fyne.CanvasObject {
 			// 단일 클릭 - 선택 (현재 미사용)
 		},
 		OnRowDoubleClick: func(row int) {
-			// 더블 클릭 - 상세보기
+			// 더블 클릭 - 리소스 모니터링 창 열기
 			if row >= 0 && row < len(d.pageData) {
-				d.showDetailDialog(d.pageData[row])
+				fw := d.pageData[row]
+				// 연결 상태가 아니면 창 열지 않음
+				if fw.ServerStatus != model.ServerStatusRunning {
+					dialog.ShowInformation("알림", "연결된 장비만 리소스 모니터링을 볼 수 있습니다.", d.window)
+					return
+				}
+				d.resourceManager.OpenOrFocus(fw, d.window)
 			}
 		},
 		// 장비명(1), 장비 IP(2), 위치(3), OS정보(5) 컬럼 인라인 편집 설정
@@ -1015,272 +1023,6 @@ func (d *DeviceTab) showAddEditDialog() {
 		fileDialog.Show()
 	}
 
-	popup.Show()
-}
-
-// 상세보기 다이얼로그를 표시합니다. (PRD 3.3.3 기준)
-func (d *DeviceTab) showDetailDialog(fw *model.Firewall) {
-	// 레이아웃 설정
-	rowHeight := float32(28)
-	rowSpacing := float32(8)
-	labelWidth := float32(100)
-	valueWidth := float32(200)
-
-	// 장비상태 텍스트
-	statusText := "알수없음"
-	switch fw.ServerStatus {
-	case model.ServerStatusRunning:
-		statusText = "정상"
-	case model.ServerStatusStop:
-		statusText = "연결안됨"
-	}
-
-	// 접속정보 타입 (PW or KEY)
-	authType := "-"
-	if fw.DevicePPK != "" {
-		authType = "KEY"
-	} else if fw.DevicePW != "" {
-		authType = "PW"
-	}
-
-	// ID 값
-	idValue := fw.DeviceID
-	if idValue == "" {
-		idValue = "-"
-	}
-
-	// PW 값 (마스킹)
-	pwValue := "-"
-	if fw.DevicePW != "" {
-		pwValue = "********"
-	}
-
-	// PPK 경로
-	ppkValue := fw.DevicePPK
-	if ppkValue == "" {
-		ppkValue = "-"
-	}
-
-	// IP 값
-	ipValue := fw.DeviceIP
-	if ipValue == "" {
-		ipValue = fw.DeviceName
-	}
-
-	// 위치 값
-	locationValue := fw.Location
-	if locationValue == "" {
-		locationValue = "-"
-	}
-
-	// OS 정보 값
-	osInfoValue := fw.OSInfo
-	if osInfoValue == "" {
-		osInfoValue = "-"
-	}
-
-	// config 가져오기
-	config, _ := d.configStore.GetConfig()
-
-	// API 경로 값 (비어있으면 전역 설정 -> 기본값 순으로 표시)
-	uploadPath := fw.ProgramUploadPath
-	if uploadPath == "" {
-		uploadPath = model.DefaultRemotePath
-	}
-
-	programUpdatePath := fw.ProgramUpdatePath
-	if programUpdatePath == "" && config != nil {
-		programUpdatePath = config.ProgramUpdatePath
-	}
-	if programUpdatePath == "" {
-		programUpdatePath = model.DefaultProgramUpdatePath
-	}
-	programUpdatePort := fw.ProgramUpdatePort
-	if programUpdatePort == 0 && config != nil {
-		programUpdatePort = config.ProgramUpdatePort
-	}
-	if programUpdatePort == 0 {
-		programUpdatePort = model.DefaultAPIPort
-	}
-	programUpdateScheme := fw.ProgramUpdateScheme
-	if programUpdateScheme == "" && config != nil {
-		programUpdateScheme = config.GetProgramUpdateScheme()
-	}
-	if programUpdateScheme == "" {
-		programUpdateScheme = model.SchemeHTTP
-	}
-
-	firewallDeployPath := fw.FirewallDeployPath
-	if firewallDeployPath == "" && config != nil {
-		firewallDeployPath = config.FirewallDeployPath
-	}
-	if firewallDeployPath == "" {
-		firewallDeployPath = model.DefaultFirewallDeployPath
-	}
-	firewallDeployPort := fw.FirewallDeployPort
-	if firewallDeployPort == 0 && config != nil {
-		firewallDeployPort = config.FirewallDeployPort
-	}
-	if firewallDeployPort == 0 {
-		firewallDeployPort = model.DefaultAPIPort
-	}
-	firewallDeployScheme := fw.FirewallDeployScheme
-	if firewallDeployScheme == "" && config != nil {
-		firewallDeployScheme = config.GetFirewallDeployScheme()
-	}
-	if firewallDeployScheme == "" {
-		firewallDeployScheme = model.SchemeHTTP
-	}
-
-	deviceInfoPath := fw.DeviceInfoPath
-	if deviceInfoPath == "" && config != nil {
-		deviceInfoPath = config.DeviceInfoPath
-	}
-	if deviceInfoPath == "" {
-		deviceInfoPath = model.DefaultDeviceInfoPath
-	}
-	deviceInfoPort := fw.DeviceInfoPort
-	if deviceInfoPort == 0 && config != nil {
-		deviceInfoPort = config.DeviceInfoPort
-	}
-	if deviceInfoPort == 0 {
-		deviceInfoPort = model.DefaultAPIPort
-	}
-	deviceInfoScheme := fw.DeviceInfoScheme
-	if deviceInfoScheme == "" && config != nil {
-		deviceInfoScheme = config.GetDeviceInfoScheme()
-	}
-	if deviceInfoScheme == "" {
-		deviceInfoScheme = model.SchemeHTTP
-	}
-
-	// 배포정보 - 방화벽 룰 버전
-	ruleVersion := fw.Version
-	if ruleVersion == "" || ruleVersion == "-" {
-		ruleVersion = "-"
-	}
-
-	// 커스텀 팝업 생성
-	var popup *widget.PopUp
-
-	// 헤더 (큰 폰트 - RichText 사용)
-	headerText := widget.NewRichTextFromMarkdown("## 상세보기")
-
-	// 폼 컨텐츠
-	formContent := container.NewVBox(
-		// 장비명
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("장비명:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fw.DeviceName)),
-		),
-		// IP
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("IP:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(ipValue)),
-		),
-		// 위치
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("위치:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(locationValue)),
-		),
-		// OS 정보
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("OS 정보:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(osInfoValue)),
-		),
-		// 연결상태
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("연결상태:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(statusText)),
-		),
-		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
-		// 접속정보
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("접속정보:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(authType)),
-		),
-		// ID
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("ID:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(idValue)),
-		),
-		// PW
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("PW:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(pwValue)),
-		),
-		// PPK 경로 (접속정보가 KEY인 경우)
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("PPK 경로:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(ppkValue)),
-		),
-		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
-		// 업로드 경로
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("업로드 경로:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(uploadPath)),
-		),
-		// 패키지업데이트
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("패키지업데이트:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s %s, 포트:%d", programUpdateScheme, programUpdatePath, programUpdatePort))),
-		),
-		// 방화벽 배포
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("방화벽 배포:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s %s, 포트:%d", firewallDeployScheme, firewallDeployPath, firewallDeployPort))),
-		),
-		// 장비보고 (상태체크 포함)
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("장비보고:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(fmt.Sprintf("%s %s, 포트:%d", deviceInfoScheme, deviceInfoPath, deviceInfoPort))),
-		),
-		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
-		// 배포정보
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("배포정보:")),
-		),
-		// 방화벽 룰 버전
-		container.NewHBox(
-			container.NewGridWrap(fyne.NewSize(labelWidth, rowHeight), widget.NewLabel("  룰 버전:")),
-			container.NewGridWrap(fyne.NewSize(valueWidth, rowHeight), widget.NewLabel(ruleVersion)),
-		),
-		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
-	)
-
-	// 확인 버튼
-	confirmBtn := component.NewCustomButton("확인", nil, nil, themes.Colors["blue"], func() {
-		popup.Hide()
-	}, 5, 5, 5, 5)
-
-	// 버튼 컨테이너 (중앙 정렬)
-	btnContainer := container.NewHBox(
-		layout.NewSpacer(),
-		confirmBtn,
-		layout.NewSpacer(),
-	)
-
-	// 전체 컨텐츠
-	contentItems := []fyne.CanvasObject{
-		headerText,
-		container.NewGridWrap(fyne.NewSize(1, rowSpacing), layout.NewSpacer()),
-		formContent,
-	}
-	contentItems = append(contentItems,
-		btnContainer,
-		container.NewGridWrap(fyne.NewSize(1, 15), layout.NewSpacer()),
-	)
-	content := container.NewVBox(contentItems...)
-
-	// 다이얼로그 높이 계산 (프로세스 리스트 유무에 따라) - 임시 주석처리
-	dialogHeight := float32(700)
-
-	// 고정 크기 컨테이너
-	paddedContent := container.New(layout.NewCustomPaddedLayout(15, 15, 15, 15), content)
-	sizedContent := container.NewGridWrap(fyne.NewSize(400, dialogHeight), paddedContent)
-
-	// 팝업 생성
-	popup = widget.NewModalPopUp(sizedContent, d.window.Canvas())
 	popup.Show()
 }
 
@@ -2030,4 +1772,11 @@ func (d *DeviceTab) SyncAutoCheckFromConfig() {
 
 	d.updateAutoCheckButton(config.AutoStatusCheck)
 	d.SetAutoStatusCheck(config.AutoStatusCheck, config.GetStatusCheckInterval())
+}
+
+// CloseAllResourceWindows 모든 리소스 모니터링 창을 닫습니다.
+func (d *DeviceTab) CloseAllResourceWindows() {
+	if d.resourceManager != nil {
+		d.resourceManager.CloseAll()
+	}
 }
