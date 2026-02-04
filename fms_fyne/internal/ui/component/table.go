@@ -155,6 +155,9 @@ func (t *PagedTable) createUI() {
 		}
 	}
 
+	// 헤더 행 고정 (스크롤 시 헤더 유지)
+	t.table.StickyRowCount = 1
+
 	// 행 높이 고정 (텍스트 오버랩 방지)
 	t.table.SetRowHeight(0, 30) // 헤더 행
 	// 데이터 행 높이는 UpdateCell에서 동적으로 설정
